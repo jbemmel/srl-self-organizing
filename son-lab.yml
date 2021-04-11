@@ -1,0 +1,38 @@
+name: son-lab
+
+topology:
+  kinds:
+    srl:
+      type: ixr6 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # TODO: Build custom container image containing SON agent
+      image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      license: ../license.key
+  nodes:
+    leaf1:
+      kind: srl
+      # config: leaf1.cfg.json
+      config: srl-son-leaf.json
+    leaf2:
+      kind: srl
+      config: srl-son-leaf.json
+    spine1:
+      kind: srl
+      config: srl-son-spine.json
+    spine2:
+      kind: srl
+      config: srl-son-spine.json
+ 
+    h1:
+      kind: linux
+      image: alpine:latest # or frrouting/frr:latest
+    h2:
+      kind: linux
+      image: alpine:latest
+    
+  links: 
+    - endpoints: ["leaf1:e1-1","spine1:e1-1"]
+    - endpoints: ["leaf1:e1-2","spine2:e1-1"]
+    - endpoints: ["leaf2:e1-1","spine1:e1-2"]
+    - endpoints: ["leaf2:e1-2","spine2:e1-2"]
+    - endpoints: ["h1:eth1","leaf1:e1-3"]
+    - endpoints: ["h2:eth1","leaf2:e1-3"]    
