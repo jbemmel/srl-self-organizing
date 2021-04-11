@@ -429,7 +429,7 @@ def ProgramFibRoutes(input_fib=None, action='add'):
     return res
 
 ##################################################################
-## Proc to process the config Notifications received by fib_agent 
+## Proc to process the config Notifications received by auto_config_agent 
 ## At present processing config from js_path = .fib-agent
 ##################################################################
 def Handle_Notification(obj, file_name, app_id, route_count):
@@ -437,11 +437,11 @@ def Handle_Notification(obj, file_name, app_id, route_count):
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
         logging.info(f"OLD FILE :: {file_name}")
         logging.info(f"Handle_Config with file_name as {file_name}")
-        if "fib_agent" in obj.config.key.js_path:
+        if "auto_config" in obj.config.key.js_path:
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
-                logging.info(f"Delete fib-agent cli scenario")
+                logging.info(f"Delete auto-config-agent cli scenario")
                 if file_name != None:
                     Update_Result(file_name, action='delete')
                 response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
@@ -470,37 +470,13 @@ def Handle_Notification(obj, file_name, app_id, route_count):
 #                    global pushed_routes
                     Update_Routes(programmed=route_count, actual=pushed_routes)
             return file_name, route_count
-    elif obj.HasField('route'):
-        # Update the status if route info got
-        if obj.route.data.owner_id == app_id:
-            addr = ipaddress.ip_address(obj.route.key.ip_prefix.ip_addr.addr).__str__()
-            prefix = obj.route.key.ip_prefix.prefix_length
-            # process delete
-            if obj.route.op == 2:
-                logging.info(f'Got delete for route {addr}/{prefix}')
-                route_count -= 1
-                Update_Routes(programmed=route_count)
-            elif obj.route.op == 1:
-                # process modifications where we do not need any route count updates
-                pass
-            else:
-                # proces add route scenario
-                route_count += 1
-                #logging.info(f'Got Route added by agent: {obj.route}')
-                nhs = ''
-                # Considering only ip nexthops. Will process mpls_next hops once dts319345 is resolved
-                for nh in obj.route.data.nexthop:
-                    logging.info(f'Route Nexthop to be processed - {nh}')
-                    # for MPLS nexthop v/s IP nexthop
-                    if nh.type==2:
-                        nhs +=ipaddress.ip_address(nh.mpls_nexthop.ip_nexthop.addr).__str__() + ', '
-                    else:
-                        nhs += ipaddress.ip_address(nh.ip_nexthop.addr).__str__() + ', '
-                logging.info(f'Route {addr}/{prefix} added by agent with nexthops {nhs}')
-                Update_Routes(programmed=route_count)
+    elif obj.HasField('lldp'):
+        # Update the config based on LLDP info, if needed
+        logging.info(f"TODO process LLDP notification : {obj}")
 
         return file_name, route_count
     else:
+        logging.info(f"Unexpected notification : {obj}")                        
         return file_name, route_count
     #always return
     return file_name, route_count
@@ -515,7 +491,7 @@ def get_app_id(app_name):
     return app_id_response.id
 
 ##################################################################################################
-## This is the main proc where all processing for fib_agent starts.
+## This is the main proc where all processing for auto_config_agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
 ## Waits on the subscribed Notifications and once any config is received, handles that config
 ## If there are critical errors, Unregisters the fib_agent gracefully.
