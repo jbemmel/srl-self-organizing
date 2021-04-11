@@ -1,0 +1,56 @@
+module auto_config_agent {
+
+    yang-version "1";
+
+    // namespace
+    namespace "urn:srl_test/auto-config-agent";
+
+    prefix "auto_config_agent";
+
+    revision "2021-04-11" {
+        description "Initial revision";
+        reference "TBD";
+    }
+
+    import srl_nokia-common {
+        prefix srl_nokia-comm;
+    }
+
+    grouping auto-config-agent-top {
+        description "Top level grouping for auto config agent sample app";
+
+        container auto-config-agent {
+            presence "presence container";
+            description "Top level enclosing container for auto config agent sample app 
+                         config and operational state data";
+
+            leaf role {
+                description "Role of this node in the fabric (layer in the network)";
+                type enumeration {
+                 enum leaf;
+                 enum spine;
+                 // TODO enum superspine;
+                }
+            }
+            leaf base-as {
+                description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";
+                type srl_nokia-comm:as-number;
+                default "65000"; // Spines get this, each leaf gets base+rank
+                }
+            leaf peerlinks-prefix {
+                description "IPv4 prefix range to use for auto-assigned peering links /31";
+                type srl_nokia-comm:ipv4-prefix;
+                default "192.168.0.0/24"; // enough for 128 /31 links
+            }
+            leaf loopbacks-prefix {
+                description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
+                type srl_nokia-comm:ipv4-prefix;
+                default "1.1.0.0/23"; // spines get 1.1.0.x, leaves 1.1.1.x
+            }
+            
+        }
+    }
+
+    // data definition statements
+    uses auto-config-agent-top;
+}
