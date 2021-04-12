@@ -7,9 +7,9 @@ module auto_config_agent {
 
     prefix "auto_config_agent";
 
-    import srl_nokia-common {
-        prefix srl_nokia-comm;
-    }
+    // import srl_nokia-common {
+    //    prefix srl_nokia-comm;
+    // }
     
     revision "2021-04-11" {
         description "Initial revision";
@@ -34,17 +34,20 @@ module auto_config_agent {
             }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";
-                type srl_nokia-comm:as-number;
+                // type srl_nokia-comm:as-number;
+                type uint32;
                 default "65000"; // Spines get this, each leaf gets base+rank
                 }
             leaf peerlinks-prefix {
                 description "IPv4 prefix range to use for auto-assigned peering links /31";
-                type srl_nokia-comm:ipv4-prefix;
+                // type srl_nokia-comm:ipv4-prefix;
+                type string;
                 default "192.168.0.0/24"; // enough for 128 /31 links
             }
             leaf loopbacks-prefix {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
-                type srl_nokia-comm:ipv4-prefix;
+                // type srl_nokia-comm:ipv4-prefix;
+                type string;
                 default "1.1.0.0/23"; // spines get 1.1.0.x, leaves 1.1.1.x
             }
             
