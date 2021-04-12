@@ -7,13 +7,13 @@ module auto_config_agent {
 
     prefix "auto_config_agent";
 
+    import srl_nokia-common {
+        prefix srl_nokia-comm;
+    }
+    
     revision "2021-04-11" {
         description "Initial revision";
         reference "TBD";
-    }
-
-    import srl_nokia-common {
-        prefix srl_nokia-comm;
     }
 
     grouping auto-config-agent-top {
