@@ -201,7 +201,7 @@ def Handle_Notification(obj, state):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
-          if (role=='ROLE_spine'):
+          if (state.role == 'ROLE_spine'):
             _r = '0'
           else:
             _r = '1'
