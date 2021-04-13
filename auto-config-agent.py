@@ -284,13 +284,14 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    next_state = Handle_Notification(obj, state)
+                    old_router_id = state.router_id
+                    Handle_Notification(obj, state)
                     
-                    # Program router_id once
-                    if state.router_id != next_state.router_id:
-                       gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=next_state.router_id)
-                    logging.info(f'Updated state: {state}->{next_state}')
-                    state = next_state
+                    # Program router_id only when changed
+                    if state.router_id != old_router_id:
+                       gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
+                    logging.info(f'Updated state: {state}')
+
     except grpc._channel._Rendezvous as err:
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
         try:
