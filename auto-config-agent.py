@@ -7,6 +7,7 @@ import sys
 import logging
 import socket
 import os
+import re
 import ipaddress
 import json
 import signal
@@ -431,7 +432,7 @@ def ProgramFibRoutes(input_fib=None, action='add'):
 ## Proc to process the config Notifications received by auto_config_agent 
 ## At present processing config from js_path = .fib-agent
 ##################################################################
-def Handle_Notification(obj, router_id, app_id):
+def Handle_Notification(obj, role, router_id):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
         if "auto_config" in obj.config.key.js_path:
@@ -452,11 +453,22 @@ def Handle_Notification(obj, router_id, app_id):
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
         logging.info(f"TODO process LLDP notification : {obj}")
+        my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
+        to_port = obj.lldp_neighbor.data.port_id
+        
+        my_port_id = re.split("/",re.split("-",my_port)[1])[1]
+        to_port_id = re.split("/",re.split("-",to_port)[1])[1]
+        
+        if (role=='ROLE_spine'):
+          _r = '0'
+        else
+          _r = '1'
+        router_id = f"1.1.{_r}.{to_port_id}"
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
     #always return
-    return router_id
+    return role, router_id
 ##################################################################################################
 ## This functions get the app_id from idb for a given app_name
 ##################################################################################################
@@ -494,6 +506,7 @@ def Run():
 
     stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
     stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
+    role=None
     router_id=None
     count = 1
     try:
@@ -504,7 +517,7 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    router_id = Handle_Notification(obj, router_id, app_id)
+                    role, router_id = Handle_Notification(obj, role, router_id)
     except grpc._channel._Rendezvous as err:
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
         try:
