@@ -80,21 +80,20 @@ def Subscribe_Notifications(stream_id):
         logging.info("Stream ID not sent.")
         return False
 
+    # Subscribe to config changes, first
+    Subscribe(stream_id, 'cfg')
+    
     ##Subscribe to Interface Notifications
-    Subscribe(stream_id, 'intf')
+    # Subscribe(stream_id, 'intf')
     
     ##Subscribe to Network-Instance Notifications
-    Subscribe(stream_id, 'nw_inst')
+    # Subscribe(stream_id, 'nw_inst')
 
     ##Subscribe to LLDP Neighbor Notifications
     Subscribe(stream_id, 'lldp')
 
     ##Subscribe to IP Route Notifications
-    Subscribe(stream_id, 'route')
-
-    ##Subscribe to Config Notifications - configs added by the fib-agent
-    Subscribe(stream_id, 'cfg')
-
+    # Subscribe(stream_id, 'route')
 
 ############################################################
 ## Function to populate state of agent config 
@@ -432,54 +431,32 @@ def ProgramFibRoutes(input_fib=None, action='add'):
 ## Proc to process the config Notifications received by auto_config_agent 
 ## At present processing config from js_path = .fib-agent
 ##################################################################
-def Handle_Notification(obj, file_name, app_id, route_count):
+def Handle_Notification(obj, router_id, app_id):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
-        logging.info(f"OLD FILE :: {file_name}")
-        logging.info(f"Handle_Config with file_name as {file_name}")
         if "auto_config" in obj.config.key.js_path:
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
                 logging.info(f"Delete auto-config-agent cli scenario")
-                if file_name != None:
-                    Update_Result(file_name, action='delete')
+                # if file_name != None:
+                #    Update_Result(file_name, action='delete')
                 response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-                route_count=0
                 logging.info('Handle_Config: Unregister response:: {}'.format(response))
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
-                if 'input_fib' in data:
-                    fib = data['input_fib']['value']
-                    #delete old file's state before updating filename var with new input-file
-                    if file_name != None:
-                        Update_Result(file_name, action='delete')
-                    logging.info(f"Got input-fib :: {data['input_fib']['value']}")
-                    #if action is not set in cli, default it to 'add'
-                    if 'action' in data:
-                        action = data['action'][7:] # skip "ACTION_xxx"
-                    else:
-                        action = 'add'
-                    logging.info(f"Action received is : {action}")
-                    file_name=fib
-                    if not ProgramFibRoutes(input_fib=fib, action=action):
-                        logging.info(f"Something went wrong during action : {action}")
-                        #update the file's status to be False and populate reason code
-                        Update_Result(file_name, action='add',result=False,reason="ERROR:Couldnt program fib")
-#                    global pushed_routes
-                    Update_Routes(programmed=route_count, actual=pushed_routes)
-            return file_name, route_count
+                if 'role' in data:
+                    role = data['role']
+                    logging.info(f"Got role :: {role}")
     elif obj.HasField('lldp'):
         # Update the config based on LLDP info, if needed
         logging.info(f"TODO process LLDP notification : {obj}")
-
-        return file_name, route_count
     else:
         logging.info(f"Unexpected notification : {obj}")                        
-        return file_name, route_count
+
     #always return
-    return file_name, route_count
+    return router_id
 ##################################################################################################
 ## This functions get the app_id from idb for a given app_name
 ##################################################################################################
@@ -517,9 +494,8 @@ def Run():
 
     stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
     stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
-    file_name=None
+    router_id=None
     count = 1
-    route_count = 0
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
@@ -528,7 +504,7 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    file_name, route_count = Handle_Notification(obj, file_name, app_id, route_count)
+                    router_id = Handle_Notification(obj, router_id, app_id)
     except grpc._channel._Rendezvous as err:
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
         try:
