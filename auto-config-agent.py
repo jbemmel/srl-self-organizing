@@ -207,10 +207,17 @@ def Handle_Notification(obj, state):
           to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
           if (state.role == 'ROLE_spine'):
-            _r = '0'
+            _r = 0
           else:
-            _r = '1'
+            _r = 1
           state.router_id = f"1.1.{_r}.{to_port_id}"
+        
+          # Configure IP on interface
+          link_index = int(to_port_id) - 1
+          script_update_interface( 
+              my_port, 
+              str( state.peerlinks[link_index] + _r ),
+              obj.lldp_neighbor.data.system_description )
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
@@ -243,6 +250,18 @@ def gnmic(path,value):
        logging.info(f'gnmic result: {stdoutput} err={stderroutput}')
     except Exception as e:
        logging.error(f'Exception caught in gnmic :: {e}')
+
+###########################
+# JvB: Invokes gnmic client to update interface configuration
+def script_update_interface(name,ip,peer):
+    logging.info(f'Calling update script: name={name} ip={ip} peer={peer}')
+    try:
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer], 
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+       stdoutput, stderroutput = script_proc.communicate()
+       logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
+    except Exception as e:
+       logging.error(f'Exception caught in script_update_interface :: {e}')
 
 class State(object):
     def __init__(self):
@@ -301,6 +320,7 @@ def Run():
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
         try:
            # Need to execute this in the mgmt network namespace, hardcoded name for now
+           # XXX needs username/password unless checked out using 'git:'
            git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
                                        cwd='/etc/opt/srlinux/appmgr',
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
