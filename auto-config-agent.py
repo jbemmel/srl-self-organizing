@@ -519,8 +519,8 @@ def Run():
 
     except Exception as e:
         logging.error('Exception caught :: {}'.format(e))
-        if file_name != None:
-            Update_Result(file_name, action='delete')
+        #if file_name != None:
+        #    Update_Result(file_name, action='delete')
         try:
             response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
             logging.error('Run try: Unregister response:: {}'.format(response))
