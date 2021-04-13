@@ -461,7 +461,7 @@ def Handle_Notification(obj, role, router_id):
         
         if (role=='ROLE_spine'):
           _r = '0'
-        else
+        else:
           _r = '1'
         router_id = f"1.1.{_r}.{to_port_id}"
     else:
