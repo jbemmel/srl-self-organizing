@@ -27,7 +27,8 @@ cat > $temp_file << EOF
 }
 EOF
 
-/usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set --replace-path /interface[name=$INTF] --replace-file $temp_file
+/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
+  --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 # For now, assume that the interface is already added to the default network-instance; only update its IP address
 
