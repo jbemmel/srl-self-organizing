@@ -218,7 +218,7 @@ def Handle_Notification(obj, state):
               my_port, 
               str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
               obj.lldp_neighbor.data.system_description,
-              str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '' )
+              str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else ''
           )
     else:
         logging.info(f"Unexpected notification : {obj}")                        
