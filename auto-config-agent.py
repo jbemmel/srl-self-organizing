@@ -191,10 +191,10 @@ def Handle_Notification(obj, state):
                 if 'role' in data:
                     state.role = data['role']
                     logging.info(f"Got role :: {state.role}")
-                if 'peerlinks-prefix' in data:
-                    state.peerlinks = ip_network(data['peerlinks-prefix'].value).subnets(new_prefix=31)
-                if 'loopbacks-prefix' in data:
-                    state.loopbacks = ip_network(data['loopbacks-prefix'].value).subnets(new_prefix=32)
+                if 'peerlinks_prefix' in data:
+                    state.peerlinks = ip_network(data['peerlinks_prefix'].value).subnets(new_prefix=31)
+                if 'loopbacks_prefix' in data:
+                    state.loopbacks = ip_network(data['loopbacks_prefix'].value).subnets(new_prefix=32)
                  
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
