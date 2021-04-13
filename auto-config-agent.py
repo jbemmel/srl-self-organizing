@@ -449,7 +449,7 @@ def Handle_Notification(obj, router_id, app_id):
                 if 'role' in data:
                     role = data['role']
                     logging.info(f"Got role :: {role}")
-    elif obj.HasField('lldp'):
+    elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
         logging.info(f"TODO process LLDP notification : {obj}")
     else:
