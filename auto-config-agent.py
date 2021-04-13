@@ -555,7 +555,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, Exit_Gracefully)
     if not os.path.exists(stdout_dir):
         os.makedirs(stdout_dir, exist_ok=True)
-    log_filename = '{}/demo_fibagent.log'.format(stdout_dir)
+    log_filename = '{}/auto_config_agent.log'.format(stdout_dir)
     logging.basicConfig(filename=log_filename, filemode='a',\
                         format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',\
                         datefmt='%H:%M:%S', level=logging.INFO)
