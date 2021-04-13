@@ -173,7 +173,7 @@ def Update_Routes(programmed, actual=None):
 ## Proc to process the config Notifications received by auto_config_agent 
 ## At present processing config from js_path = .fib-agent
 ##################################################################
-def Handle_Notification(obj, role, router_id):
+def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
         if "auto_config" in obj.config.key.js_path:
@@ -189,8 +189,8 @@ def Handle_Notification(obj, role, router_id):
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
                 if 'role' in data:
-                    role = data['role']
-                    logging.info(f"Got role :: {role}")
+                    state.role = data['role']
+                    logging.info(f"Got role :: {state.role}")
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
         logging.info(f"process LLDP notification : {obj}")
@@ -205,15 +205,12 @@ def Handle_Notification(obj, role, router_id):
             _r = '0'
           else:
             _r = '1'
-          router_id = f"1.1.{_r}.{to_port_id}"
+          state.router_id = f"1.1.{_r}.{to_port_id}"
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
-    # Program router_id once
-    gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=router_id)
-    
-    #always return
-    return role, router_id
+    #always return updated state
+    return state
 ##################################################################################################
 ## This functions get the app_id from idb for a given app_name
 ##################################################################################################
@@ -242,6 +239,10 @@ def gnmic(path,value):
     except Exception as e:
        logging.error(f'Exception caught in gnmic :: {e}')
 
+class State(object):
+    def __init__(self):
+        self.router_id = None
+    
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
@@ -269,8 +270,8 @@ def Run():
 
     stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
     stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
-    role=None
-    router_id=None
+    
+    state = State()
     count = 1
     try:
         for r in stream_response:
@@ -280,7 +281,12 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    role, router_id = Handle_Notification(obj, role, router_id)
+                    next_state = Handle_Notification(obj, state)
+                    
+                    # Program router_id once
+                    if state.router_id != next_state.router_id:
+                       gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=next_state.router_id)
+                    state = next_state
     except grpc._channel._Rendezvous as err:
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
         try:
