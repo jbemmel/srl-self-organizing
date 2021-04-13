@@ -27,7 +27,7 @@ cat > $temp_file << EOF
 }
 EOF
 
-/usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set --update-path /interface[name=$INTF] --update-file $temp_file
+/usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 # For now, assume that the interface is already added to the default network-instance; only update its IP address
 
