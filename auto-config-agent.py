@@ -195,6 +195,8 @@ def Handle_Notification(obj, state):
                     state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=31))
                 if 'loopbacks_prefix' in data:
                     state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
+                if 'base_as' in data:
+                    state.base_as = int( data['base_as']['value'] )
                  
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
@@ -212,13 +214,15 @@ def Handle_Notification(obj, state):
             _r = 1
           state.router_id = f"1.1.{_r}.{to_port_id}"
         
-          # Configure IP on interface
+          # Configure IP on interface and BGP for leaves
           link_index = int(to_port_id) - 1
           script_update_interface( 
               my_port, 
               str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
               obj.lldp_neighbor.data.system_description,
-              str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else ''
+              str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '*',
+              state.base_as + (int(to_port_id) if _r==1 else 0),
+              state.router_id
           )
     else:
         logging.info(f"Unexpected notification : {obj}")                        
@@ -255,10 +259,10 @@ def gnmic(path,value):
 
 ###########################
 # JvB: Invokes gnmic client to update interface configuration
-def script_update_interface(name,ip,peer,peer_ip):
-    logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer}')
+def script_update_interface(name,ip,peer,peer_ip,as,router_id):
+    logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={as} router_id={router_id}')
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip], 
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,as,router_id], 
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
