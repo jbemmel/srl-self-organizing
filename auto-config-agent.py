@@ -286,6 +286,7 @@ def Run():
                     # Program router_id once
                     if state.router_id != next_state.router_id:
                        gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=next_state.router_id)
+                    logging.info(f'Updated state: {state}->{next_state}')
                     state = next_state
     except grpc._channel._Rendezvous as err:
         logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
