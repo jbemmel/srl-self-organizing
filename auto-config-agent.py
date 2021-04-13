@@ -233,9 +233,9 @@ def gnmic(path,value):
        #git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
        #                            cwd='/etc/opt/srlinux/appmgr',
        #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-       gnmic_proc = subprocess.Popen(['/usr/local/bin/gnmic','-a 127.0.0.1:57400','-u admin','-p admin',
-                                      '--skip-verify','set',  # '--encoding JSON_IETF',
-                                      f'--update-path {path}', f'--update-value {value}'], 
+       gnmic_proc = subprocess.Popen(['/usr/local/bin/gnmic','-a','127.0.0.1:57400','-u','admin','-p','admin',
+                                      '--skip-verify','--encoding','JSON_IETF','set',
+                                      '--update-path',path,'--update-value',value ], 
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = gnmic_proc.communicate()
        logging.info(f'gnmic result: {stdoutput} err={stderroutput}')
