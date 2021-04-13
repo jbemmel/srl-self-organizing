@@ -468,6 +468,9 @@ def Handle_Notification(obj, role, router_id):
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
+    # Program router_id once
+    gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=router_id)
+    
     #always return
     return role, router_id
 ##################################################################################################
@@ -479,6 +482,24 @@ def get_app_id(app_name):
     app_id_response=stub.GetAppId(request=appId_req, metadata=metadata)
     logging.info(f'app_id_response {app_id_response.status} {app_id_response.id} ')
     return app_id_response.id
+
+###########################
+# JvB: Invokes gnmic client to update node configuration
+def gnmic(path,value):
+    logging.info(f'Calling gnmic: path={path} value={value}')
+    try:
+       # Need to execute this in the mgmt network namespace, hardcoded name for now
+       #git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
+       #                            cwd='/etc/opt/srlinux/appmgr',
+       #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+       gnmic_proc = subprocess.Popen(['/usr/local/bin/gnmic','-a 127.0.0.1:57400','-u admin','-p admin',
+                                      '--skip-verify','--encoding JSON_IETF','set', 
+                                      f'--update-path {path}', f'--update-value {value}'], 
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+       stdoutput, stderroutput = gnmic_proc.communicate()
+       logging.info(f'gnmic result: {stdoutput} err={stderroutput}')
+    except Exception as e:
+       logging.error(f'Exception caught in gnmic :: {e}')
 
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
