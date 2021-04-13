@@ -5,6 +5,7 @@
 INTF="$1"
 IP_PREFIX="$2"
 PEER="$3"
+PEER_IP="$4"
 
 temp_file=$(mktemp --suffix=.json)
 cat > $temp_file << EOF
@@ -31,6 +32,17 @@ EOF
   --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 # For now, assume that the interface is already added to the default network-instance; only update its IP address
+
+if [[ "$PEER_IP" != "" ]]; then
+cat > $temp_file << EOF
+{
+      "admin-state": "enable",
+      "peer-group": "spines"
+}
+EOF
+/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
+  --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
+fi
 
 rm -f $temp_file
 exit $exitcode
