@@ -7,7 +7,7 @@ IP_PREFIX="$2"
 PEER="$3"
 
 temp_file=$(mktemp --suffix=.json)
-cat > $temp_file <<< EOF
+cat > $temp_file << EOF
 {
   "description": "To $PEER",
   "admin-state": "enable",
