@@ -6,6 +6,8 @@ INTF="$1"
 IP_PREFIX="$2"
 PEER="$3"
 PEER_IP="$4"
+AS="$5"
+ROUTER_ID="$6"
 
 temp_file=$(mktemp --suffix=.json)
 cat > $temp_file << EOF
@@ -36,12 +38,48 @@ exitcode=$?
 if [[ "$PEER_IP" != "" ]]; then
 cat > $temp_file << EOF
 {
+  "admin-state": "enable",
+  "autonomous-system": $AS,
+  "router-id": "$ROUTER_ID",
+  "ebgp-default-policy": {
+    "import-reject-all": false,
+    "export-reject-all": false
+  },
+  "group": [
+    {
+      "group-name": "spines",
+      "admin-state": "enable",
+      "export-policy": "export-hosts",
+      "peer-as": 65000
+    }
+  ],
+  "ipv4-unicast": {
+    "multipath": {
+      "max-paths-level-1": 4,
+      "max-paths-level-2": 4
+    }
+  },
+  "ipv6-unicast": {
+    "multipath": {
+      "max-paths-level-1": 4,
+      "max-paths-level-2": 4
+    }
+  },
+  "neighbor": [
+    {
+      "peer-address": "$PEER_IP",
       "admin-state": "enable",
       "peer-group": "spines"
+    }
+  ],
+  "route-advertisement": {
+    "rapid-withdrawal": true
+  }
 }
+
 EOF
 /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
+  --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 fi
 
 rm -f $temp_file
