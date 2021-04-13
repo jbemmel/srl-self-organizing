@@ -10,17 +10,16 @@ topology:
   nodes:
     leaf1:
       kind: srl
-      # config: leaf1.cfg.json
       config: srl-son-leaf.json
     leaf2:
       kind: srl
-      config: srl-son-leaf.json
+      # config: srl-son-leaf.json
     spine1:
       kind: srl
       config: srl-son-spine.json
     spine2:
       kind: srl
-      config: srl-son-spine.json
+      # config: srl-son-spine.json
  
     h1:
       kind: linux
