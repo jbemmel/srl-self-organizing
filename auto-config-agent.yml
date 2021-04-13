@@ -1,8 +1,8 @@
 # See example_config.yml for an explanation of all the accepted fields
 auto_config_agent:
    path: /etc/opt/srlinux/appmgr/
-   launch-command: /etc/opt/srlinux/appmgr/auto_config_agent.sh
-   search-command: python3 /etc/opt/srlinux/appmgr/auto_config_agent.py
+   launch-command: /etc/opt/srlinux/appmgr/auto-config-agent.sh
+   search-command: python3 /etc/opt/srlinux/appmgr/auto-config-agent.py
    wait-for-config: Yes
    failure-threshold: 100
    failure-action: wait=forever
@@ -10,6 +10,6 @@ auto_config_agent:
    version-command: ' cat build_version'
    yang-modules:
        names: 
-           - "auto_config_agent"
+           - "auto-config-agent"
        source-directories:
            - "/etc/opt/srlinux/appmgr/"
