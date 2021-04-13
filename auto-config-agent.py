@@ -456,14 +456,15 @@ def Handle_Notification(obj, role, router_id):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         
-        my_port_id = re.split("/",re.split("-",my_port)[1])[1]
-        to_port_id = re.split("/",re.split("-",to_port)[1])[1]
+        if my_port != 'mgmt0' and to_port != 'mgmt0':
+          my_port_id = re.split("/",re.split("-",my_port)[1])[1]
+          to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
-        if (role=='ROLE_spine'):
-          _r = '0'
-        else:
-          _r = '1'
-        router_id = f"1.1.{_r}.{to_port_id}"
+          if (role=='ROLE_spine'):
+            _r = '0'
+          else:
+            _r = '1'
+          router_id = f"1.1.{_r}.{to_port_id}"
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
