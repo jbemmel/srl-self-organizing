@@ -243,6 +243,9 @@ class State(object):
     def __init__(self):
         self.router_id = None
     
+    def __str__(self):
+        return str(self.__class__) + ": " + str(self.__dict__)
+    
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
