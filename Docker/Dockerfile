@@ -6,6 +6,8 @@ RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.10.0/gnm
 # COPY ./appmgr/ /etc/opt/srlinux/appmgr/ # doesn't stick
 COPY ./appmgr/ /root/
 
+RUN mkdir -p /etc/opt/srlinux/appmgr/ && cp /root/* /etc/opt/srlinux/appmgr/
+
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"
 ENV SRL_AUTO_CONFIG_RELEASE=$SRL_AUTO_CONFIG_RELEASE
