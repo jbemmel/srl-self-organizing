@@ -1080,19 +1080,33 @@
   "srl_nokia-interfaces:interface": [
     {
       "name": "ethernet-1/1",
+      "description": "To SRLinux-v21.3.1-410-g75939dc880 leaf1 5.4.0-70-generic #78-Ubuntu SMP Fri Mar 19 13:29:52 UTC 2021",
       "admin-state": "enable",
       "subinterface": [
         {
-          "index": 0
+          "index": 0,
+          "admin-state": "enable"
         }
       ]
     },
     {
       "name": "ethernet-1/2",
+      "description": "To SRLinux-v21.3.1-410-g75939dc880 leaf2 5.4.0-70-generic #78-Ubuntu SMP Fri Mar 19 13:29:52 UTC 2021",
       "admin-state": "enable",
       "subinterface": [
         {
-          "index": 0
+          "index": 0,
+          "admin-state": "enable"
+        }
+      ]
+    },
+    {
+      "name": "lo0",
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0,
+          "admin-state": "enable"
         }
       ]
     },
@@ -1323,8 +1337,34 @@
         },
         {
           "name": "ethernet-1/2.0"
+        },
+        {
+          "name": "lo0.0"
         }
-      ]
+      ],
+      "protocols": {
+        "srl_nokia-bgp:bgp": {
+          "admin-state": "disable",
+          "autonomous-system": 65000,
+          "export-policy": "spine-export-policy",
+          "router-id": "1.1.1.1",
+          "ipv4-unicast": {
+            "multipath": {
+              "max-paths-level-1": 4,
+              "max-paths-level-2": 4
+            }
+          },
+          "ipv6-unicast": {
+            "multipath": {
+              "max-paths-level-1": 4,
+              "max-paths-level-2": 4
+            }
+          },
+          "route-advertisement": {
+            "rapid-withdrawal": true
+          }
+        }
+      }
     },
     {
       "name": "mgmt",
@@ -1344,5 +1384,41 @@
         }
       }
     }
-  ]
+  ],
+  "srl_nokia-routing-policy:routing-policy": {
+    "prefix-set": [
+      {
+        "name": "p2plinks",
+        "prefix": [
+          {
+            "ip-prefix": "0.0.0.0/0",
+            "mask-length-range": "31..31"
+          }
+        ]
+      }
+    ],
+    "policy": [
+      {
+        "name": "spine-export-policy",
+        "default-action": {
+          "accept": {
+            
+          }
+        },
+        "statement": [
+          {
+            "sequence-id": 10,
+            "match": {
+              "prefix-set": "p2plinks"
+            },
+            "action": {
+              "reject": {
+                
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
 }
