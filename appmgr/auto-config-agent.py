@@ -67,7 +67,7 @@ def Subscribe_Notifications(stream_id):
     Subscribe(stream_id, 'cfg')
     
     ##Subscribe to LLDP Neighbor Notifications
-    Subscribe(stream_id, 'lldp')
+    ## Subscribe(stream_id, 'lldp')
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent 
@@ -97,6 +97,7 @@ def Handle_Notification(obj, state):
                     state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
+                return not state.role is None
                  
     elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
@@ -127,8 +128,8 @@ def Handle_Notification(obj, state):
     else:
         logging.info(f"Unexpected notification : {obj}")                        
 
-    #always return updated state
-    return state
+    # dont subscribe to LLDP now
+    return False
 ##################################################################################################
 ## This functions get the app_id from idb for a given app_name
 ##################################################################################################
@@ -207,6 +208,7 @@ def Run():
     
     state = State()
     count = 1
+    lldp_subscribed = False
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
@@ -215,8 +217,9 @@ def Run():
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     logging.info('TO DO -commit.end config')
                 else:
-                    old_router_id = state.router_id
-                    Handle_Notification(obj, state)
+                    if Handle_Notification(obj, state) and not lldp_subscribed:
+                       Subscribe(stream_id, 'lldp')
+                       lldp_subscribed = True
                     
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
