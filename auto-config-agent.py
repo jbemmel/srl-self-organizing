@@ -272,6 +272,7 @@ def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
 class State(object):
     def __init__(self):
         self.router_id = None
+        self.role = None       # May not be set in config
     
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
