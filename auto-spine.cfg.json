@@ -1348,6 +1348,10 @@
           "autonomous-system": 65000,
           "export-policy": "spine-export-policy",
           "router-id": "1.1.1.1",
+	  "ebgp-default-policy": {
+           "import-reject-all": false,
+           "export-reject-all": false
+          },
           "ipv4-unicast": {
             "multipath": {
               "max-paths-level-1": 4,
