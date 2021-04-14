@@ -1,5 +1,5 @@
 # srl-self-organizing
-Each node has the exact same config, and configures itself based on LLDP
+Each node has a generic config, and configures itself based on LLDP
 
 2 roles currently supported: Spine or Leaf
 * All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
@@ -15,5 +15,7 @@ YANG model provides parameters:
   ( For example: 1.1.0.0/23, spine1=1.1.0.1 and leaf1=1.1.1.1 )
 
 
-## Install
-`git clone https://github.com/jbemmel/srl-self-organizing.git /etc/opt/srlinux/appmgr`
+## Deploy lab
+1. Checkout the project from git
+2. `cd Docker && make build` -> this creates a local Docker image for srl/auto-config
+3. `sudo clab deploy -t ./srl-son.lab`
