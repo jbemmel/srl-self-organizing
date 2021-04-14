@@ -8,6 +8,8 @@ PEER="$3"
 PEER_IP="$4"
 AS="$5"
 ROUTER_ID="$6"
+PEER_AS_MIN="$7"
+PEER_AS_MAX="$8"
 
 temp_file=$(mktemp --suffix=.json)
 cat > $temp_file << EOF
@@ -67,7 +69,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
           "prefix": "192.168.0.0/24",
           "peer-group": "leaves",
           "allowed-peer-as": [
-            "65001..65002"
+            "$PEER_AS_MIN..$PEER_AS_MAX"
           ]
         }
       ]
@@ -87,7 +89,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "group-name": "spines",
       "admin-state": "enable",
       "export-policy": "export-hosts",
-      "peer-as": 65000
+      "peer-as": $PEER_AS_MIN
     }
 ],
 EOF
