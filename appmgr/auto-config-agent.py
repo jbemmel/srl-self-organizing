@@ -99,6 +99,8 @@ def Handle_Notification(obj, state):
                     state.base_as = int( data['base_as']['value'] )
                 if 'max_spines' in data:
                     state.max_spines = int( data['max_spines']['value'] )
+                if 'max_leaves' in data:
+                    state.max_leaves = int( data['max_leaves']['value'] )
                 return not state.role is None
                  
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -113,10 +115,10 @@ def Handle_Notification(obj, state):
         
           if (state.role == 'ROLE_spine'):
             _r = 0
-            link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1  # TODO remove hardcoded max 4 spines
+            link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
           else:
             _r = 1
-            link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1  # TODO remove hardcoded max 4 spines
+            link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
           state.router_id = f"1.1.{_r}.{to_port_id}"
         
           # Configure IP on interface and BGP for leaves
@@ -126,7 +128,9 @@ def Handle_Notification(obj, state):
               obj.lldp_neighbor.data.system_description,
               str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '*',
               state.base_as + (int(to_port_id) if _r==1 else 0),
-              state.router_id
+              state.router_id,
+              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
+              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves
           )
     else:
         logging.info(f"Unexpected notification : {obj}")                        
@@ -146,11 +150,11 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
+def script_update_interface(name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max):
     logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} router_id={router_id}')
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
-                                       name,ip,peer,peer_ip,str(_as),router_id], 
+                                       name,ip,peer,peer_ip,str(_as),router_id,str(peer_as_min),str(peer_as_max)], 
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
