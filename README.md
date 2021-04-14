@@ -3,7 +3,7 @@
 What if network nodes would auto-configure themselves?
 
 This basic example offers a starting point for a Python-based SR Linux agent that configures the local node.
-Each node has a generic config, and is configured based on LLDP
+Each node has a generic config, and is configured with peering links and eBGP based on LLDP
 
 What is demonstrated:
 * How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/appmgr)
