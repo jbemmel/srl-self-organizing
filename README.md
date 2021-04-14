@@ -1,5 +1,9 @@
 # srl-self-organizing
-Each node has a generic config, and configures itself based on LLDP
+
+What if network nodes would auto-configure themselves?
+
+This basic example offers a starting point for a Python-based SR Linux agent that configures the local node.
+Each node has a generic config, and is configured based on LLDP
 
 2 roles currently supported: Spine or Leaf
 * All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
@@ -17,5 +21,15 @@ YANG model provides parameters:
 
 ## Deploy lab
 1. Checkout the project from git
-2. `cd Docker && make build` -> this creates a local Docker image for srl/auto-config
+2. `cd Docker && make build` -> this creates a local Docker image called 'srl/auto-config'
 3. `sudo clab deploy -t ./srl-son.lab`
+
+## eBGP design details
+This example uses only eBGP peering to exchange routes
+* Spines share a private base AS, each leaf gets a unique leaf AS
+* eBGP peering using /31 IPv4 link addresses
+* Spine side uses dynamic neighbors, such that the spines only need to known a subnet prefix for leaves
+* Routing policy to 
+  + stop forwarding leaf loopbacks beyond the spines (tag with no-export)
+  + only advertise direct attached subnets (don't export AS path length >= 1 routes)
+  + not advertise /31 peering links 
