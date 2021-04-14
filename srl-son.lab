@@ -5,7 +5,8 @@ topology:
     srl:
       type: ixr6 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # TODO: Build custom container image containing SON agent
-      image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      image: srl/auto-config:latest
       license: ../license.key
   nodes:
     leaf1:
