@@ -204,7 +204,7 @@ def Handle_Notification(obj, state):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         
-        if my_port != 'mgmt0' and to_port != 'mgmt0':
+        if my_port != 'mgmt0' and to_port != 'mgmt0' and state.HasField('peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
