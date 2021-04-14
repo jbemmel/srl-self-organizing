@@ -6,8 +6,8 @@ This basic example offers a starting point for a Python-based SR Linux agent tha
 Each node has a generic config, and is configured based on LLDP
 
 What is demonstrated:
-* How to create a custom agent for SR Linux
-* How to register to receive LLDP events
+* How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/appmgr)
+* How to [register to receive LLDP events](https://github.com/jbemmel/srl-self-organizing/blob/main/appmgr/auto-config-agent.py#L47)
 * How to [use gnmic to send JSON configuration to the local node](https://github.com/jbemmel/srl-self-organizing/blob/main/appmgr/gnmic-configure-interface.sh) ( note: just as a Proof-of-Concept )
 * How to [build a custom Docker container](https://github.com/jbemmel/srl-self-organizing/tree/main/Docker) containing the sources
 
