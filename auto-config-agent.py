@@ -224,8 +224,8 @@ def Run():
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
-        try:
+        logging.info(f'GOING TO EXIT NOW, DOING FINAL git pull: {err}')
+        # try:
            # Need to execute this in the mgmt network namespace, hardcoded name for now
            # XXX needs username/password unless checked out using 'git:'
            # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
@@ -233,18 +233,18 @@ def Run():
            #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
            # stdoutput, stderroutput = git_pull.communicate()
            # logging.info(f'git pull result: {stdoutput} err={stderroutput}')
-        except Exception as e:
-           logging.error(f'Exception caught in git pull :: {e}')
+        # except Exception as e:
+        #   logging.error(f'Exception caught in git pull :: {e}')
 
     except Exception as e:
-        logging.error('Exception caught :: {}'.format(e))
+        logging.error(f'Exception caught :: {e}')
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
         try:
             response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-            logging.error('Run try: Unregister response:: {}'.format(response))
+            logging.error(f'Run try: Unregister response:: {response}')
         except grpc._channel._Rendezvous as err:
-            logging.info('GOING TO EXIT NOW: {}'.format(err))
+            logging.info(f'GOING TO EXIT NOW: {err}')
             sys.exit()
         return True
     sys.exit()
