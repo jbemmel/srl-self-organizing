@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Temporary script to provision an interface using gnmic, complicated to pass JSON objects
+# Sample script to provision SRLinux using gnmic
 
 INTF="$1"
 IP_PREFIX="$2"
@@ -10,6 +10,7 @@ AS="$5"
 ROUTER_ID="$6"
 PEER_AS_MIN="$7"
 PEER_AS_MAX="$8"
+LINK_PREFIX="$9"  # IP subnet used for allocation of IPs to BGP peers
 
 temp_file=$(mktemp --suffix=.json)
 cat > $temp_file << EOF
@@ -66,7 +67,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     "accept": {
       "match": [
         {
-          "prefix": "192.168.0.0/24",
+          "prefix": "$LINK_PREFIX",
           "peer-group": "leaves",
           "allowed-peer-as": [
             "$PEER_AS_MIN..$PEER_AS_MAX"
