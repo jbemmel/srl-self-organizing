@@ -17,17 +17,7 @@ import traceback
 import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
-import interface_service_pb2
-import networkinstance_service_pb2
-import route_service_pb2
-import route_service_pb2_grpc
-import nexthop_group_service_pb2
-import nexthop_group_service_pb2_grpc
-import mpls_service_pb2
-import mpls_service_pb2_grpc
 import config_service_pb2
-import telemetry_service_pb2
-import telemetry_service_pb2_grpc
 import sdk_common_pb2
 from logging.handlers import RotatingFileHandler
 
@@ -53,18 +43,9 @@ pushed_routes = 0
 ############################################################
 def Subscribe(stream_id, option):
     op = sdk_service_pb2.NotificationRegisterRequest.AddSubscription
-    if option == 'intf':
-        entry = interface_service_pb2.InterfaceSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, intf=entry)
-    elif option == 'nw_inst':
-        entry = networkinstance_service_pb2.NetworkInstanceSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, nw_inst=entry)
-    elif option == 'lldp':
+    if option == 'lldp':
         entry = lldp_service_pb2.LldpNeighborSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, lldp_neighbor=entry)
-    elif option == 'route':
-        entry = route_service_pb2.IpRouteSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, route=entry)
     elif option == 'cfg':
         entry = config_service_pb2.ConfigSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
@@ -85,17 +66,8 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
     
-    ##Subscribe to Interface Notifications
-    # Subscribe(stream_id, 'intf')
-    
-    ##Subscribe to Network-Instance Notifications
-    # Subscribe(stream_id, 'nw_inst')
-
     ##Subscribe to LLDP Neighbor Notifications
     Subscribe(stream_id, 'lldp')
-
-    ##Subscribe to IP Route Notifications
-    # Subscribe(stream_id, 'route')
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent 
@@ -247,8 +219,8 @@ def Run():
                     Handle_Notification(obj, state)
                     
                     # Program router_id only when changed
-                    if state.router_id != old_router_id:
-                       gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
+                    # if state.router_id != old_router_id:
+                    #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
@@ -256,11 +228,11 @@ def Run():
         try:
            # Need to execute this in the mgmt network namespace, hardcoded name for now
            # XXX needs username/password unless checked out using 'git:'
-           git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
-                                       cwd='/etc/opt/srlinux/appmgr',
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-           stdoutput, stderroutput = git_pull.communicate()
-           logging.info(f'git pull result: {stdoutput} err={stderroutput}')
+           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
+           #                            cwd='/etc/opt/srlinux/appmgr',
+           #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+           # stdoutput, stderroutput = git_pull.communicate()
+           # logging.info(f'git pull result: {stdoutput} err={stderroutput}')
         except Exception as e:
            logging.error(f'Exception caught in git pull :: {e}')
 
