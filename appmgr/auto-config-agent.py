@@ -92,6 +92,7 @@ def Handle_Notification(obj, state):
                     state.role = data['role']
                     logging.info(f"Got role :: {state.role}")
                 if 'peerlinks_prefix' in data:
+                    state.peerlinks_prefix = data['peerlinks_prefix']['value']
                     state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=31))
                 if 'loopbacks_prefix' in data:
                     state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
@@ -130,7 +131,8 @@ def Handle_Notification(obj, state):
               state.base_as + (int(to_port_id) if _r==1 else 0),
               state.router_id,
               state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
-              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves
+              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
+              state.peerlinks_prefix
           )
     else:
         logging.info(f"Unexpected notification : {obj}")                        
@@ -150,11 +152,13 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max):
-    logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} router_id={router_id}')
+def script_update_interface(name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links):
+    logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
+                  'router_id={router_id} peer_links={peer_links}')
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
-                                       name,ip,peer,peer_ip,str(_as),router_id,str(peer_as_min),str(peer_as_max)], 
+                                       name,ip,peer,peer_ip,str(_as),router_id,
+                                       str(peer_as_min),str(peer_as_max),peer_links], 
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
