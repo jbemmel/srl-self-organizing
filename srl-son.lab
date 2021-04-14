@@ -11,13 +11,15 @@ topology:
   nodes:
     leaf1:
       kind: srl
-      config: srl-son-leaf.json
+      # config: srl-son-leaf.json
+      config: auto-leaf.cfg.json
     leaf2:
       kind: srl
       config: auto-leaf.cfg.json
     spine1:
       kind: srl
-      config: srl-son-spine.json
+      # config: srl-son-spine.json
+      config: auto-spine.cfg.json
     spine2:
       kind: srl
       config: auto-spine.cfg.json
