@@ -12,21 +12,12 @@ import ipaddress
 import json
 import signal
 import subprocess # JvB for git pull call
+import traceback
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
-import interface_service_pb2
-import networkinstance_service_pb2
-import route_service_pb2
-import route_service_pb2_grpc
-import nexthop_group_service_pb2
-import nexthop_group_service_pb2_grpc
-import mpls_service_pb2
-import mpls_service_pb2_grpc
 import config_service_pb2
-import telemetry_service_pb2
-import telemetry_service_pb2_grpc
 import sdk_common_pb2
 from logging.handlers import RotatingFileHandler
 
@@ -52,18 +43,9 @@ pushed_routes = 0
 ############################################################
 def Subscribe(stream_id, option):
     op = sdk_service_pb2.NotificationRegisterRequest.AddSubscription
-    if option == 'intf':
-        entry = interface_service_pb2.InterfaceSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, intf=entry)
-    elif option == 'nw_inst':
-        entry = networkinstance_service_pb2.NetworkInstanceSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, nw_inst=entry)
-    elif option == 'lldp':
+    if option == 'lldp':
         entry = lldp_service_pb2.LldpNeighborSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, lldp_neighbor=entry)
-    elif option == 'route':
-        entry = route_service_pb2.IpRouteSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, route=entry)
     elif option == 'cfg':
         entry = config_service_pb2.ConfigSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
@@ -84,90 +66,8 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
     
-    ##Subscribe to Interface Notifications
-    # Subscribe(stream_id, 'intf')
-    
-    ##Subscribe to Network-Instance Notifications
-    # Subscribe(stream_id, 'nw_inst')
-
     ##Subscribe to LLDP Neighbor Notifications
     Subscribe(stream_id, 'lldp')
-
-    ##Subscribe to IP Route Notifications
-    # Subscribe(stream_id, 'route')
-
-############################################################
-## Function to populate state of agent config 
-## using telemetry -- add/update info from state 
-############################################################
-def Add_Telemetry(js_path, js_data ):
-    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
-    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
-    telemetry_info = telemetry_update_request.state.add()
-    telemetry_info.key.js_path = js_path
-    telemetry_info.data.json_content = js_data
-    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
-    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
-    return telemetry_response
-
-############################################################
-## Function to cleanup state of agent config 
-## using telemetry -- cleanup info from state
-############################################################
-def Delete_Telemetry(js_path):
-    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
-    telemetry_delete_request = telemetry_service_pb2.TelemetryDeleteRequest()
-    telemetry_delete = telemetry_delete_request.key.add()
-    telemetry_delete.js_path = js_path
-    logging.info(f"Telemetry_Delete_Request :: {telemetry_delete_request}")
-    telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_delete_request, metadata=metadata)
-    return telemetry_response
-
-############################################################
-## Function to populate state fields of the agent
-## It updates command: info from state fib-agent
-############################################################
-def Update_Result(input_fib, result=True, reason=None, action='add'):
-    js_path = '.fib_agent.fib_result{.name=="' + input_fib + '"}'
-    json_content='{"fib_result": '
-    if action == 'add':
-        for key in ['programmed-state', 'reason-code']:
-            if key == 'programmed-state':
-                json_content=json_content+ '{ "programmed_state" : {"value": ' + str(result).lower()+' },'
-            else:
-                if result == False:
-                    code = reason
-                else:
-                    code = None
-                json_content =json_content+  '"reason_code" : {"value": "' + str(code) +'"}'
-        json_content =json_content+'}}'
-        response = Add_Telemetry(js_path=js_path, js_data=json_content)
-        logging.info(f"Telemetry_Update_Response :: {response}")
-        return True
-    elif action =='delete':
-        response = Delete_Telemetry(js_path=js_path)
-        logging.info(f"Telemetry_Delete_Response :: {response}")
-        return True
-    else:
-        assert False, "Got unrecognized action"
-    return True   
-
-############################################################
-## Function to populate number of route count received by agent
-## It updates command: info from state fib-agent route-count
-############################################################
-def Update_Routes(programmed, actual=None):
-    json_content = ''
-    js_path = '.demo_fib_agent'
-    json_content = '{"programmed_routes": {"value": ' + str(programmed) + '},'
-    if actual:
-        route_count = actual
-    else:
-        route_count = pushed_routes
-    json_content = json_content + '"route_count": {"value": ' + str(route_count) + '}}'
-    
-    Add_Telemetry(js_path=js_path, js_data=json_content)
-    return True
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent 
@@ -204,7 +104,7 @@ def Handle_Notification(obj, state):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         
-        if my_port != 'mgmt0' and to_port != 'mgmt0':
+        if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
@@ -262,7 +162,7 @@ def gnmic(path,value):
 def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
     logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} router_id={router_id}')
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,_as,router_id], 
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,str(_as),router_id], 
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -272,6 +172,7 @@ def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
 class State(object):
     def __init__(self):
         self.router_id = None
+        self.role = None       # May not be set in config
     
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
@@ -318,32 +219,32 @@ def Run():
                     Handle_Notification(obj, state)
                     
                     # Program router_id only when changed
-                    if state.router_id != old_router_id:
-                       gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
+                    # if state.router_id != old_router_id:
+                    #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW, DOING FINAL git pull: {}'.format(err))
-        try:
+        logging.info(f'GOING TO EXIT NOW, DOING FINAL git pull: {err}')
+        # try:
            # Need to execute this in the mgmt network namespace, hardcoded name for now
            # XXX needs username/password unless checked out using 'git:'
-           git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
-                                       cwd='/etc/opt/srlinux/appmgr',
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-           stdoutput, stderroutput = git_pull.communicate()
-           logging.info(f'git pull result: {stdoutput} err={stderroutput}')
-        except Exception as e:
-           logging.error(f'Exception caught in git pull :: {e}')
+           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
+           #                            cwd='/etc/opt/srlinux/appmgr',
+           #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+           # stdoutput, stderroutput = git_pull.communicate()
+           # logging.info(f'git pull result: {stdoutput} err={stderroutput}')
+        # except Exception as e:
+        #   logging.error(f'Exception caught in git pull :: {e}')
 
     except Exception as e:
-        logging.error('Exception caught :: {}'.format(e))
+        logging.error(f'Exception caught :: {e}')
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
         try:
             response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-            logging.error('Run try: Unregister response:: {}'.format(response))
+            logging.error(f'Run try: Unregister response:: {response}')
         except grpc._channel._Rendezvous as err:
-            logging.info('GOING TO EXIT NOW: {}'.format(err))
+            logging.info(f'GOING TO EXIT NOW: {err}')
             sys.exit()
         return True
     sys.exit()
