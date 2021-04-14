@@ -98,7 +98,7 @@ def Handle_Notification(obj, state):
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
                  
-    elif obj.HasField('lldp_neighbor'):
+    elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
         logging.info(f"process LLDP notification : {obj}")
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
