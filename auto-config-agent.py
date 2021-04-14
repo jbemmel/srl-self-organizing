@@ -96,79 +96,6 @@ def Subscribe_Notifications(stream_id):
     ##Subscribe to IP Route Notifications
     # Subscribe(stream_id, 'route')
 
-############################################################
-## Function to populate state of agent config 
-## using telemetry -- add/update info from state 
-############################################################
-def Add_Telemetry(js_path, js_data ):
-    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
-    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
-    telemetry_info = telemetry_update_request.state.add()
-    telemetry_info.key.js_path = js_path
-    telemetry_info.data.json_content = js_data
-    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
-    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
-    return telemetry_response
-
-############################################################
-## Function to cleanup state of agent config 
-## using telemetry -- cleanup info from state
-############################################################
-def Delete_Telemetry(js_path):
-    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
-    telemetry_delete_request = telemetry_service_pb2.TelemetryDeleteRequest()
-    telemetry_delete = telemetry_delete_request.key.add()
-    telemetry_delete.js_path = js_path
-    logging.info(f"Telemetry_Delete_Request :: {telemetry_delete_request}")
-    telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_delete_request, metadata=metadata)
-    return telemetry_response
-
-############################################################
-## Function to populate state fields of the agent
-## It updates command: info from state fib-agent
-############################################################
-def Update_Result(input_fib, result=True, reason=None, action='add'):
-    js_path = '.fib_agent.fib_result{.name=="' + input_fib + '"}'
-    json_content='{"fib_result": '
-    if action == 'add':
-        for key in ['programmed-state', 'reason-code']:
-            if key == 'programmed-state':
-                json_content=json_content+ '{ "programmed_state" : {"value": ' + str(result).lower()+' },'
-            else:
-                if result == False:
-                    code = reason
-                else:
-                    code = None
-                json_content =json_content+  '"reason_code" : {"value": "' + str(code) +'"}'
-        json_content =json_content+'}}'
-        response = Add_Telemetry(js_path=js_path, js_data=json_content)
-        logging.info(f"Telemetry_Update_Response :: {response}")
-        return True
-    elif action =='delete':
-        response = Delete_Telemetry(js_path=js_path)
-        logging.info(f"Telemetry_Delete_Response :: {response}")
-        return True
-    else:
-        assert False, "Got unrecognized action"
-    return True   
-
-############################################################
-## Function to populate number of route count received by agent
-## It updates command: info from state fib-agent route-count
-############################################################
-def Update_Routes(programmed, actual=None):
-    json_content = ''
-    js_path = '.demo_fib_agent'
-    json_content = '{"programmed_routes": {"value": ' + str(programmed) + '},'
-    if actual:
-        route_count = actual
-    else:
-        route_count = pushed_routes
-    json_content = json_content + '"route_count": {"value": ' + str(route_count) + '}}'
-    
-    Add_Telemetry(js_path=js_path, js_data=json_content)
-    return True
-
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent 
 ## At present processing config from js_path = .fib-agent
@@ -204,7 +131,7 @@ def Handle_Notification(obj, state):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         
-        if my_port != 'mgmt0' and to_port != 'mgmt0' and state.HasField('peerlinks'):
+        if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           to_port_id = re.split("/",re.split("-",to_port)[1])[1]
         
