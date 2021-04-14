@@ -89,7 +89,6 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "spines",
       "admin-state": "enable",
-      "export-policy": "export-hosts",
       "peer-as": $PEER_AS_MIN
     }
 ],
@@ -102,10 +101,6 @@ cat > $temp_file << EOF
   "autonomous-system": $AS,
   "router-id": "$ROUTER_ID",
   $DYNAMIC_NEIGHBORS
-  "ebgp-default-policy": {
-    "import-reject-all": false,
-    "export-reject-all": false
-  },
   "ipv4-unicast": {
     "multipath": {
       "max-paths-level-1": 4,
