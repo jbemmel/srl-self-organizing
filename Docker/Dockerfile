@@ -7,5 +7,5 @@ COPY ./appmgr/ /etc/opt/srlinux/appmgr/
 COPY ./appmgr/ /root/
 
 # Using a build arg to set the release tag, set a default for running docker build manually
-ARG SRL_AUTOCONFIG_RELEASE="[custom build]"
-ENV SRL_AUTOCONFIG_RELEASE=$SRL_AUTOCONFIG_RELEASE
+ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"
+ENV SRL_AUTO_CONFIG_RELEASE=$SRL_AUTO_CONFIG_RELEASE
