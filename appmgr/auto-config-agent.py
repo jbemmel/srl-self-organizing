@@ -141,30 +141,14 @@ def get_app_id(app_name):
     return app_id_response.id
 
 ###########################
-# JvB: Invokes gnmic client to update node configuration
-def gnmic(path,value):
-    logging.info(f'Calling gnmic: path={path} value={value}')
-    try:
-       # Need to execute this in the mgmt network namespace, hardcoded name for now
-       #git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
-       #                            cwd='/etc/opt/srlinux/appmgr',
-       #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-       gnmic_proc = subprocess.Popen(['/usr/local/bin/gnmic','-a','127.0.0.1:57400','-u','admin','-p','admin',
-                                      '--skip-verify','--encoding','JSON_IETF','set',
-                                      '--update-path',path,'--update-value',value ], 
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-       stdoutput, stderroutput = gnmic_proc.communicate()
-       logging.info(f'gnmic result: {stdoutput} err={stderroutput}')
-    except Exception as e:
-       logging.error(f'Exception caught in gnmic :: {e}')
-
+# JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-# JvB: Invokes gnmic client to update interface configuration
 def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
     logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} router_id={router_id}')
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,str(_as),router_id], 
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
+                                       name,ip,peer,peer_ip,str(_as),router_id], 
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
     except Exception as e:
@@ -172,7 +156,6 @@ def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
 
 class State(object):
     def __init__(self):
-        self.router_id = None
         self.role = None       # May not be set in config
     
     def __str__(self):
