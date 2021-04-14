@@ -97,6 +97,8 @@ def Handle_Notification(obj, state):
                     state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
+                if 'max_spines' in data:
+                    state.max_spines = int( data['max_spines']['value'] )
                 return not state.role is None
                  
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -111,10 +113,10 @@ def Handle_Notification(obj, state):
         
           if (state.role == 'ROLE_spine'):
             _r = 0
-            link_index = 4 * (int(to_port_id) - 1) + int(my_port_id) - 1  # TODO remove hardcoded max 4 spines
+            link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1  # TODO remove hardcoded max 4 spines
           else:
             _r = 1
-            link_index = 4 * (int(my_port_id) - 1) + int(to_port_id) - 1  # TODO remove hardcoded max 4 spines
+            link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1  # TODO remove hardcoded max 4 spines
           state.router_id = f"1.1.{_r}.{to_port_id}"
         
           # Configure IP on interface and BGP for leaves
