@@ -35,6 +35,29 @@ EOF
   --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
+# Set loopback IP
+cat > $temp_file << EOF
+{
+  "admin-state": "enable",
+  "subinterface": [
+    {
+      "index": 0,
+      "admin-state": "enable",
+      "ipv4": {
+        "address": [
+          {
+            "ip-prefix": "$ROUTER_ID/32"
+          }
+        ]
+      }
+    }
+  ]
+}
+EOF
+/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
+  --replace-path /interface[name=lo0] --replace-file $temp_file
+exitcode+=$?
+
 if [[ "$PEER_IP" == "*" ]]; then
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
