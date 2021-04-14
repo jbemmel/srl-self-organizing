@@ -116,7 +116,7 @@ def Handle_Notification(obj, state):
           state.router_id = f"1.1.{_r}.{to_port_id}"
         
           # Configure IP on interface and BGP for leaves
-          link_index = int(to_port_id) - 1
+          link_index = 4 * (int(to_port_id) - 1) + int(my_port_id) - 1  # TODO remove hardcoded max 4 spines
           script_update_interface( 
               my_port, 
               str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
