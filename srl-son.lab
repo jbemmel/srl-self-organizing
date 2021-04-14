@@ -14,7 +14,7 @@ topology:
       config: srl-son-leaf.json
     leaf2:
       kind: srl
-      # config: srl-son-leaf.json
+      config: auto-leaf.cfg.json
     spine1:
       kind: srl
       config: srl-son-spine.json

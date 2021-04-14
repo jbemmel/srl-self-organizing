@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    
+    "role": "spine"
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
