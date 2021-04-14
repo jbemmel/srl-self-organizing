@@ -12,6 +12,7 @@ import ipaddress
 import json
 import signal
 import subprocess # JvB for git pull call
+import traceback
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
@@ -189,7 +190,7 @@ def gnmic(path,value):
 def script_update_interface(name,ip,peer,peer_ip,_as,router_id):
     logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} router_id={router_id}')
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,_as,router_id], 
+       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',name,ip,peer,peer_ip,str(_as),router_id], 
                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
