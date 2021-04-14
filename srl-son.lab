@@ -20,7 +20,7 @@ topology:
       config: srl-son-spine.json
     spine2:
       kind: srl
-      # config: srl-son-spine.json
+      config: auto-spine.cfg.json
  
     h1:
       kind: linux
