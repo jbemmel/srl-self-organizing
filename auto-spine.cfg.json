@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "spine"
+    
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
@@ -1080,11 +1080,21 @@
   "srl_nokia-interfaces:interface": [
     {
       "name": "ethernet-1/1",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0
+        }
+      ]
     },
     {
       "name": "ethernet-1/2",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0
+        }
+      ]
     },
     {
       "name": "mgmt0",
