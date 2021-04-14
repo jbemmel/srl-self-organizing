@@ -8,7 +8,7 @@ Each node has a generic config, and is configured based on LLDP
 What is demonstrated:
 * How to create a custom agent for SR Linux
 * How to register to receive LLDP events
-* How to use gnmic to send JSON configuration to the local node ( note: just as a Proof-of-Concept )
+* How to [use gnmic to send JSON configuration to the local node](https://github.com/jbemmel/srl-self-organizing/blob/main/appmgr/gnmic-configure-interface.sh) ( note: just as a Proof-of-Concept )
 * How to [build a custom Docker container](https://github.com/jbemmel/srl-self-organizing/tree/main/Docker) containing the sources
 
 2 roles currently supported: Spine or Leaf
