@@ -9,9 +9,10 @@ topology:
       image: srl/auto-config:latest
       license: ../license.key
     linux:
-      binds:
-      - daemons:/etc/frr/daemons
-      - lldpd.conf:/etc/lldpd.conf
+      image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
+      # binds:
+      # - daemons:/etc/frr/daemons
+
   nodes:
     leaf1:
       kind: srl
@@ -30,10 +31,9 @@ topology:
  
     h1:
       kind: linux
-      image: frrouting/frr:latest # or alpine:latest
+
     h2:
       kind: linux
-      image: frrouting/frr:latest
     
   links: 
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
