@@ -112,7 +112,11 @@ def Handle_Notification(obj, state):
         
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
-          to_port_id = re.split("/",re.split("-",to_port)[1])[1]
+          m = re.match("^ethernet-(\d+)/(\d+)$", to_port)
+          if m:
+            to_port_id = m.groups()[1]
+          else:
+            to_port_id = my_port_id  # FRR Linux host or other element not sending port name
         
           if (state.role == 'ROLE_spine'):
             _r = 0
@@ -120,15 +124,17 @@ def Handle_Notification(obj, state):
           else:
             _r = 1
             link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
-          state.router_id = f"1.1.{_r}.{to_port_id}"
-        
+          
+          if m: # Only for valid to_port
+            state.router_id = f"1.1.{_r}.{to_port_id}"
+
           # Configure IP on interface and BGP for leaves
           script_update_interface( 
               my_port, 
               str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
-              obj.lldp_neighbor.data.system_description,
+              obj.lldp_neighbor.data.system_description if m else 'host',
               str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '*',
-              state.base_as + (int(to_port_id) if _r==1 else 0),
+              state.base_as + (int(to_port_id) if _r==1 and m else 0),
               state.router_id,
               state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
               state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
