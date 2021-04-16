@@ -4,10 +4,13 @@ topology:
   kinds:
     srl:
       type: ixr6 # See https://www.nokia.com/networks/products/7250-interconnect-router/
-      # TODO: Build custom container image containing SON agent
+      # Uses custom container image containing auto-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
       license: ../license.key
+    linux:
+      binds:
+      - daemons:/etc/frr/daemons
   nodes:
     leaf1:
       kind: srl
@@ -26,10 +29,10 @@ topology:
  
     h1:
       kind: linux
-      image: alpine:latest # or frrouting/frr:latest
+      image: frrouting/frr:latest # or alpine:latest
     h2:
       kind: linux
-      image: alpine:latest
+      image: frrouting/frr:latest
     
   links: 
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
