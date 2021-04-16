@@ -4,7 +4,7 @@
 
 INTF="$1"
 IP_PREFIX="$2"
-PEER="$3"
+PEER="$3"         # 'host' for Linux nodes
 PEER_IP="$4"
 AS="$5"
 ROUTER_ID="$6"
@@ -38,7 +38,7 @@ EOF
   --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
-# Set loopback IP
+# Set loopback IP, TODO only once not every LLDP message
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
@@ -90,6 +90,11 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "group-name": "spines",
       "admin-state": "enable",
       "peer-as": $PEER_AS_MIN
+    },
+    {
+      "group-name": "hosts",
+      "admin-state": "enable",
+      "peer-as": $AS
     }
 ],
 EOF
@@ -126,10 +131,11 @@ EOF
 exitcode+=$?
 
 if [[ "$PEER_IP" != "*" ]]; then
+PEER_GROUP="spines" && [[ "$PEER" == "host" ]] && PEER_GROUP="hosts"
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "spines"
+  "peer-group": "$PEER_GROUP"
 }
 EOF
 /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
