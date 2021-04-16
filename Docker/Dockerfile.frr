@@ -1,5 +1,7 @@
 FROM frrouting/frr:latest
 
-RUN apk add openrc open-lldp && echo 'lldp : { eth1 : { adminStatus = 3; }; };' >> /var/lib/lldpad/lldpad.conf
+RUN apk add openrc open-lldp && \
+ echo 'lldp : { eth1 : { adminStatus = 3; tlvid00000005 : { enableTx = true; };}; };' >> /var/lib/lldpad/lldpad.conf && \
+ sed -i 's|set -e$|set -e;/usr/sbin/lldpad -d|g' /usr/lib/frr/docker-start
 
 COPY ./daemons /etc/frr/
