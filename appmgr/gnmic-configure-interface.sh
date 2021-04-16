@@ -13,6 +13,7 @@ PEER_AS_MAX="$8"
 LINK_PREFIX="$9"  # IP subnet used for allocation of IPs to BGP peers
 
 temp_file=$(mktemp --suffix=.json)
+_IP127="${IP_PREFIX//\/31/\/127}"
 cat > $temp_file << EOF
 {
   "description": "To $PEER",
@@ -31,7 +32,7 @@ cat > $temp_file << EOF
       "ipv6": {
         "address": [
           {
-            "ip-prefix": "2001::${${IP_PREFIX//\/31/\/127}//\./:}"
+            "ip-prefix": "2001::${_IP127//\./:}"
           }
         ]
       }
