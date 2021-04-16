@@ -1,5 +1,5 @@
 FROM frrouting/frr:latest
 
-RUN apk add openrc open-lldp
+RUN apk add openrc open-lldp && lldptool -L -i eth1 adminStatus=rxtx
 
 COPY ./daemons /etc/frr/
