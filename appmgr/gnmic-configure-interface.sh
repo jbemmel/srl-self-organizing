@@ -133,7 +133,15 @@ exitcode+=$?
 fi
 
 if [[ "$PEER_IP" != "*" ]]; then
-PEER_GROUP="spines" && [[ "$PEER" == "host" ]] && PEER_GROUP="hosts"
+
+if [[ "$PEER" == "host" ]]; then
+PEER_GROUP="hosts"
+_IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
+else
+PEER_GROUP="spines"
+_IP="$PEER_IP"
+fi
+
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
@@ -141,7 +149,7 @@ cat > $temp_file << EOF
 }
 EOF
 /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
+  --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
