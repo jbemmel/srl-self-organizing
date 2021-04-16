@@ -126,9 +126,11 @@ cat > $temp_file << EOF
 EOF
 
 # Replace allows max 1 peer, TODO only add neighbors when already configured?
+if [[ "$PEER" != "host" ]]; then
 /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
   --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
+fi
 
 if [[ "$PEER_IP" != "*" ]]; then
 PEER_GROUP="spines" && [[ "$PEER" == "host" ]] && PEER_GROUP="hosts"
