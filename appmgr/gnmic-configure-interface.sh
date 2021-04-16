@@ -27,6 +27,13 @@ cat > $temp_file << EOF
             "ip-prefix": "$IP_PREFIX"
           }
         ]
+      },
+      "ipv6": {
+        "address": [
+          {
+            "ip-prefix": "2001::${${IP_PREFIX//\/31/\/127}//\./:}"
+          }
+        ]
       }
     }
   ]
