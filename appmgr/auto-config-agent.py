@@ -134,7 +134,7 @@ def Handle_Notification(obj, state):
               str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
               obj.lldp_neighbor.data.system_description if m else 'host',
               str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '*',
-              state.base_as + (int(to_port_id) if _r==1 and m else 0),
+              state.base_as + (int(to_port_id) if _r==1 else 0),
               state.router_id,
               state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
               state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
