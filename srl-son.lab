@@ -11,6 +11,7 @@ topology:
     linux:
       binds:
       - daemons:/etc/frr/daemons
+      - lldpd.conf:/etc/lldpd.conf
   nodes:
     leaf1:
       kind: srl
