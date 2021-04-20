@@ -13,7 +13,7 @@ What is demonstrated:
 
 2 roles currently supported: Spine or Leaf
 * All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
-* Could auto-determine role: Some links connected but no LLDP -> assume this is a leaf node, otherwise spine
+* Could auto-determine role: Some links connected but no LLDP or MAC address instead of SRL port name -> assume this is a leaf node, otherwise spine
 * For now: role is an agent parameter
 
 YANG model provides parameters:
