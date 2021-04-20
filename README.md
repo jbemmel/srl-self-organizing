@@ -30,10 +30,10 @@ YANG model provides parameters:
 2. `cd Docker && make build` -> this creates a local Docker image called 'srl/auto-config'
 3. `sudo clab deploy -t ./srl-son.lab`
 
-## eBGP design details
-This example uses only eBGP peering to exchange routes
+## BGP design details
+This example uses eBGP peering to exchange routes within the fabric, and iBGP towards FRR Linux hosts
 * Spines share a private base AS, each leaf gets a unique leaf AS
-* eBGP peering using /31 IPv4 link addresses
+* eBGP peering using /31 IPv4 link addresses, iBGP uses /127 IPv6 link addresses (TODO link-local with BGP unnumbered)
 * Spine side uses dynamic neighbors, such that the spines only need to known a subnet prefix for leaves
 * Routing policy to 
   + stop forwarding leaf loopbacks beyond the spines (tag with no-export)
