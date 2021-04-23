@@ -12,7 +12,7 @@ COPY 42_sr_copy_custom_appmgr.sh /opt/srlinux/bin/bootscript/
 
 # Install balena, a modern Docker application to run containers within SRL
 # Requires cSRL to be started using 
-# sudo docker run -it --privileged -v /tmp/var_lib_docker:/var/lib/docker srl/auto-config:latest
+# sudo docker run -it --privileged -v /tmp/var_lib_docker:/var/lib/balena-engine srl/auto-config:latest
 RUN curl -sfL https://balena.io/engine/install.sh | sh
 
 # Using a build arg to set the release tag, set a default for running docker build manually
