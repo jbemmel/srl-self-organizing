@@ -7,4 +7,4 @@ FROM frrouting/frr:latest
 RUN apk add lldpd && \
  sed -i 's|set -e$|set -e;/usr/sbin/lldpd|g' /usr/lib/frr/docker-start
 
-COPY ./daemons /etc/frr/
+COPY --chown=root:root ./daemons /etc/frr
