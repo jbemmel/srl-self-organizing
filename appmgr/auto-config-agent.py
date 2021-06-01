@@ -132,8 +132,8 @@ def Handle_Notification(obj, state):
             if leafId:
               leaf = m.groups()[0] # typically 1,2,3,...
               to_port_id += (int(leaf) - 1) * 32
-              link_index = (state.max_spines + int(to_port_id) - 1) * state.max_leaves
-                         + (int(my_port_id) - 1) + int(to_port_id) - 1
+              _port = (int(my_port_id) - 1) + int(to_port_id) - 1
+              link_index = (state.max_spines + int(to_port_id) - 1) * state.max_leaves + _port 
             else: # Only supports hosts connected to different ports of leaves
               link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
 
