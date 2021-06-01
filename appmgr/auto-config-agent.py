@@ -109,6 +109,7 @@ def Handle_Notification(obj, state):
         logging.info(f"process LLDP notification : {obj}")
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
+        peer_sys_name = obj.lldp_neighbor.data.system_name
 
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
