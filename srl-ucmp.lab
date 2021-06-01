@@ -19,7 +19,6 @@ topology:
     h2: { kind: srl, config: auto-host.cfg.json }
     h3: { kind: srl, config: auto-host.cfg.json }
     h4: { kind: srl, config: auto-host.cfg.json }
-    h5: { kind: srl, config: auto-host.cfg.json }
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
@@ -28,8 +27,7 @@ topology:
 
     - endpoints: ["h1:e1-1","leaf1:e1-2"]
     - endpoints: ["h2:e1-1","leaf1:e1-3"]
-    - endpoints: ["h3:e1-1","leaf1:e1-4"]
 
-    - endpoints: ["h4:e1-1","leaf2:e1-2"]
+    - endpoints: ["h3:e1-1","leaf2:e1-2"]
 
-    - endpoints: ["h5:e1-1","leaf3:e1-2"]
+    - endpoints: ["h4:e1-1","leaf3:e1-2"]

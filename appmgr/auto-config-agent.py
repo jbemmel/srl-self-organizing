@@ -122,24 +122,29 @@ def Handle_Notification(obj, state):
           # For spine-spine connections, build iBGP
           if (state.role == 'ROLE_spine') and 'spine' not in peer_sys_name:
             _r = 0
+            _i = 0
             link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
           elif (state.role != 'ROLE_endpoint'):
-            _r = 1
+            logging.info(f"Configure LEAF or SPINE-SPINE local_port={my_port_id} peer_port={to_port_id}")
+            spineId = re.match(".*spine(\d+).*", peer_sys_name)
+            _r = 0 if state.role == 'ROLE_spine' and spineId and int(spineId.groups()[0]) > int(my_port_id) else 1
+            _i = 1
             link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
           else:
-            _r = 2
+            _r = 1
+            _i = 2
             leafId = re.match(".*leaf(\d+).*", peer_sys_name)
             if leafId:
-              leaf = m.groups()[0] # typically 1,2,3,...
+              leaf = leafId.groups()[0] # typically 1,2,3,...
               to_port_id += (int(leaf) - 1) * 32
               _port = (int(my_port_id) - 1) + int(to_port_id) - 1
-              link_index = (state.max_spines + int(to_port_id) - 1) * state.max_leaves + _port 
+              link_index = (state.max_spines + int(to_port_id) - 1) * state.max_leaves + _port
             else: # Only supports hosts connected to different ports of leaves
               link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else _r }.{to_port_id}"
+            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else _i }.{to_port_id}"
             router_id_changed = True
 
           # Configure IP on interface and BGP for leaves
