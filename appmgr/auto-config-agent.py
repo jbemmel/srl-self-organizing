@@ -123,13 +123,23 @@ def Handle_Notification(obj, state):
           if (state.role == 'ROLE_spine') and 'spine' not in peer_sys_name:
             _r = 0
             link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
-          else:
+          elif (state.role != 'ROLE_endpoint'):
             _r = 1
             link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
+          else:
+            _r = 2
+            leafId = re.match(".*leaf(\d+).*", peer_sys_name)
+            if leafId:
+              leaf = m.groups()[0] # typically 1,2,3,...
+              to_port_id += (int(leaf) - 1) * 32
+              link_index = (state.max_spines + int(to_port_id) - 1) * state.max_leaves
+                         + (int(my_port_id) - 1) + int(to_port_id) - 1
+            else: # Only supports hosts connected to different ports of leaves
+              link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else 1 }.{to_port_id}"
+            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else _r }.{to_port_id}"
             router_id_changed = True
 
           # Configure IP on interface and BGP for leaves
@@ -142,7 +152,7 @@ def Handle_Notification(obj, state):
                  my_port,
                  _ip + '/31',
                  obj.lldp_neighbor.data.system_description if m else 'host',
-                 _peer if _r==1 else '*',
+                 _peer if state.role != 'ROLE_spine' else '*',
                  state.base_as + (int(to_port_id) if state.role != 'ROLE_spine' else 0),
                  state.router_id if router_id_changed else "",
                  state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
