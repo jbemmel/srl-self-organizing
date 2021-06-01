@@ -1,0 +1,35 @@
+name: ucmp-lab # Unequal Cost Multiple Paths
+
+topology:
+  kinds:
+    srl:
+      type: ixr6 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # Uses custom container image containing auto-config agent
+      # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      image: srl/auto-config:latest
+      license: ../license.key
+
+  nodes:
+    leaf1:  { kind: srl, config: auto-leaf.cfg.json }
+    leaf2:  { kind: srl, config: auto-leaf.cfg.json }
+    leaf3:  { kind: srl, config: auto-leaf.cfg.json }
+    spine1: { kind: srl, config: auto-spine.cfg.json }
+
+    h1: { kind: srl, config: auto-host.cfg.json }
+    h2: { kind: srl, config: auto-host.cfg.json }
+    h3: { kind: srl, config: auto-host.cfg.json }
+    h4: { kind: srl, config: auto-host.cfg.json }
+    h5: { kind: srl, config: auto-host.cfg.json }
+
+  links:
+    - endpoints: ["leaf1:e1-1","spine1:e1-1"]
+    - endpoints: ["leaf2:e1-1","spine1:e1-2"]
+    - endpoints: ["leaf3:e1-1","spine1:e1-3"]
+
+    - endpoints: ["h1:e1-1","leaf1:e1-2"]
+    - endpoints: ["h2:e1-1","leaf1:e1-3"]
+    - endpoints: ["h3:e1-1","leaf1:e1-4"]
+
+    - endpoints: ["h4:e1-1","leaf2:e1-2"]
+
+    - endpoints: ["h5:e1-1","leaf3:e1-2"]
