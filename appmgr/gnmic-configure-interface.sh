@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Sample script to provision SRLinux using gnmic
-
-INTF="$1"
-IP_PREFIX="$2"
-PEER="$3"         # 'host' for Linux nodes
-PEER_IP="$4"
-AS="$5"
-ROUTER_ID="$6"
-PEER_AS_MIN="$7"
-PEER_AS_MAX="$8"
-LINK_PREFIX="$9"  # IP subnet used for allocation of IPs to BGP peers
+ROLE="$1"  # "spine" or "leaf"
+INTF="$2"
+IP_PREFIX="$3"
+PEER="$4"         # 'host' for Linux nodes
+PEER_IP="$5"
+AS="$6"
+ROUTER_ID="$7"
+PEER_AS_MIN="$8"
+PEER_AS_MAX="$9"
+LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
@@ -46,7 +46,24 @@ EOF
   --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
-# Set loopback IP, TODO only once not every LLDP message
+# Enable BFD, except for host facing interfaces
+if [[ "$PEER" != "host" ]]; then
+cat > $temp_file << EOF
+{
+ "admin-state" : "enable",
+ "desired-minimum-transmit-interval" : 250000,
+ "required-minimum-receive" : 250000,
+ "detection-multiplier" : 3
+}
+EOF
+
+/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
+  --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
+exitcode=$?
+fi
+
+# Set loopback IP, if provided
+if [[ "$ROUTER_ID" != "" ]]; then
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
@@ -60,6 +77,13 @@ cat > $temp_file << EOF
             "ip-prefix": "$ROUTER_ID/32"
           }
         ]
+      },
+      "ipv6": {
+        "address": [
+          {
+            "ip-prefix": "2001::${ROUTER_ID//\./:}/128"
+          }
+        ]
       }
     }
   ]
@@ -69,7 +93,36 @@ EOF
   --replace-path /interface[name=lo0] --replace-file $temp_file
 exitcode+=$?
 
-if [[ "$PEER_IP" == "*" ]]; then
+cat > $temp_file << EOF
+{
+  "router-id": "$ROUTER_ID",
+  "admin-state": "enable",
+  "version": "ospf-v3",
+  "address-family": "ipv6-unicast",
+  "max-ecmp-paths": 4,
+  "area": [
+    {
+      "area-id": "0.0.0.0",
+      "interface": [
+        {
+          "interface-name": "ethernet-1/1.0",
+          "interface-type": "point-to-point"
+        },
+        {
+          "interface-name": "lo0.0",
+          "interface-type": "broadcast",
+          "passive": true
+        }
+      ]
+    }
+  ]
+}
+EOF
+/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
+  --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
+exitcode+=$?
+
+if [[ "$ROLE" == "spine" ]]; then
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
     "accept": {
@@ -84,7 +137,13 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       ]
     }
   },
+"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
 "group": [
+    {
+      "group-name": "fellow-spines",
+      "admin-state": "enable",
+      "peer-as": $AS
+    },
     {
       "group-name": "leaves",
       "admin-state": "enable"
@@ -97,6 +156,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "spines",
       "admin-state": "enable",
+      "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
       "peer-as": $PEER_AS_MIN
     },
     {
@@ -139,15 +199,17 @@ if [[ "$PEER" != "host" ]]; then
   --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
 fi
+fi # if router_id provided, first time only
 
 if [[ "$PEER_IP" != "*" ]]; then
-
+_IP="$PEER_IP"
 if [[ "$PEER" == "host" ]]; then
 PEER_GROUP="hosts"
 _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
+elif [[ "$ROLE" == "spine" ]]; then
+PEER_GROUP="fellow-spines"
 else
 PEER_GROUP="spines"
-_IP="$PEER_IP"
 fi
 
 cat > $temp_file << EOF

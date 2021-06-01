@@ -38,7 +38,7 @@ pushed_routes = 0
 
 ############################################################
 ## Subscribe to required event
-## This proc handles subscription of: Interface, LLDP, 
+## This proc handles subscription of: Interface, LLDP,
 ##                      Route, Network Instance, Config
 ############################################################
 def Subscribe(stream_id, option):
@@ -65,12 +65,12 @@ def Subscribe_Notifications(stream_id):
 
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
-    
+
     ##Subscribe to LLDP Neighbor Notifications
     ## Subscribe(stream_id, 'lldp')
 
 ##################################################################
-## Proc to process the config Notifications received by auto_config_agent 
+## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path = .fib-agent
 ##################################################################
 def Handle_Notification(obj, state):
@@ -103,13 +103,13 @@ def Handle_Notification(obj, state):
                 if 'max_leaves' in data:
                     state.max_leaves = int( data['max_leaves']['value'] )
                 return not state.role is None
-                 
+
     elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
         logging.info(f"process LLDP notification : {obj}")
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
-        
+
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           m = re.match("^ethernet-(\d+)/(\d+)$", to_port)
@@ -117,31 +117,40 @@ def Handle_Notification(obj, state):
             to_port_id = m.groups()[1]
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
-        
-          if (state.role == 'ROLE_spine'):
+
+          # For spine-spine connections, build iBGP
+          if (state.role == 'ROLE_spine') and 'spine' not in peer_sys_name:
             _r = 0
             link_index = state.max_spines * (int(to_port_id) - 1) + int(my_port_id) - 1
           else:
             _r = 1
             link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
-          
-          if m: # Only for valid to_port
-            state.router_id = f"1.1.{_r}.{to_port_id}"
+
+          router_id_changed = False
+          if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
+            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else 1 }.{to_port_id}"
+            router_id_changed = True
 
           # Configure IP on interface and BGP for leaves
-          script_update_interface( 
-              my_port, 
-              str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31',
-              obj.lldp_neighbor.data.system_description if m else 'host',
-              str( list(state.peerlinks[link_index].hosts())[0] ) if _r==1 else '*',
-              state.base_as + (int(to_port_id) if _r==1 else 0),
-              state.router_id,
-              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
-              state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
-              state.peerlinks_prefix
-          )
+          link_name = f"link{link_index}"
+          if not hasattr(state,link_name):
+             _ip = str( list(state.peerlinks[link_index].hosts())[_r] )
+             _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+             script_update_interface(
+                 'spine' if state.role == 'ROLE_spine' else 'leaf',
+                 my_port,
+                 _ip + '/31',
+                 obj.lldp_neighbor.data.system_description if m else 'host',
+                 _peer if _r==1 else '*',
+                 state.base_as + (int(to_port_id) if state.role != 'ROLE_spine' else 0),
+                 state.router_id if router_id_changed else "",
+                 state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
+                 state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
+                 state.peerlinks_prefix
+             )
+             setattr( state, link_name, _ip )
     else:
-        logging.info(f"Unexpected notification : {obj}")                        
+        logging.info(f"Unexpected notification : {obj}")
 
     # dont subscribe to LLDP now
     return False
@@ -158,13 +167,13 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links):
-    logging.info(f'Calling update script: name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                  'router_id={router_id} peer_links={peer_links}')
+def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links):
+    logging.info(f'Calling update script: role={role} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
+                 f'router_id={router_id} peer_links={peer_links}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
-                                       name,ip,peer,peer_ip,str(_as),router_id,
-                                       str(peer_as_min),str(peer_as_max),peer_links], 
+                                       role,name,ip,peer,peer_ip,str(_as),router_id,
+                                       str(peer_as_min),str(peer_as_max),peer_links],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -174,10 +183,10 @@ def script_update_interface(name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_
 class State(object):
     def __init__(self):
         self.role = None       # May not be set in config
-    
+
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
-    
+
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
 ## Agent registration, notification registration, Subscrition to notifications.
@@ -189,7 +198,7 @@ def Run():
 
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
-    
+
     app_id = get_app_id(agent_name)
     if not app_id:
         logging.error(f'idb does not have the appId for {agent_name} : {app_id}')
@@ -205,7 +214,7 @@ def Run():
 
     stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
     stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
-    
+
     state = State()
     count = 1
     lldp_subscribed = False
@@ -220,7 +229,7 @@ def Run():
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
-                    
+
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
                     #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
@@ -231,7 +240,7 @@ def Run():
         # try:
            # Need to execute this in the mgmt network namespace, hardcoded name for now
            # XXX needs username/password unless checked out using 'git:'
-           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'], 
+           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'],
            #                            cwd='/etc/opt/srlinux/appmgr',
            #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
            # stdoutput, stderroutput = git_pull.communicate()
