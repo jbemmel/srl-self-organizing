@@ -1453,7 +1453,8 @@
         "srl_nokia-bgp:bgp": {
           "admin-state": "disable",
           "autonomous-system": 65001,
-          "export-policy": "accept-all",
+          "import-policy": "bgp-import",
+          "export-policy": "bgp-export",
           "router-id": "1.1.1.1",
 	  "ebgp-default-policy": {
            "import-reject-all": false,
@@ -1531,6 +1532,12 @@
         "member": [
           "no-export"
         ]
+      },
+      {
+        "name": "FABRIC-ROUTES",
+        "member": [
+          "65000:1"
+        ]
       }
     ],
     "policy": [
@@ -1541,6 +1548,54 @@
             
           }
         }
+      },
+      {
+        "name": "bgp-export",
+        "statement": [
+          {
+            "sequence-id": 10,
+            "match": {
+              "protocol": "srl_nokia-common:bgp",
+              "bgp": {
+                "community-set": "FABRIC-ROUTES"
+              }
+            },
+            "action": {
+              "accept": {
+                "bgp": {
+                  "communities": {
+                    "replace": "FABRIC-ROUTES"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "bgp-import",
+        "default-action": {
+          "reject": {
+
+          }
+        },
+        "statement": [
+          {
+            "sequence-id": 10,
+            "match": {
+              "protocol": "srl_nokia-common:bgp"
+            },
+            "action": {
+              "accept": {
+                "bgp": {
+                  "communities": {
+                    "replace": "FABRIC-ROUTES"
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       {
         "name": "export-hosts",
