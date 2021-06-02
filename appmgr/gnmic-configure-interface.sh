@@ -1,16 +1,17 @@
 #!/bin/bash
 
 # Sample script to provision SRLinux using gnmic
-ROLE="$1"  # "spine" or "leaf"
+ROLE="$1"  # "spine" or "leaf" or "endpoint"
 INTF="$2"
 IP_PREFIX="$3"
-PEER="$4"         # 'host' for Linux nodes
+PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
 AS="$6"
 ROUTER_ID="$7"
 PEER_AS_MIN="$8"
 PEER_AS_MAX="$9"
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
+PEER_TYPE="${11}"
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
@@ -47,7 +48,7 @@ EOF
 exitcode=$?
 
 # Enable BFD, except for host facing interfaces
-if [[ "$PEER" != "host" ]]; then
+if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
@@ -150,7 +151,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     }
   ],
 EOF
-else
+elif [[ "$ROLE" == "leaf" ]]; then
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "group": [
     {
@@ -166,6 +167,16 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     }
 ],
 EOF
+else
+  IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
+  "group": [
+      {
+        "group-name": "leaves",
+        "admin-state": "enable",
+        "peer-as": $PEER_AS_MIN
+      }
+  ],
+  EOF
 fi
 
 cat > $temp_file << EOF
@@ -193,23 +204,24 @@ cat > $temp_file << EOF
 
 EOF
 
-# Replace allows max 1 peer, TODO only add neighbors when already configured?
-if [[ "$PEER" != "host" ]]; then
+# Replace allows max 1 peer
 /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
   --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
-fi
+
 fi # if router_id provided, first time only
 
 if [[ "$PEER_IP" != "*" ]]; then
 _IP="$PEER_IP"
-if [[ "$PEER" == "host" ]]; then
+if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
 PEER_GROUP="hosts"
 _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
 elif [[ "$ROLE" == "spine" ]]; then
 PEER_GROUP="fellow-spines"
-else
+elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
+else
+PEER_GROUP="leaves"
 fi
 
 cat > $temp_file << EOF

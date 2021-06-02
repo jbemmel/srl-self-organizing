@@ -102,6 +102,8 @@ def Handle_Notification(obj, state):
                     state.max_spines = int( data['max_spines']['value'] )
                 if 'max_leaves' in data:
                     state.max_leaves = int( data['max_leaves']['value'] )
+                if 'max_hosts_per_leaf' in data:
+                    state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
                 return not state.role is None
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -164,8 +166,8 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
     else:
         leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
         if leafId:
-            # Disambiguate assuming 32 ports per leaf
-            return (int(leafId.groups()[0]) - 1) * 32 + lldp_peer_port
+            # Disambiguate assuming N ports per leaf
+            return (int(leafId.groups()[0]) - 1) * state.max_hosts_per_leaf + lldp_peer_port
         return lldp_peer_port
 
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
@@ -175,6 +177,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _r = 0
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
+    peer_type = 'leaf'
   elif (state.role != 'ROLE_endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*spine(\d+).*", lldp_peer_name)
@@ -183,24 +186,32 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _i = 1
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
+      peer_type = 'spine'
     else: # XXX hardcoded max hosts per leaf: 32
-      link_index = state.max_spines * state.max_leaves + 32 * (state.node_id-1) + (lldp_my_port - 1)
+      link_index = state.max_spines * state.max_leaves + state.max_hosts_per_leaf * (state.node_id-1) + (lldp_my_port - 1)
+      peer_type = 'host'
   else:
     _r = 1
     _i = 2
+    peer_type = 'leaf'
     leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
     if leafId:
       leaf = leafId.groups()[0] # typically 1,2,3,...
-      link_index = state.max_spines * state.max_leaves + 32 * (int(leaf)-1) + (lldp_peer_port - 1)
+      link_index = state.max_spines * state.max_leaves + state.max_hosts_per_leaf * (int(leaf)-1) + (lldp_peer_port - 1)
     else: # Only supports hosts connected to different ports of leaves
       link_index = state.max_spines * state.max_leaves + (lldp_peer_port - 1)
+
+  if link_index >= len(state.peerlinks):
+      logging.error(f'Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}')
+      return False
+
   # Configure IP on interface and BGP for leaves
   link_name = f"link{link_index}"
   if not hasattr(state,link_name):
      _ip = str( list(state.peerlinks[link_index].hosts())[_r] )
      _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
      script_update_interface(
-         'spine' if state.role == 'ROLE_spine' else 'leaf',
+         state.role[5:], # strip 'ROLE_' prefix
          intf_name,
          _ip + '/31',
          lldp_peer_desc,
@@ -209,7 +220,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.router_id if set_router_id else "",
          state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
          state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
-         state.peerlinks_prefix
+         state.peerlinks_prefix, peer_type
      )
      setattr( state, link_name, _ip )
 
@@ -227,13 +238,13 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links):
+def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type):
     logging.info(f'Calling update script: role={role} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                 f'router_id={router_id} peer_links={peer_links}' )
+                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
                                        role,name,ip,peer,peer_ip,str(_as),router_id,
-                                       str(peer_as_min),str(peer_as_max),peer_links],
+                                       str(peer_as_min),str(peer_as_max),peer_links,peer_type],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')

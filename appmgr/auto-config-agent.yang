@@ -61,6 +61,11 @@ module auto_config_agent {
                 type uint16;
                 default 16; // Currently only affects max AS that spines accept BGP peering from
             }
+            leaf max-hosts-per-leaf {
+                description "Maximum number of host ports per leaf, controls IP allocation; must match across fabric";
+                type uint16;
+                default 4; // Too high -> out of peer link IP space
+            }
 
         }
     }
