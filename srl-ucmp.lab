@@ -15,9 +15,9 @@ topology:
     leaf3:  { kind: srl, config: auto-leaf.cfg.json }
     spine1: { kind: srl, config: auto-spine.cfg.json }
 
-    h1: { kind: srl, config: auto-host.cfg.json }
-    h2: { kind: srl, config: auto-host.cfg.json }
-    h3: { kind: srl, config: auto-host.cfg.json }
+    h1: { kind: srl, config: auto-host-with-vip.cfg.json }
+    h2: { kind: srl, config: auto-host-with-vip.cfg.json }
+    h3: { kind: srl, config: auto-host-with-vip.cfg.json }
     h4: { kind: srl, config: auto-host.cfg.json }
 
   links:
