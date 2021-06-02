@@ -183,7 +183,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _i = 1
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
-  else: # XXX hardcoded max hosts per leaf: 32
+    else: # XXX hardcoded max hosts per leaf: 32
       link_index = state.max_spines * state.max_leaves + 32 * (state.node_id-1) + (lldp_my_port - 1)
   else:
     _r = 1
