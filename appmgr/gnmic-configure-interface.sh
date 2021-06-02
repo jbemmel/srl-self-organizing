@@ -168,15 +168,15 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 ],
 EOF
 else
-  IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
-  "group": [
-      {
-        "group-name": "leaves",
-        "admin-state": "enable",
-        "peer-as": $PEER_AS_MIN
-      }
-  ],
-  EOF
+IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
+"group": [
+    {
+      "group-name": "leaves",
+      "admin-state": "enable",
+      "peer-as": $PEER_AS_MIN
+    }
+],
+EOF
 fi
 
 cat > $temp_file << EOF
@@ -222,6 +222,7 @@ elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
 else
 PEER_GROUP="leaves"
+_IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
 fi
 
 cat > $temp_file << EOF

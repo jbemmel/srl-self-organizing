@@ -178,12 +178,14 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
     peer_type = 'leaf'
+    _as = state.base_as
   elif (state.role != 'ROLE_endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*spine(\d+).*", lldp_peer_name)
     _masterSpine = state.role == 'ROLE_spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.role=='ROLE_leaf') else 1
     _i = 1
+    _as = state.base_as + (0 if state.role == 'ROLE_spine' else state.node_id)
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
@@ -198,8 +200,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     if leafId:
       leaf = leafId.groups()[0] # typically 1,2,3,...
       link_index = state.max_spines * state.max_leaves + state.max_hosts_per_leaf * (int(leaf)-1) + (lldp_peer_port - 1)
+      _as = state.base_as + int(leaf) # iBGP, same AS as leaf
     else: # Only supports hosts connected to different ports of leaves
       link_index = state.max_spines * state.max_leaves + (lldp_peer_port - 1)
+      _as = state.base_as + lldp_peer_port
 
   if link_index >= len(state.peerlinks):
       logging.error(f'Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}')
@@ -216,10 +220,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _ip + '/31',
          lldp_peer_desc,
          _peer if state.role != 'ROLE_spine' else '*',
-         state.base_as + (lldp_peer_port if state.role != 'ROLE_spine' else 0),
+         _as,
          state.router_id if set_router_id else "",
-         state.base_as if (state.role == 'ROLE_leaf') else state.base_as + 1,
-         state.base_as if (state.role == 'ROLE_leaf') else state.base_as + state.max_leaves,
+         state.base_as if (state.role != 'ROLE_spine') else state.base_as + 1,
+         state.base_as if (state.role != 'ROLE_spine') else state.base_as + state.max_leaves,
          state.peerlinks_prefix, peer_type
      )
      setattr( state, link_name, _ip )
