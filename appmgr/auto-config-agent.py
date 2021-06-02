@@ -121,25 +121,26 @@ def Handle_Notification(obj, state):
 
           # First figure out this node's relative id in its group. Don't depend on hostname
           if not hasattr(state,"node_id"):
-             node_id = determine_local_node_id( state, int(my_port), int(to_port), peer_sys_name):
+             node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
              if node_id == 0:
-                state.pending_peers[ my_port_id ] = ( my_port, int(my_port_id), int(to_port_id),
-                  peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host' )
+                state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
+                  peer_sys_name, obj.lldp_neighbor.data.system_description )
                 return False; # Unable to continue configuration
              state.node_id = node_id
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            state.router_id = f"1.1.{ 0 if state.role == 'ROLE_spine' else _i }.{ state.node_id }"
+            _i = 0 if state.role == 'ROLE_spine' else 1 if state.role == 'ROLE_leaf' else 2
+            state.router_id = f"1.1.{ _i }.{ state.node_id }"
             router_id_changed = True
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
           if router_id_changed:
-             for _my_port, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc in state.pending_peers:
-                 configure_peer_link( state, _my_port, _my_port_id, _to_port_id,
-                   _peer_sys_name, _lldp_desc )
+             for intf in state.pending_peers:
+                 _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc = state.pending_peers[intf]
+                 configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
 
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -155,16 +156,17 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
     if state.role == "ROLE_spine":
        # TODO spine-spine link case
        return lldp_my_port
-   elif state.role == "ROLE_leaf":
-       if "spine" in lldp_peer_name:
-           return lldp_peer_port
-       else:
-           return 0 # Cannot determine yet
-   else:
-       leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
-       if leafId:
-           return (int(leafId.groups()[0]) - 1) * 32 + lldp_peer_port
-       return lldp_peer_port
+    elif state.role == "ROLE_leaf":
+        if "spine" in lldp_peer_name:
+            return lldp_peer_port
+        else:
+            return 0 # Cannot determine yet
+    else:
+        leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
+        if leafId:
+            # Disambiguate assuming 32 ports per leaf
+            return (int(leafId.groups()[0]) - 1) * 32 + lldp_peer_port
+        return lldp_peer_port
 
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
@@ -174,25 +176,24 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
   elif (state.role != 'ROLE_endpoint'):
-    if 'spine' not in lldp_peer_name:
-       m = False # Only configure Leaf router ID based on Spine connection
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*spine(\d+).*", lldp_peer_name)
     _masterSpine = state.role == 'ROLE_spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.role=='ROLE_leaf') else 1
     _i = 1
-    link_index = state.max_spines * (int(my_port_id) - 1) + int(to_port_id) - 1
+    if spineId: # For spine facing links, pick based on peer_port
+      link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
+  else: # XXX hardcoded max hosts per leaf: 32
+      link_index = state.max_spines * state.max_leaves + 32 * (state.node_id-1) + (lldp_my_port - 1)
   else:
     _r = 1
     _i = 2
     leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
     if leafId:
       leaf = leafId.groups()[0] # typically 1,2,3,...
-      to_port_id += (int(leaf) - 1) * 32
-      _port = (lldp_my_port-1) + lldp_peer_port - 1
-      link_index = (state.max_spines + lldp_peer_port - 1) * state.max_leaves + _port
+      link_index = state.max_spines * state.max_leaves + 32 * (int(leaf)-1) + (lldp_peer_port - 1)
     else: # Only supports hosts connected to different ports of leaves
-      link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
+      link_index = state.max_spines * state.max_leaves + (lldp_peer_port - 1)
   # Configure IP on interface and BGP for leaves
   link_name = f"link{link_index}"
   if not hasattr(state,link_name):
