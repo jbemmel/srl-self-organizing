@@ -157,7 +157,7 @@ def Handle_Notification(obj, state):
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
     if state.role == "ROLE_spine":
        # TODO spine-spine link case
-       return lldp_my_port
+       return lldp_peer_port
     elif state.role == "ROLE_leaf":
         if "spine" in lldp_peer_name:
             return lldp_peer_port
