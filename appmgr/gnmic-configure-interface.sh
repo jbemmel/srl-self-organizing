@@ -220,14 +220,14 @@ if [[ "$PEER_IP" != "*" ]]; then
 _IP="$PEER_IP"
 if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
 PEER_GROUP="hosts"
-_IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
+# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
 elif [[ "$ROLE" == "spine" ]]; then
 PEER_GROUP="fellow-spines"
 elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
 else
 PEER_GROUP="leaf-ibgp"
-_IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
+# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
 fi
 
 cat > $temp_file << EOF
