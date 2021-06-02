@@ -224,7 +224,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.router_id if set_router_id else "",
          state.base_as if (state.role != 'ROLE_spine') else state.base_as + 1,
          state.base_as if (state.role != 'ROLE_spine') else state.base_as + state.max_leaves,
-         state.peerlinks_prefix, peer_type
+         state.peerlinks_prefix, peer_type, "disable" # Disable OSPFv3 for now
      )
      setattr( state, link_name, _ip )
 
@@ -242,13 +242,13 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type):
+def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,ospf):
     logging.info(f'Calling update script: role={role} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type}' )
+                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} ospf={ospf}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
                                        role,name,ip,peer,peer_ip,str(_as),router_id,
-                                       str(peer_as_min),str(peer_as_max),peer_links,peer_type],
+                                       str(peer_as_min),str(peer_as_max),peer_links,peer_type,ospf],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')

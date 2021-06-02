@@ -12,6 +12,7 @@ PEER_AS_MIN="$8"
 PEER_AS_MAX="$9"
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
+OSPF_ADMIN_STATE="${12}" # 'enable' or 'disable'
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
@@ -97,7 +98,7 @@ exitcode+=$?
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
-  "admin-state": "enable",
+  "admin-state": "$OSPF_ADMIN_STATE",
   "version": "ospf-v3",
   "address-family": "ipv6-unicast",
   "max-ecmp-paths": 4,
@@ -188,12 +189,14 @@ cat > $temp_file << EOF
   "router-id": "$ROUTER_ID",
   $DYNAMIC_NEIGHBORS
   "ipv4-unicast": {
+    "admin-state": "enable",
     "multipath": {
       "max-paths-level-1": 4,
       "max-paths-level-2": 4
     }
   },
   "ipv6-unicast": {
+    "admin-state": "enable",
     "multipath": {
       "max-paths-level-1": 4,
       "max-paths-level-2": 4

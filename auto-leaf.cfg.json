@@ -1453,7 +1453,7 @@
         "srl_nokia-bgp:bgp": {
           "admin-state": "disable",
           "autonomous-system": 65001,
-          "export-policy": "export-hosts",
+          "export-policy": "accept-all",
           "router-id": "1.1.1.1",
 	  "ebgp-default-policy": {
            "import-reject-all": false,
