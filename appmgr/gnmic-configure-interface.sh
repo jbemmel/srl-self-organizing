@@ -163,6 +163,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "hosts",
       "admin-state": "enable",
+      "ipv6-unicast" : { "admin-state" : "enable" },
       "peer-as": $AS
     }
 ],
@@ -171,9 +172,10 @@ else
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "group": [
     {
-      "group-name": "leaves",
+      "group-name": "leaf-ibgp",
       "admin-state": "enable",
-      "peer-as": $PEER_AS_MIN
+      "ipv6-unicast" : { "admin-state" : "enable" },
+      "peer-as": $AS
     }
 ],
 EOF
@@ -221,7 +223,7 @@ PEER_GROUP="fellow-spines"
 elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
 else
-PEER_GROUP="leaves"
+PEER_GROUP="leaf-ibgp"
 _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
 fi
 

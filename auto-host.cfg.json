@@ -1412,6 +1412,10 @@
           {
             "ip-prefix": "0.0.0.0/0",
             "mask-length-range": "32..32"
+          },
+          {
+            "ip-prefix": "::/0",
+            "mask-length-range": "128..128"
           }
         ]
       },
@@ -1421,6 +1425,10 @@
           {
             "ip-prefix": "0.0.0.0/0",
             "mask-length-range": "31..31"
+          },
+          {
+            "ip-prefix": "::/0",
+            "mask-length-range": "127..127"
           }
         ]
       }
