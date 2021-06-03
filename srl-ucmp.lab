@@ -14,6 +14,7 @@ topology:
     leaf2:  { kind: srl, config: auto-leaf.cfg.json }
     leaf3:  { kind: srl, config: auto-leaf.cfg.json }
     spine1: { kind: srl, config: auto-spine.cfg.json }
+    spine2: { kind: srl, config: auto-spine.cfg.json }
 
     h1: { kind: srl, config: auto-host-with-vip.cfg.json }
     h2: { kind: srl, config: auto-host-with-vip.cfg.json }
@@ -24,10 +25,13 @@ topology:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
     - endpoints: ["leaf2:e1-1","spine1:e1-2"]
     - endpoints: ["leaf3:e1-1","spine1:e1-3"]
+    - endpoints: ["leaf1:e1-2","spine2:e1-1"]
+    - endpoints: ["leaf2:e1-2","spine2:e1-2"]
+    - endpoints: ["leaf3:e1-2","spine2:e1-3"]
 
-    - endpoints: ["h1:e1-1","leaf1:e1-2"]
-    - endpoints: ["h2:e1-1","leaf1:e1-3"]
+    - endpoints: ["h1:e1-1","leaf1:e1-3"]
+    - endpoints: ["h2:e1-1","leaf1:e1-4"]
 
-    - endpoints: ["h3:e1-1","leaf2:e1-2"]
+    - endpoints: ["h3:e1-1","leaf2:e1-3"]
 
-    - endpoints: ["h4:e1-1","leaf3:e1-2"]
+    - endpoints: ["h4:e1-1","leaf3:e1-3"]
