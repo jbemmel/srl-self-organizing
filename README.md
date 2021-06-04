@@ -38,4 +38,7 @@ This example uses eBGP peering to exchange routes within the fabric, and iBGP to
 * Routing policy to 
   + stop forwarding leaf loopbacks beyond the spines (tag with no-export)
   + only advertise direct attached subnets (don't export AS path length >= 1 routes)
-  + not advertise /31 peering links 
+  + not advertise /31 peering links
+
+## EVPN overlay
+The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
