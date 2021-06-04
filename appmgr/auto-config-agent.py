@@ -18,6 +18,8 @@ import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
 import config_service_pb2
+import route_service_pb2
+import route_service_pb2_grpc
 import sdk_common_pb2
 from logging.handlers import RotatingFileHandler
 
@@ -49,6 +51,11 @@ def Subscribe(stream_id, option):
     elif option == 'cfg':
         entry = config_service_pb2.ConfigSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
+    elif option == 'route':
+        # This includes all network namespaces, i.e. including mgmt
+        entry = route_service_pb2.IpRouteSubscriptionRequest()
+        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, route=entry)
+
     subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     print('Status of subscription response for {}:: {}'.format(option, subscription_response.status))
 
@@ -143,6 +150,34 @@ def Handle_Notification(obj, state):
              for intf in state.pending_peers:
                  _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc = state.pending_peers[intf]
                  configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+
+    elif obj.HasField('route'):
+        addr = ipaddress.ip_address(obj.route.key.ip_prefix.ip_addr.addr).__str__()
+        prefix = obj.route.key.ip_prefix.prefix_length
+        netins = obj.route.key.net_inst_name
+        logging.info( f"ROUTE notification: {addr}/{prefix} net_instance={netins}" )
+        # nhg_id = obj.route.data.nhg_id
+        # owner_id = obj.route.data.owner_id # To correlate Delete later on
+        # "1" == "default" instance
+        if obj.route.data.metric!=10 and prefix==32 and netins=="1":
+           route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
+           route_request = route_service_pb2.RouteAddRequest()
+           route_info = route_request.routes.add()
+           route_info.key.net_inst_name = "default" # obj.route.key.net_inst_name
+           route_info.key.ip_prefix.ip_addr.addr = obj.route.key.ip_prefix.ip_addr.addr
+           route_info.key.ip_prefix.prefix_length = obj.route.key.ip_prefix.prefix_length
+           route_info.data.metric = 10 # test
+           logging.info(f"ROUTE REQUEST :: {route_request}")
+           try:
+              route_stub.SyncStart(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
+              route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
+              logging.info(f"ROUTE RESPONSE:: {route_response} status={route_response.status}")
+              route_sync_response = route_stub.SyncEnd(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
+              logging.info(route_sync_response)
+           except Exception as e:
+              logging.error(e)
+        else:
+           logging.info("Ignored")
 
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -304,12 +339,13 @@ def Run():
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
+                       Subscribe(stream_id, 'route')
                        lldp_subscribed = True
 
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
                     #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
-                    logging.info(f'Updated state: {state}')
+                    # logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'GOING TO EXIT NOW, DOING FINAL git pull: {err}')

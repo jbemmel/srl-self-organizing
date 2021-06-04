@@ -11,9 +11,16 @@ COPY 42_sr_copy_custom_appmgr.sh /opt/srlinux/bin/bootscript/
 # sudo docker run -it --privileged -v /tmp/var_lib_docker:/var/lib/balena-engine srl/auto-config:latest
 RUN curl -sfL https://balena.io/engine/install.sh | sh
 
+# Add Paris traceroute
+COPY --from=paris-traceroute /usr/local/bin/paris-* /usr/local/bin/
+COPY --from=paris-traceroute /usr/local/lib/* /usr/local/lib/
+
 # --chown=srlinux:srlinux
 # COPY ./appmgr/ /etc/opt/srlinux/appmgr/ # doesn't stick
 COPY ./appmgr/ /home/appmgr
+
+# Add FIB agent
+COPY ./srl-demo-agent/demo_* /home/appmgr/
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"

@@ -16,10 +16,14 @@ OSPF_ADMIN_STATE="${12}" # 'enable' or 'disable'
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
+if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+  _ROUTED='"type" : "routed",'
+fi
 cat > $temp_file << EOF
 {
   "description": "To $PEER",
   "admin-state": "enable",
+  $_ROUTED
   "subinterface": [
     {
       "index": 0,
@@ -149,6 +153,18 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "leaves",
       "admin-state": "enable"
+    },
+    {
+      "group-name": "evpn",
+      "admin-state": "enable",
+      "peer-as": $AS,
+      "evpn": {
+        "admin-state": "enable"
+      },
+      "route-reflector": {
+        "client": true,
+        "cluster-id": "$ROUTER_ID"
+      }
     }
   ],
 EOF
@@ -166,6 +182,14 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "admin-state": "enable",
       "ipv6-unicast" : { "admin-state" : "enable" },
       "peer-as": $AS
+    },
+    {
+      "group-name": "evpn",
+      "admin-state": "enable",
+      "peer-as": $PEER_AS_MIN,
+      "evpn": {
+        "admin-state": "enable"
+      }
     }
 ],
 EOF
