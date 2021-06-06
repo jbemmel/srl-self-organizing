@@ -139,10 +139,14 @@ class CommandLoop(object):
           _path_parts = _m.split('/')
           _root = '/'.join( _path_parts[0:-1] )
           _leaf = utilities.sanitize_name( _path_parts[-1] )
-          _result = str( getattr( _data.get_first_descendant(_root), _leaf) )
-          self._output.print_warning_line( f'path={match} -> {_result}' )
-          _r = _result.split(" ")
-          return _result if len(_r)==1 else _r[1] if _r[0]==_leaf else "?"
+          _result = getattr( _data.get_first_descendant(_root), _leaf)
+          self._output.print_warning_line( f'path={match} -> {_result} type={type(_result)}' )
+          try:
+             self._output.print_warning_line( f'get={ _result.get("ip-prefix") }' )
+          except Exception as e:
+             self._output.print_warning_line( str(e) )
+          _r = str(_result).split(" ")
+          return str(_result) if len(_r)==1 else _r[1] if _r[0]==_leaf else "?"
 
         return re.sub('\$\{(.*)\}', lambda m: _lookup(m.group()), line)
 
