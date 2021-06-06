@@ -132,21 +132,23 @@ class CommandLoop(object):
           if _m[0]!="/":
               self._output.print_warning_line( f'Lookup ENV var={match}' )
               return os.environ[ _m ]
-          _path = build_path( _m )
+
           self._output.print_warning_line( f'Lookup variable path={match}' )
+          _path_parts = _m.split('/')
+          _leafkey = _path_parts[-1].split('#') # Allow '#' for use with keys
+          _root = '/'.join( _path_parts[0:-2] ) + '/' + _leafkey[0]
+          _leaf = utilities.sanitize_name( _leafkey[0] )
+          _path = build_path( _root )
           # This returns a / node
           _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)
-          _path_parts = _m.split('/')
-          _root = '/'.join( _path_parts[0:-1] )
-          _leaf = utilities.sanitize_name( _path_parts[-1] )
           _result = getattr( _data.get_first_descendant(_root), _leaf)
           self._output.print_warning_line( f'path={match} -> {_result} type={type(_result)}' )
-          try:
-             self._output.print_warning_line( f'get={ _result.get("ip-prefix") }' )
-          except Exception as e:
-             self._output.print_warning_line( str(e) )
-          _r = str(_result).split(" ")
-          return str(_result) if len(_r)==1 else _r[1] if _r[0]==_leaf else "?"
+          # list address -> key ip-prefix, or container bgp -> leaf router-id
+          if len(_leafkey) > 1:
+              _key = utilities.sanitize_name( _leafkey[1] )
+              return str( getattr( _result.get(), _key ) )
+          else:
+              return str( _result ) # leaf value
 
         return re.sub('\$\{(.*)\}', lambda m: _lookup(m.group()), line)
 

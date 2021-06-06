@@ -23,7 +23,7 @@ COPY ./appmgr/ /home/appmgr
 COPY ./srl-demo-agent/demo_* /home/appmgr/
 
 # Add CLI enhancements
-COPY ./mgmt_cli_engine_command_loop.py.jvb /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli_engine/command_loop.py
+COPY ./mgmt_cli_engine_command_loop.py /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli_engine/command_loop.py
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"
