@@ -23,10 +23,10 @@ cat > $temp_file << EOF
 {
   "description": "To $PEER",
   "admin-state": "enable",
-  $_ROUTED
   "subinterface": [
     {
       "index": 0,
+      $_ROUTED
       "admin-state": "enable",
       "ipv4": {
         "address": [

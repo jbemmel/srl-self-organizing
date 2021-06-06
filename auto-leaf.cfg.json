@@ -1569,6 +1569,21 @@
                 }
               }
             }
+          },
+          {
+            "sequence-id": 20,
+            "match": {
+              "protocol": "srl_nokia-common:local"
+            },
+            "action": {
+              "accept": {
+                "bgp": {
+                  "communities": {
+                    "replace": "FABRIC-ROUTES"
+                  }
+                }
+              }
+            }
           }
         ]
       },
