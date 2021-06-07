@@ -135,20 +135,30 @@ class CommandLoop(object):
 
           self._output.print_warning_line( f'Lookup variable path={match}' )
           _path_parts = _m.split('/')
-          _leafkey = _path_parts[-1].split('#') # Allow '#' for use with keys
-          _root = '/'.join( _path_parts[0:-2] ) + '/' + _leafkey[0]
-          _leaf = utilities.sanitize_name( _leafkey[0] )
+          _root = '/'.join( _path_parts[0:-1] )
           _path = build_path( _root )
           # This returns a / node
           _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)
-          _result = getattr( _data.get_first_descendant(_root), _leaf)
-          self._output.print_warning_line( f'path={match} -> {_result} type={type(_result)}' )
-          # list address -> key ip-prefix, or container bgp -> leaf router-id
-          if len(_leafkey) > 1:
-              _key = utilities.sanitize_name( _leafkey[1] )
-              return str( getattr( _result.get(), _key ) )
+          _node = _data.get_first_descendant(_root)
+
+          # Support annotations using '!!!' or '!!!key'
+          if '!!!' in _path_parts[-1]:
+              _la = _path_parts[-1].split('!!!')
+              _anns = _node.get_annotations(utilities.sanitize_name(_la[0]))
+              _result = _anns[0].text
+              if _la[1]!='':
+                 _kvs = _result.split(',')
+                 _result = "" # If not found, return empty string
+                 for k in _kvs:
+                     _kv = k.split('=')
+                     if len(_kv)==2 and _kv[0]==_la[1]:
+                         self._output.print_warning_line( f'Using annotation {k}' )
+                         _result = _kv[1]
+                         break
           else:
-              return str( _result ) # leaf value
+             _result = getattr(_node,utilities.sanitize_name( _path_parts[-1] ))
+          self._output.print_warning_line( f'path={_m} -> {_result} type={type(_result)}' )
+          return str( _result ) # leaf value, can be int or bool
 
         return re.sub('\$\{(.*)\}', lambda m: _lookup(m.group()), line)
 
@@ -161,6 +171,9 @@ class CommandLoop(object):
             self._check_for_configuration_session_termination()
             line = self._process_vars(line) # JvB added
             self._observe_pre_parsing(line)
+
+            # TODO:
+            # line = self._observe_pre_parsing(line) or line
 
             self._state.parser_recursion_level = 0
             commands = self._line_parser.parse(line)

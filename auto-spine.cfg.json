@@ -1477,12 +1477,30 @@
         ]
       }
     ],
+    "community-set": [
+      {
+        "name": "no-export",
+        "member": [
+          "no-export"
+        ]
+      },
+      {
+        "name": "FABRIC-ROUTES",
+        "member": [
+          "65000:1"
+        ]
+      }
+    ],
     "policy": [
       {
         "name": "spine-export-policy",
         "default-action": {
           "accept": {
-            
+            "bgp": {
+                  "communities": {
+                    "replace": "no-export"
+                  }
+            }
           }
         },
         "statement": [
