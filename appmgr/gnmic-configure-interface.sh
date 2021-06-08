@@ -104,7 +104,7 @@ cat > $temp_file << EOF
   "admin-state": "$OSPF_ADMIN_STATE",
   "version": "ospf-v3",
   "address-family": "ipv6-unicast",
-  "max-ecmp-paths": 4,
+  "max-ecmp-paths": 8,
   "area": [
     {
       "area-id": "0.0.0.0",
@@ -213,15 +213,15 @@ cat > $temp_file << EOF
   "ipv4-unicast": {
     "admin-state": "enable",
     "multipath": {
-      "max-paths-level-1": 4,
-      "max-paths-level-2": 4
+      "max-paths-level-1": 8,
+      "max-paths-level-2": 8
     }
   },
   "ipv6-unicast": {
     "admin-state": "enable",
     "multipath": {
-      "max-paths-level-1": 4,
-      "max-paths-level-2": 4
+      "max-paths-level-1": 8,
+      "max-paths-level-2": 8
     }
   },
   "route-advertisement": {
