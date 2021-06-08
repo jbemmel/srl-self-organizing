@@ -164,7 +164,7 @@ class CommandLoop(object):
           self._output.print_warning_line( f'path={_m} -> {_result} type={type(_result)}' )
           if len(_expr_eval) > 1:
               # Make result available as '_' in locals, and ipaddress
-              _globals = { ipaddress: ipaddress }
+              _globals = { "ipaddress" : ipaddress }
               _locals  = { "_" : str( _result ) }
               return str( eval(_expr_eval[1], _globals, _locals ) )
           else:
