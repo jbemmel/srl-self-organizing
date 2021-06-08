@@ -249,6 +249,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   if not hasattr(state,link_name):
      _ip = str( list(state.peerlinks[link_index].hosts())[_r] )
      _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+     logging.info(f"Configuring link index {link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}") 
      script_update_interface(
          state.role[5:], # strip 'ROLE_' prefix
          intf_name,
@@ -262,6 +263,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix, peer_type, "disable" # Disable OSPFv3 for now
      )
      setattr( state, link_name, _ip )
+  else:
+     logging.info(f"Link index {link_index} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
 
 
 ##################################################################################################
