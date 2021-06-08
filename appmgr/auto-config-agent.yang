@@ -66,6 +66,11 @@ module auto_config_agent {
                 type uint16;
                 default 4; // Too high -> out of peer link IP space
             }
+            leaf max-lag-links {
+                description "Maximum number of links in a LAG bundle, controls IP allocation; must match across fabric";
+                type uint8;
+                default 4; // Too high -> out of peer link IP space
+            }
 
         }
     }

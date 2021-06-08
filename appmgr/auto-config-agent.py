@@ -111,6 +111,8 @@ def Handle_Notification(obj, state):
                     state.max_leaves = int( data['max_leaves']['value'] )
                 if 'max_hosts_per_leaf' in data:
                     state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
+                if 'max_lag_links' in data:
+                    state.max_lag_links = int( data['max_lag_links']['value'] )
                 return not state.role is None
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -225,7 +227,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
     else: # XXX hardcoded max hosts per leaf: 32
-      link_index = state.max_spines * state.max_leaves + state.max_hosts_per_leaf * (state.node_id-1) + (lldp_my_port - 1)
+      link_index = (state.max_spines * state.max_leaves +
+                    state.max_hosts_per_leaf * (state.node_id-1) +
+                    state.max_lag_links * (lldp_peer_port - 1) +
+                    (lldp_my_port - 1))
       peer_type = 'host'
   else:
     _r = 1
@@ -234,7 +239,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
     if leafId:
       leaf = leafId.groups()[0] # typically 1,2,3,...
-      link_index = state.max_spines * state.max_leaves + state.max_hosts_per_leaf * (int(leaf)-1) + (lldp_peer_port - 1)
+      link_index = (state.max_spines * state.max_leaves +
+                    state.max_hosts_per_leaf * (int(leaf)-1) +
+                    state.max_lag_links * (lldp_my_port - 1) +
+                    (lldp_peer_port - 1))
       _as = state.base_as + int(leaf) # iBGP, same AS as leaf
     else: # Only supports hosts connected to different ports of leaves
       link_index = state.max_spines * state.max_leaves + (lldp_peer_port - 1)
@@ -249,7 +257,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   if not hasattr(state,link_name):
      _ip = str( list(state.peerlinks[link_index].hosts())[_r] )
      _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
-     logging.info(f"Configuring link index {link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}") 
+     logging.info(f"Configuring link index {link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
      script_update_interface(
          state.role[5:], # strip 'ROLE_' prefix
          intf_name,
