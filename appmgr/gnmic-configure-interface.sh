@@ -101,7 +101,7 @@ exitcode+=$?
 
 cat > $temp_file << EOF
 {
-  "router-id": "$ROUTER_ID",
+  "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   "admin-state": "$OSPF_ADMIN_STATE",
   "version": "ospf-v3",
   "address-family": "ipv6-unicast",
