@@ -27,6 +27,9 @@ import os
 from srlinux.location import build_path
 from srlinux.data import utilities
 
+# For use with eval
+import ipaddress
+
 class CommandLoop(object):
     ''' Main executable class for any CLI engine.
         It will:
@@ -134,7 +137,8 @@ class CommandLoop(object):
               return os.environ[ _m ]
 
           self._output.print_warning_line( f'Lookup variable path={match}' )
-          _path_parts = _m.split('/')
+          _expr_eval = _m.split('|') # Support ${path|eval}, todo escaping
+          _path_parts = _expr_eval[0].split('/')
           _la = _path_parts[-1].split('!!!')
           _root = '/'.join( _path_parts[0:-1] if len(_path_parts)>2 else ["",_la[0]] )
           _path = build_path( _root )
@@ -144,8 +148,8 @@ class CommandLoop(object):
 
           # Support annotations using '!!!' or '!!!key'
           if '!!!' in _path_parts[-1]:
-              _anns = _node.get_annotations(utilities.sanitize_name(_la[0]))
-              _result = _anns[0].text
+              _anns = _node.get_annotations( _la[0] if len(_path_parts)>2 else None )
+              _result = _anns[0].text if _anns!=[] else ""
               if _la[1]!='':
                  _kvs = _result.split(',')
                  _result = "" # If not found, return empty string
@@ -158,7 +162,13 @@ class CommandLoop(object):
           else:
              _result = getattr(_node,utilities.sanitize_name( _path_parts[-1] ))
           self._output.print_warning_line( f'path={_m} -> {_result} type={type(_result)}' )
-          return str( _result ) # leaf value, can be int or bool
+          if len(_expr_eval) > 1:
+              # Make result available as '_' in locals, and ipaddress
+              _globals = { ipaddress: ipaddress }
+              _locals  = { "_" : str( _result ) }
+              return str( eval(_expr_eval[1], _globals, _locals ) )
+          else:
+              return str( _result ) # leaf value, can be int or bool
 
         return re.sub('\$\{(.*)\}', lambda m: _lookup(m.group()), line)
 
