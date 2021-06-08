@@ -135,7 +135,8 @@ class CommandLoop(object):
 
           self._output.print_warning_line( f'Lookup variable path={match}' )
           _path_parts = _m.split('/')
-          _root = '/'.join( _path_parts[0:-1] )
+          _la = _path_parts[-1].split('!!!')
+          _root = '/'.join( _path_parts[0:-1] if len(_path_parts)>2 else ["",_la[0]] )
           _path = build_path( _root )
           # This returns a / node
           _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)
@@ -143,7 +144,6 @@ class CommandLoop(object):
 
           # Support annotations using '!!!' or '!!!key'
           if '!!!' in _path_parts[-1]:
-              _la = _path_parts[-1].split('!!!')
               _anns = _node.get_annotations(utilities.sanitize_name(_la[0]))
               _result = _anns[0].text
               if _la[1]!='':

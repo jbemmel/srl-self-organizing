@@ -14,6 +14,8 @@ LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 OSPF_ADMIN_STATE="${12}" # 'enable' or 'disable'
 
+GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
+
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
@@ -48,8 +50,7 @@ cat > $temp_file << EOF
 EOF
 
 # For now, assume that the interface is already added to the default network-instance; only update its IP address
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --replace-path /interface[name=$INTF] --replace-file $temp_file
+$GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
 # Enable BFD, except for host facing interfaces
@@ -63,8 +64,7 @@ cat > $temp_file << EOF
 }
 EOF
 
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
+$GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode=$?
 fi
 
@@ -95,13 +95,12 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --replace-path /interface[name=lo0] --replace-file $temp_file
+$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
 exitcode+=$?
 
 cat > $temp_file << EOF
 {
-  "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
+  "router-id": "$ROUTER_ID",
   "admin-state": "$OSPF_ADMIN_STATE",
   "version": "ospf-v3",
   "address-family": "ipv6-unicast",
@@ -124,8 +123,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
 exitcode+=$?
 
 if [[ "$ROLE" == "spine" ]]; then
@@ -210,7 +208,7 @@ cat > $temp_file << EOF
 {
   "admin-state": "enable",
   "autonomous-system": $AS,
-  "router-id": "$ROUTER_ID",
+  "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   "ipv4-unicast": {
     "admin-state": "enable",
@@ -234,8 +232,15 @@ cat > $temp_file << EOF
 EOF
 
 # Replace allows max 1 peer
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
+exitcode+=$?
+
+# Annotate /system as well
+cat > $temp_file << EOF
+{ "_annotate" : "${ROUTER_ID##*.}" }
+EOF
+
+$GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
 fi # if router_id provided, first time only
@@ -260,8 +265,7 @@ cat > $temp_file << EOF
   "peer-group": "$PEER_GROUP"
 }
 EOF
-/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf set \
-  --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
