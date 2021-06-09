@@ -59,6 +59,9 @@ EOF
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
+# Add it to the default instance
+$GNMIC set --update /network-instance[name=default]/interface[name=${INTF}.0]:::string:::''
+
 # Enable BFD, except for host facing interfaces
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
 cat > $temp_file << EOF
@@ -104,10 +107,6 @@ cat > $temp_file << EOF
     {
       "area-id": "0.0.0.0",
       "interface": [
-        {
-          "interface-name": "${INTF}.0",
-          "interface-type": "point-to-point"
-        },
         {
           "interface-name": "lo0.0",
           "interface-type": "broadcast",
