@@ -83,20 +83,8 @@ cat > $temp_file << EOF
     {
       "index": 0,
       "admin-state": "enable",
-      "ipv4": {
-        "address": [
-          {
-            "ip-prefix": "$ROUTER_ID/32"
-          }
-        ]
-      },
-      "ipv6": {
-        "address": [
-          {
-            "ip-prefix": "2001::${ROUTER_ID//\./:}/128"
-          }
-        ]
-      }
+      "ipv4": { "address": [ { "ip-prefix": "$ROUTER_ID/32" } ] },
+      "ipv6": { "address": [ { "ip-prefix": "2001::${ROUTER_ID//\./:}/128" } ] }
     }
   ]
 }
@@ -104,6 +92,7 @@ EOF
 $GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
 exitcode+=$?
 
+# TODO more incremental, interfaces should be added based on LLDP events
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
@@ -132,6 +121,40 @@ EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
 exitcode+=$?
 
+# Need a generic BGP policy to advertise loopbacks; apply specifically
+cat > $temp_file << EOF
+{
+  "prefix-set": [
+    {
+      "name": "loopbacks",
+      "prefix": [
+        { "ip-prefix": "0.0.0.0/0","mask-length-range": "32..32" },
+        { "ip-prefix": "::/0", "mask-length-range": "128..128" }
+      ]
+    }
+  ],
+  "policy": [
+    {
+      "name": "export-loopbacks",
+      "default-action": { "reject": { } },
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": {
+            "prefix-set": "loopbacks"
+          },
+          "action": { "accept": { } }
+        }
+      ]
+    }
+  ]
+}
+EOF
+
+# Or replace to reset all to a known state?
+$GNMIC set --update-path /routing-policy --update-file $temp_file
+exitcode+=$?
+
 if [[ "$ROLE" == "spine" ]]; then
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
@@ -156,7 +179,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     },
     {
       "group-name": "leaves",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "export-policy": "export-loopbacks"
     },
     {
       "group-name": "evpn",
@@ -178,6 +202,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "spines",
       "admin-state": "enable",
+      "export-policy": "export-loopbacks",
       "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
       "peer-as": $PEER_AS_MIN
     },
@@ -188,7 +213,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "peer-as": $AS
     },
     {
-      "group-name": "evpn",
+      "group-name": "evpn-rr",
       "admin-state": "enable",
       "peer-as": $PEER_AS_MIN,
       "evpn": {
@@ -237,7 +262,6 @@ cat > $temp_file << EOF
 
 EOF
 
-# Replace allows max 1 peer
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
 

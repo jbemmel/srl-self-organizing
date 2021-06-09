@@ -143,9 +143,9 @@ class CommandLoop(object):
              self._output.print_warning_line( f'Lookup state path={match} _root={_root} parts={_path_parts}' )
 
              # Support lookup in state too, using '//'
-             if _path_parts[0] == '' and _path_parts[1] == '':
+             if _root[0:2] == "//":
                _root = _root[1:] # Strip '/'
-               _path = build_path( _root ) 
+               _path = build_path( _root )
                _store = self._state.server.get_data_store( DataStore.State )
                _data = _store.get_data(_path,recursive=False,include_field_defaults=True)
              else:

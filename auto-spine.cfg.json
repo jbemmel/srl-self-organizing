@@ -1417,34 +1417,7 @@
         {
           "name": "lo0.0"
         }
-      ],
-      "protocols": {
-        "srl_nokia-bgp:bgp": {
-          "admin-state": "disable",
-          "autonomous-system": 65000,
-          "export-policy": "spine-export-policy",
-          "router-id": "1.1.1.1",
-	  "ebgp-default-policy": {
-           "import-reject-all": false,
-           "export-reject-all": false
-          },
-          "ipv4-unicast": {
-            "multipath": {
-              "max-paths-level-1": 4,
-              "max-paths-level-2": 4
-            }
-          },
-          "ipv6-unicast": {
-            "multipath": {
-              "max-paths-level-1": 4,
-              "max-paths-level-2": 4
-            }
-          },
-          "route-advertisement": {
-            "rapid-withdrawal": true
-          }
-        }
-      }
+      ]
     },
     {
       "name": "mgmt",
@@ -1464,59 +1437,5 @@
         }
       }
     }
-  ],
-  "srl_nokia-routing-policy:routing-policy": {
-    "prefix-set": [
-      {
-        "name": "p2plinks",
-        "prefix": [
-          {
-            "ip-prefix": "0.0.0.0/0",
-            "mask-length-range": "31..31"
-          }
-        ]
-      }
-    ],
-    "community-set": [
-      {
-        "name": "no-export",
-        "member": [
-          "no-export"
-        ]
-      },
-      {
-        "name": "FABRIC-ROUTES",
-        "member": [
-          "65000:1"
-        ]
-      }
-    ],
-    "policy": [
-      {
-        "name": "spine-export-policy",
-        "default-action": {
-          "accept": {
-            "bgp": {
-                  "communities": {
-                    "replace": "no-export"
-                  }
-            }
-          }
-        },
-        "statement": [
-          {
-            "sequence-id": 10,
-            "match": {
-              "prefix-set": "p2plinks"
-            },
-            "action": {
-              "reject": {
-                
-              }
-            }
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }
