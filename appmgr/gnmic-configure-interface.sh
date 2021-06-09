@@ -105,7 +105,7 @@ cat > $temp_file << EOF
       "area-id": "0.0.0.0",
       "interface": [
         {
-          "interface-name": "ethernet-1/1.0",
+          "interface-name": "${INTF}.0",
           "interface-type": "point-to-point"
         },
         {

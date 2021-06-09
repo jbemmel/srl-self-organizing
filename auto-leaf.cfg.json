@@ -1111,6 +1111,16 @@
       "admin-state": "enable"
     },
     {
+      "name": "lo0",
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0,
+          "admin-state": "enable"
+        }
+      ]
+    },
+    {
       "name": "mgmt0",
       "admin-state": "enable",
       "subinterface": [
@@ -1174,17 +1184,6 @@
         {
           "name": "mgmt",
           "admin-state": "enable"
-        }
-      ]
-    },
-    "srl_nokia-sflow:sflow": {
-      "admin-state": "enable",
-      "collector": [
-        {
-          "collector-id": 1,
-          "collector-address": "172.20.20.10",
-          "network-instance": "default",
-          "source-address": "192.168.0.1"
         }
       ]
     },
@@ -1339,6 +1338,15 @@
     }
   },
   "srl_nokia-network-instance:network-instance": [
+    {
+      "name": "default",
+      "admin-state": "enable",
+      "interface": [
+        {
+          "name": "lo0.0"
+        }
+      ]
+    },
     {
       "name": "mgmt",
       "type": "srl_nokia-network-instance:ip-vrf",
