@@ -135,7 +135,7 @@ cat > $temp_file << EOF
   ],
   "policy": [
     {
-      "name": "export-loopbacks",
+      "name": "select-loopbacks",
       "default-action": { "reject": { } },
       "statement": [
         {
@@ -180,7 +180,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "leaves",
       "admin-state": "enable",
-      "export-policy": "export-loopbacks"
+      "import-policy": "select-loopbacks",
+      "export-policy": "select-loopbacks"
     },
     {
       "group-name": "evpn",
@@ -202,7 +203,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "spines",
       "admin-state": "enable",
-      "export-policy": "export-loopbacks",
+      "import-policy": "select-loopbacks",
+      "export-policy": "select-loopbacks",
       "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
       "peer-as": $PEER_AS_MIN
     },
