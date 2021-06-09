@@ -26,6 +26,7 @@ import re
 import os
 from srlinux.location import build_path
 from srlinux.data import utilities
+from srlinux.schema.data_store import DataStore
 
 # For use with eval
 import ipaddress
@@ -132,36 +133,49 @@ class CommandLoop(object):
 
         def _lookup(match): # match looks like ${/path/x}
           _m = match[2:-1]  # Strip '${' and '}'
-          if _m[0]!="/":
-              self._output.print_warning_line( f'Lookup ENV var={match}' )
-              return os.environ[ _m ]
-
-          self._output.print_warning_line( f'Lookup variable path={match}' )
           _expr_eval = _m.split('|') # Support ${path|eval}, todo escaping
           _path_parts = _expr_eval[0].split('/')
-          _la = _path_parts[-1].split('!!!')
-          _root = '/'.join( _path_parts[0:-1] if len(_path_parts)>2 else ["",_la[0]] )
-          _path = build_path( _root )
-          # This returns a / node
-          _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)
-          _node = _data.get_first_descendant(_root)
 
-          # Support annotations using '!!!' or '!!!key'
-          if '!!!' in _path_parts[-1]:
-              _anns = _node.get_annotations( _la[0] if len(_path_parts)>2 else None )
-              _result = _anns[0].text if _anns!=[] else ""
-              if _la[1]!='':
-                 _kvs = _result.split(',')
-                 _result = "" # If not found, return empty string
-                 for k in _kvs:
-                     _kv = k.split('=')
-                     if len(_kv)==2 and _kv[0]==_la[1]:
-                         self._output.print_warning_line( f'Using annotation {k}' )
-                         _result = _kv[1]
-                         break
+          if len(_path_parts)>1:
+             _leaf = _path_parts[-1]
+             _la = _leaf.split('!!!')
+             _root = '/'.join( _path_parts[0:-1] if len(_path_parts)>2 else ["",_la[0]] )
+             self._output.print_warning_line( f'Lookup state path={match} _root={_root} parts={_path_parts}' )
+
+             # Support lookup in state too, using '//'
+             if _path_parts[0] == '' and _path_parts[1] == '':
+               _root = _root[1:] # Strip '/'
+               _path = build_path( _root ) 
+               _store = self._state.server.get_data_store( DataStore.State )
+               _data = _store.get_data(_path,recursive=False,include_field_defaults=True)
+             else:
+               _path = build_path( _root )
+               _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)
+
+             _node = _data.get_first_descendant(_root)
+
+             # Support annotations using '!!!' or '!!!key'
+             if '!!!' in _leaf:
+                 _anns = _node.get_annotations( _la[0] if len(_path_parts)>2 else None )
+                 _result = _anns[0].text if _anns!=[] else ""
+                 if _la[1]!='':
+                    _kvs = _result.split(',')
+                    _result = "" # If not found, return empty string
+                    for k in _kvs:
+                        _kv = k.split('=')
+                        if len(_kv)==2 and _kv[0]==_la[1]:
+                            self._output.print_warning_line( f'Using annotation {k}' )
+                            _result = _kv[1]
+                            break
+             elif _node is not None:
+                _result = getattr(_node,utilities.sanitize_name( _leaf ))
+             else:
+                _result = "" # For non-existent objects, resolve to empty string
+             self._output.print_warning_line( f'root={_root} leaf={_leaf} -> {_result} type={type(_result)}' )
           else:
-             _result = getattr(_node,utilities.sanitize_name( _path_parts[-1] ))
-          self._output.print_warning_line( f'path={_m} -> {_result} type={type(_result)}' )
+             self._output.print_warning_line( f'Lookup ENV var={_path_parts[0]}' )
+             _result = os.environ[ _path_parts[0] ]
+
           if len(_expr_eval) > 1:
               # Make result available as '_' in locals, and ipaddress
               _globals = { "ipaddress" : ipaddress }

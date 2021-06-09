@@ -15,8 +15,15 @@ topology:
     leaf2:  { kind: srl, config: auto-leaf.cfg.json }
     spine1: { kind: srl, config: auto-spine.cfg.json }
 
-    h1: { kind: srl, config: auto-host-with-vip.cfg.json }
-    h2: { kind: srl, config: auto-host-with-vip.cfg.json }
+    #h1: { kind: srl, config: auto-host-with-vip.cfg.json }
+    #h2: { kind: srl, config: auto-host-with-vip.cfg.json }
+    h1:
+      kind: linux
+      image: alpine:latest # or frrouting/frr:latest
+    h2:
+      kind: linux
+      image: alpine:latest # or frrouting/frr:latest
+    
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]

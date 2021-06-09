@@ -222,7 +222,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _masterSpine = state.role == 'ROLE_spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.role=='ROLE_leaf') else 1
     _i = 1
-    _as = state.base_as + (0 if state.role == 'ROLE_spine' else state.node_id)
+    _as = state.base_as + (0 if state.role == 'ROLE_spine' # Use i- for iBGP
+                             or 'i-' in lldp_peer_name else state.node_id)
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
@@ -266,7 +267,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _peer if state.role != 'ROLE_spine' else '*',
          _as,
          state.router_id if set_router_id else "",
-         state.base_as if (state.role != 'ROLE_spine') else state.base_as + 1,
+         state.base_as, # For spine, allow both iBGP (same AS) and eBGP
          state.base_as if (state.role != 'ROLE_spine') else state.base_as + state.max_leaves,
          state.peerlinks_prefix, peer_type, "disable" # Disable OSPFv3 for now
      )

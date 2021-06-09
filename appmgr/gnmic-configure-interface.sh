@@ -21,14 +21,20 @@ _IP127="${IP_PREFIX//\/31/\/127}"
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
 fi
+if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
+  _VLAN_TAGGING='"vlan-tagging" : true,'
+  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
+fi
 cat > $temp_file << EOF
 {
   "description": "To $PEER",
+  $_VLAN_TAGGING
   "admin-state": "enable",
   "subinterface": [
     {
       "index": 0,
       $_ROUTED
+      $_VLAN
       "admin-state": "enable",
       "ipv4": {
         "address": [
