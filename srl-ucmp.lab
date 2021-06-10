@@ -9,6 +9,8 @@ topology:
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
       license: ../license.key
+      env:
+        SPINES: 2 # TODO subtract this from host ID
 
   nodes:
     leaf1:  { kind: srl, config: auto-leaf.cfg.json }
@@ -30,7 +32,7 @@ topology:
     - endpoints: ["leaf2:e1-2","spine2:e1-2"]
     - endpoints: ["leaf3:e1-2","spine2:e1-3"]
 
-    - endpoints: ["h1:e1-1","leaf1:e1-3"]
+    - endpoints: ["h1:e1-1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
     - endpoints: ["h2:e1-1","leaf1:e1-4"]
 
     - endpoints: ["h3:e1-1","leaf2:e1-3"]

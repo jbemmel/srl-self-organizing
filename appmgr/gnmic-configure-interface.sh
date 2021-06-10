@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # Sample script to provision SRLinux using gnmic
+# TODO next version: Use Jinja2 templates plus native Python logic instead
+#
+#
 ROLE="$1"  # "spine" or "leaf" or "endpoint"
 INTF="$2"
 IP_PREFIX="$3"
@@ -12,9 +15,11 @@ PEER_AS_MIN="$8"
 PEER_AS_MAX="$9"
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
-OSPF_ADMIN_STATE="${12}" # 'enable' or 'disable'
+PEER_ROUTER_ID="${12}"
+OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
 
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
+GLOBAL_AS="$AS"
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
@@ -79,6 +84,14 @@ fi
 
 # Set loopback IP, if provided
 if [[ "$ROUTER_ID" != "" ]]; then
+
+if [[ "$ROLE" == "leaf" ]]; then
+# XXX cannot ping system0 interface, may want to create lo0.0 with ipv6 addr
+LOOPBACK_IF="system"
+else
+LOOPBACK_IF="lo"
+fi
+
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
@@ -92,7 +105,10 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
+$GNMIC set --replace-path /interface[name=${LOOPBACK_IF}0] --replace-file $temp_file
+exitcode+=$?
+
+$GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
 
 # TODO more incremental, interfaces should be added based on LLDP events
@@ -155,6 +171,7 @@ $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
 if [[ "$ROLE" == "spine" ]]; then
+IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
     "accept": {
@@ -165,11 +182,17 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
           "allowed-peer-as": [
             "$PEER_AS_MIN..$PEER_AS_MAX"
           ]
+        },
+        {
+          "prefix": "$ip1.$ip2.$ip3.0/22",
+          "peer-group": "evpn",
+          "allowed-peer-as": [ "$AS" ]
         }
       ]
     }
-  },
+},
 "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+"evpn": { "rapid-update": true },
 "group": [
     {
       "group-name": "fellow-spines",
@@ -186,9 +209,9 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "group-name": "evpn",
       "admin-state": "enable",
       "peer-as": $AS,
-      "evpn": {
-        "admin-state": "enable"
-      },
+      "evpn": { "admin-state": "enable" },
+      "ipv4-unicast": { "admin-state": "disable" },
+      "ipv6-unicast": { "admin-state": "disable" },
       "route-reflector": {
         "client": true,
         "cluster-id": "$ROUTER_ID"
@@ -197,7 +220,9 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   ],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
+GLOBAL_AS="$PEER_AS_MIN"  # Such that auto route-targets work
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
+"evpn": { "rapid-update": true },
 "group": [
     {
       "group-name": "spines",
@@ -205,21 +230,23 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "import-policy": "select-loopbacks",
       "export-policy": "select-loopbacks",
       "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
-      "peer-as": $PEER_AS_MIN
+      "peer-as": $PEER_AS_MIN,
+      "local-as": [ { "as-number": $AS } ]
     },
     {
       "group-name": "hosts",
       "admin-state": "enable",
       "ipv6-unicast" : { "admin-state" : "enable" },
-      "peer-as": $AS
+      "peer-as": $AS,
+      "local-as": [ { "as-number": $AS } ]
     },
     {
       "group-name": "evpn-rr",
       "admin-state": "enable",
       "peer-as": $PEER_AS_MIN,
-      "evpn": {
-        "admin-state": "enable"
-      }
+      "local-as": [ { "as-number": $PEER_AS_MIN } ],
+      "evpn": { "admin-state": "enable" },
+      "transport" : { "local-address" : "${ROUTER_ID}" }
     }
 ],
 EOF
@@ -239,7 +266,7 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "autonomous-system": $AS,
+  "autonomous-system": $GLOBAL_AS,
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   "ipv4-unicast": {
@@ -298,6 +325,14 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
 exitcode+=$?
+fi
+
+# Peer router ID only set for spines when this node is a leaf
+if [[ "$PEER_ROUTER_ID" != "" ]]; then
+cat > $temp_file << EOF
+{ "admin-state": "enable", "peer-group": "evpn-rr" }
+EOF
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 fi
 
 rm -f $temp_file

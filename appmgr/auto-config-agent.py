@@ -21,6 +21,7 @@ import config_service_pb2
 import route_service_pb2
 import route_service_pb2_grpc
 import sdk_common_pb2
+
 from logging.handlers import RotatingFileHandler
 
 ############################################################
@@ -96,13 +97,14 @@ def Handle_Notification(obj, state):
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
                 if 'role' in data:
-                    state.role = data['role']
+                    state.role = data['role'][5:] # strip "ROLE_"
                     logging.info(f"Got role :: {state.role}")
                 if 'peerlinks_prefix' in data:
                     state.peerlinks_prefix = data['peerlinks_prefix']['value']
                     state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=31))
                 if 'loopbacks_prefix' in data:
-                    state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
+                    # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
+                    state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
                 if 'max_spines' in data:
@@ -141,8 +143,7 @@ def Handle_Notification(obj, state):
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            _i = 0 if state.role == 'ROLE_spine' else 1 if state.role == 'ROLE_leaf' else 2
-            state.router_id = f"1.1.{ _i }.{ state.node_id }"
+            state.router_id = determine_router_id( state, state.role, state.node_id )
             router_id_changed = True
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
@@ -192,10 +193,10 @@ def Handle_Notification(obj, state):
 ## Depends on LLDP system naming for now (but not local system name)
 #####
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
-    if state.role == "ROLE_spine":
+    if state.role == "spine":
        # TODO spine-spine link case
        return lldp_peer_port
-    elif state.role == "ROLE_leaf":
+    elif state.role == "leaf":
         if "spine" in lldp_peer_name:
             return lldp_peer_port
         else:
@@ -207,26 +208,43 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
             return (int(leafId.groups()[0]) - 1) * state.max_hosts_per_leaf + lldp_peer_port
         return lldp_peer_port
 
+###
+# Calculates an IPv4 address to be used as router ID for the given node/role
+# Note: More generically 'node level', spine=0 leaf=1 host=2 for standard CLOS
+###
+def determine_router_id( state, role, node_id ):
+    _l = node_level(role)
+    return str( state.loopbacks_prefix[ 256 * _l + node_id ] )
+
+def node_level( role ):
+    if role=="spine":
+        return 0
+    elif role=="leaf":
+        return 1
+    return 2
+
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
   # For spine-spine connections, build iBGP
-  if (state.role == 'ROLE_spine') and 'spine' not in lldp_peer_name:
+  peer_router_id = ""
+  if (state.role == 'spine') and 'spine' not in lldp_peer_name:
     _r = 0
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
     peer_type = 'leaf'
     _as = state.base_as
-  elif (state.role != 'ROLE_endpoint'):
+  elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*spine(\d+).*", lldp_peer_name)
-    _masterSpine = state.role == 'ROLE_spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
-    _r = 0 if _masterSpine or (not spineId and state.role=='ROLE_leaf') else 1
+    _masterSpine = state.role == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
+    _r = 0 if _masterSpine or (not spineId and state.role=='leaf') else 1
     _i = 1
-    _as = state.base_as + (0 if state.role == 'ROLE_spine' # Use i- for iBGP
+    _as = state.base_as + (0 if state.role == 'spine' # Use i- for iBGP
                              or 'i-' in lldp_peer_name else state.node_id)
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
+      peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else: # XXX hardcoded max hosts per leaf: 32
       link_index = (state.max_spines * state.max_leaves +
                     state.max_hosts_per_leaf * (state.node_id-1) +
@@ -260,16 +278,19 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
      logging.info(f"Configuring link index {link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
      script_update_interface(
-         state.role[5:], # strip 'ROLE_' prefix
+         state.role,
          intf_name,
          _ip + '/31',
          lldp_peer_desc,
-         _peer if state.role != 'ROLE_spine' else '*',
+         _peer if state.role != 'spine' else '*',
          _as,
          state.router_id if set_router_id else "",
          state.base_as, # For spine, allow both iBGP (same AS) and eBGP
-         state.base_as if (state.role != 'ROLE_spine') else state.base_as + state.max_leaves,
-         state.peerlinks_prefix, peer_type, "disable" # Disable OSPFv3 for now
+         state.base_as if (state.role != 'spine') else state.base_as + state.max_leaves,
+         state.peerlinks_prefix,
+         peer_type,
+         peer_router_id,
+         "disable" # Disable OSPFv3 for now
      )
      setattr( state, link_name, _ip )
   else:
@@ -289,13 +310,14 @@ def get_app_id(app_name):
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,ospf):
+def script_update_interface(role,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,ospf):
     logging.info(f'Calling update script: role={role} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} ospf={ospf}' )
+                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} ospf={ospf}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
                                        role,name,ip,peer,peer_ip,str(_as),router_id,
-                                       str(peer_as_min),str(peer_as_max),peer_links,peer_type,ospf],
+                                       str(peer_as_min),str(peer_as_max),peer_links,
+                                       peer_type,peer_rid,ospf],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -373,7 +395,9 @@ def Run():
         #   logging.error(f'Exception caught in git pull :: {e}')
 
     except Exception as e:
-        logging.error(f'Exception caught :: {e}')
+        traceback_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error(f'Exception caught :: {e} stack:{traceback_str}')
+        # traceback.print_exc()
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
         try:

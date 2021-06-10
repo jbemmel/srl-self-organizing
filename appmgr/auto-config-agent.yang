@@ -49,7 +49,7 @@ module auto_config_agent {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
                 // type srl_nokia-comm:ipv4-prefix;
                 type string;
-                default "1.1.0.0/23"; // spines get 1.1.0.x, leaves 1.1.1.x
+                default "1.1.0.0/22"; // spines get 1.1.0.x, leaves 1.1.1.x
             }
             leaf max-spines {
                 description "Maximum number of spines, controls IP link addressing; must match across fabric";
