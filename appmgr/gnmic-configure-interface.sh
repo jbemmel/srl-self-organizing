@@ -19,7 +19,6 @@ PEER_ROUTER_ID="${12}"
 OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
 
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
-GLOBAL_AS="$AS"
 
 temp_file=$(mktemp --suffix=.json)
 _IP127="${IP_PREFIX//\/31/\/127}"
@@ -220,7 +219,6 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   ],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
-GLOBAL_AS="$PEER_AS_MIN"  # Such that auto route-targets work
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "evpn": { "rapid-update": true },
 "group": [
@@ -263,10 +261,13 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 EOF
 fi
 
+#
+# By default, the global AS and local AS get prepended to all routes sent out
+#
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "autonomous-system": $GLOBAL_AS,
+  "autonomous-system": $AS,
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   "ipv4-unicast": {
