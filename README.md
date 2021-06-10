@@ -31,11 +31,12 @@ YANG model provides parameters:
 3. `sudo clab deploy -t ./srl-leafspine.lab`
 
 ## BGP design details
-This example uses eBGP peering to exchange routes within the fabric, and iBGP towards FRR Linux hosts
+This example uses eBGP peering to exchange routes within the fabric, and iBGP towards Linux hosts
 * Spines share a private base AS, each leaf gets a unique leaf AS
 * eBGP peering using /31 IPv4 link addresses, iBGP uses /127 IPv6 link addresses (TODO link-local with BGP unnumbered)
 * Spine side uses dynamic neighbors, such that the spines only need to known a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
+* Global AS set to unique leaf AS, allows for simple loop detection but EVPN auto route-targets don't work
 
 ## EVPN overlay
 The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
