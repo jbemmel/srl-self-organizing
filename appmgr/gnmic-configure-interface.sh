@@ -21,65 +21,6 @@ OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
-_IP127="${IP_PREFIX//\/31/\/127}"
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
-  _ROUTED='"type" : "routed",'
-fi
-if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
-  _VLAN_TAGGING='"vlan-tagging" : true,'
-  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
-fi
-cat > $temp_file << EOF
-{
-  "description": "To $PEER",
-  $_VLAN_TAGGING
-  "admin-state": "enable",
-  "subinterface": [
-    {
-      "index": 0,
-      $_ROUTED
-      $_VLAN
-      "admin-state": "enable",
-      "ipv4": {
-        "address": [
-          {
-            "ip-prefix": "$IP_PREFIX"
-          }
-        ]
-      },
-      "ipv6": {
-        "address": [
-          {
-            "ip-prefix": "2001::${_IP127//\./:}"
-          }
-        ]
-      }
-    }
-  ]
-}
-EOF
-
-# For now, assume that the interface is already added to the default network-instance; only update its IP address
-$GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
-exitcode=$?
-
-# Add it to the default instance
-$GNMIC set --update /network-instance[name=default]/interface[name=${INTF}.0]:::string:::''
-
-# Enable BFD, except for host facing interfaces
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
-cat > $temp_file << EOF
-{
- "admin-state" : "enable",
- "desired-minimum-transmit-interval" : 250000,
- "required-minimum-receive" : 250000,
- "detection-multiplier" : 3
-}
-EOF
-
-$GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
-exitcode=$?
-fi
 
 # Set loopback IP, if provided
 if [[ "$ROUTER_ID" != "" ]]; then
@@ -232,13 +173,6 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "local-as": [ { "as-number": $AS } ]
     },
     {
-      "group-name": "hosts",
-      "admin-state": "enable",
-      "ipv6-unicast" : { "admin-state" : "enable" },
-      "peer-as": $AS,
-      "local-as": [ { "as-number": $AS } ]
-    },
-    {
       "group-name": "evpn-rr",
       "admin-state": "enable",
       "peer-as": $PEER_AS_MIN,
@@ -302,7 +236,160 @@ EOF
 $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
+# For leaves, create Overlay VRF
+if [[ "$ROLE" == "leaf" ]]; then
+
+cat > $temp_file << EOF
+{
+  "vxlan-interface": [
+    {
+      "index": 0,
+      "type": "srl_nokia-interfaces:routed",
+      "ingress": {
+        "vni": 10000
+      },
+      "egress": {
+        "source-ip": "use-system-ipv4-address"
+      }
+    }
+  ]
+}
+EOF
+$GNMIC set --update-path /tunnel-interface[name=vxlan1] --update-file $temp_file
+exitcode+=$?
+
+# Set autonomous system & router-id for BGP to hosts
+# Assumes a L3 service
+cat > $temp_file << EOF
+{
+    "type": "srl_nokia-network-instance:ip-vrf",
+    "_annotate_type": "routed",
+    "admin-state": "enable",
+    "vxlan-interface": [ { "name": "vxlan1.0" } ],
+    "protocols": {
+      "bgp": {
+        "admin-state": "enable",
+        "autonomous-system": $PEER_AS_MIN,
+        "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
+        "ipv4-unicast": {
+          "admin-state": "enable",
+          "multipath": {
+            "max-paths-level-1": 32,
+            "max-paths-level-2": 32
+          }
+        },
+        "ipv6-unicast": {
+          "admin-state": "enable",
+          "multipath": {
+            "max-paths-level-1": 32,
+            "max-paths-level-2": 32
+          }
+        },
+        "route-advertisement": {
+          "rapid-withdrawal": true
+        },
+        "groups": [{
+          "group-name": "hosts",
+          "admin-state": "enable",
+          "ipv6-unicast" : { "admin-state" : "enable" },
+          "peer-as": $AS,
+          "local-as": [ { "as-number": $AS } ]
+        }]
+      },
+      "bgp-evpn": {
+        "srl_nokia-bgp-evpn:bgp-instance": [
+          {
+            "id": 1,
+            "admin-state": "enable",
+            "vxlan-interface": "vxlan1.0",
+            "evi": 10000,
+            "ecmp": 8
+          }
+        ]
+      },
+      "srl_nokia-bgp-vpn:bgp-vpn": {
+        "bgp-instance": [
+          {
+            "id": 1,
+            "route-target": {
+              "export-rt": "target:$PEER_AS_MIN:10000",
+              "import-rt": "target:$PEER_AS_MIN:10000"
+            }
+          }
+        ]
+      }
+    }
+  }
+EOF
+$GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_file
+exitcode+=$?
+fi
+
 fi # if router_id provided, first time only
+
+_IP127="${IP_PREFIX//\/31/\/127}"
+if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+  _ROUTED='"type" : "routed",'
+fi
+if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
+  _VLAN_TAGGING='"vlan-tagging" : true,'
+  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
+fi
+cat > $temp_file << EOF
+{
+  "description": "To $PEER",
+  $_VLAN_TAGGING
+  "admin-state": "enable",
+  "subinterface": [
+    {
+      "index": 0,
+      $_ROUTED
+      $_VLAN
+      "admin-state": "enable",
+      "ipv4": {
+        "address": [
+          {
+            "ip-prefix": "$IP_PREFIX"
+          }
+        ]
+      },
+      "ipv6": {
+        "address": [
+          {
+            "ip-prefix": "2001::${_IP127//\./:}"
+          }
+        ]
+      }
+    }
+  ]
+}
+EOF
+
+# For now, assume that the interface is already added to the default network-instance; only update its IP address
+$GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
+exitcode=$?
+
+# Add it to the correct instance
+if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]]; then
+VRF="overlay"
+else
+VRF="default"
+fi
+$GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
+
+# Enable BFD, except for host facing interfaces
+if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+cat > $temp_file << EOF
+{
+ "admin-state" : "enable",
+ "desired-minimum-transmit-interval" : 250000,
+ "required-minimum-receive" : 250000,
+ "detection-multiplier" : 3
+}
+EOF
+$GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
+exitcode=$?
+fi
 
 if [[ "$PEER_IP" != "*" ]]; then
 _IP="$PEER_IP"
@@ -324,7 +411,7 @@ cat > $temp_file << EOF
   "peer-group": "$PEER_GROUP"
 }
 EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
