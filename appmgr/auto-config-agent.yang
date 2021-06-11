@@ -29,8 +29,9 @@ module auto_config_agent {
                 type enumeration {
                  enum leaf;
                  enum spine;
-                 enum endpoint; // Use SRL to emulate a Linux host
+                 enum endpoint;  // Use SRL to emulate a Linux host
                  // TODO enum superspine;
+                 // enum leaf-with-evpn; // Leaf with BGP EVPN/VXLAN overlay enabled?
                 }
             }
             leaf base-as {
@@ -38,6 +39,12 @@ module auto_config_agent {
                 // type srl_nokia-comm:as-number;
                 type uint32;
                 default 65000; // Spines get this, each leaf gets base+rank
+            }
+            leaf leaf-as {
+                description "AS to use for leaves, 0=auto (eBGP)";
+                // type srl_nokia-comm:as-number;
+                type uint32;
+                default 0; // Default base+rank = eBGP
             }
             leaf peerlinks-prefix {
                 description "IPv4 prefix range to use for auto-assigned peering links /31";
@@ -71,7 +78,16 @@ module auto_config_agent {
                 type uint8;
                 default 4; // Too high -> out of peer link IP space
             }
-
+            leaf use-evpn {
+                description "Provision BGP EVPN control plane and VXLAN endpoints";
+                type boolean;
+                default false;
+            }
+            leaf use-ospfv3 {
+                description "Provision OSPFv3 on fabric interfaces";
+                type boolean;
+                default false;
+            }
         }
     }
 

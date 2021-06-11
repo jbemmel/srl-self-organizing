@@ -17,6 +17,7 @@ LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
 OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
+USE_EVPN_OVERLAY="${14}" # '1' or '0'
 
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
@@ -160,9 +161,58 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   ],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
+
+IFS='' read -r -d '' HOSTS_GROUP << EOF
+{
+  "group-name": "hosts",
+  "admin-state": "enable",
+  "ipv6-unicast" : { "admin-state" : "enable" },
+  "peer-as": $AS,
+  "local-as": [ { "as-number": $AS } ]
+}
+EOF
+
+IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
+"dynamic-neighbors": {
+    "accept": {
+      "match": [
+        {
+          "prefix": "$LINK_PREFIX",
+          "peer-group": "hosts",
+          "allowed-peer-as": [
+            "$AS"
+          ]
+        }
+      ]
+    }
+}
+EOF
+
+if [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+DEFAULT_HOSTS_GROUP=""
+DEFAULT_DYNAMIC_HOST_PEERING=""
+IFS='' read -r -d '' EVPN_RR_GROUP << EOF
+,{
+  "group-name": "evpn-rr",
+  "admin-state": "enable",
+  "peer-as": $PEER_AS_MIN,
+  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "evpn": { "admin-state": "enable" },
+  "transport" : { "local-address" : "${ROUTER_ID}" }
+}
+EOF
+
+else
+DEFAULT_HOSTS_GROUP="$HOSTS_GROUP,"
+DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
+EVPN_RR_GROUP=""
+fi
+
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "evpn": { "rapid-update": true },
+$DEFAULT_DYNAMIC_HOST_PEERING
 "group": [
+    $DEFAULT_HOSTS_GROUP
     {
       "group-name": "spines",
       "admin-state": "enable",
@@ -171,15 +221,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
       "peer-as": $PEER_AS_MIN,
       "local-as": [ { "as-number": $AS } ]
-    },
-    {
-      "group-name": "evpn-rr",
-      "admin-state": "enable",
-      "peer-as": $PEER_AS_MIN,
-      "local-as": [ { "as-number": $PEER_AS_MIN } ],
-      "evpn": { "admin-state": "enable" },
-      "transport" : { "local-address" : "${ROUTER_ID}" }
     }
+    $EVPN_RR_GROUP
 ],
 EOF
 else
@@ -237,7 +280,7 @@ $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
 # For leaves, create Overlay VRF
-if [[ "$ROLE" == "leaf" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 
 cat > $temp_file << EOF
 {
@@ -259,7 +302,7 @@ $GNMIC set --update-path /tunnel-interface[name=vxlan1] --update-file $temp_file
 exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
-# Assumes a L3 service
+# Assumes a L3 service, TODO allow eBGP for hosts too?
 cat > $temp_file << EOF
 {
     "type": "srl_nokia-network-instance:ip-vrf",
@@ -285,19 +328,14 @@ cat > $temp_file << EOF
             "max-paths-level-2": 32
           }
         },
+        $DYNAMIC_HOST_PEERING,
+        "group" : [ $HOSTS_GROUP ],
         "route-advertisement": {
           "rapid-withdrawal": true
-        },
-        "groups": [{
-          "group-name": "hosts",
-          "admin-state": "enable",
-          "ipv6-unicast" : { "admin-state" : "enable" },
-          "peer-as": $AS,
-          "local-as": [ { "as-number": $AS } ]
-        }]
+        }
       },
       "bgp-evpn": {
-        "srl_nokia-bgp-evpn:bgp-instance": [
+        "bgp-instance": [
           {
             "id": 1,
             "admin-state": "enable",
@@ -307,7 +345,7 @@ cat > $temp_file << EOF
           }
         ]
       },
-      "srl_nokia-bgp-vpn:bgp-vpn": {
+      "bgp-vpn": {
         "bgp-instance": [
           {
             "id": 1,
@@ -365,12 +403,12 @@ cat > $temp_file << EOF
 }
 EOF
 
-# For now, assume that the interface is already added to the default network-instance; only update its IP address
+# Update interface IP address
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode=$?
 
 # Add it to the correct instance
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 VRF="overlay"
 else
 VRF="default"
@@ -391,12 +429,12 @@ $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_f
 exitcode=$?
 fi
 
-if [[ "$PEER_IP" != "*" ]]; then
+if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]]; then
 _IP="$PEER_IP"
-if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
-PEER_GROUP="hosts"
+# if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
+# PEER_GROUP="hosts"
 # _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-elif [[ "$ROLE" == "spine" ]]; then
+if [[ "$ROLE" == "spine" ]]; then
 PEER_GROUP="fellow-spines"
 elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
@@ -416,7 +454,7 @@ exitcode+=$?
 fi
 
 # Peer router ID only set for spines when this node is a leaf
-if [[ "$PEER_ROUTER_ID" != "" ]]; then
+if [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr" }
 EOF
