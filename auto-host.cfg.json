@@ -1,6 +1,7 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "endpoint"
+    "role": "endpoint",
+    "leaf-as": 65000
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
