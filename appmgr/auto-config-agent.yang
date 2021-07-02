@@ -50,7 +50,7 @@ module auto_config_agent {
                 description "IPv4 prefix range to use for auto-assigned peering links /31";
                 // type srl_nokia-comm:ipv4-prefix;
                 type string;
-                default "169.254.0.0/16"; // enough for 32768 /31 links
+                default "192.168.127.0/24"; // enough for 128 /31 links
             }
             leaf loopbacks-prefix {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
