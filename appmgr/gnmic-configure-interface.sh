@@ -22,6 +22,7 @@ USE_EVPN_OVERLAY="${14}" # '1' or '0'
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
+exitcode=0
 
 # Set loopback IP, if provided
 if [[ "$ROUTER_ID" != "" ]]; then
@@ -65,6 +66,7 @@ cat > $temp_file << EOF
       "area-id": "0.0.0.0",
       "interface": [
         {
+          "admin-state": "enable",
           "interface-name": "lo0.0",
           "interface-type": "broadcast",
           "passive": true
@@ -405,7 +407,7 @@ EOF
 
 # Update interface IP address
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
-exitcode=$?
+exitcode+=$?
 
 # Add it to the correct instance
 if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
@@ -414,6 +416,17 @@ else
 VRF="default"
 fi
 $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
+exitcode+=$?
+
+# Add it to OSPF (even if disabled)
+cat > $temp_file << EOF
+{
+ "admin-state": "enable",
+ "interface-type": "point-to-point"
+}
+EOF
+$GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
+exitcode+=$?
 
 # Enable BFD, except for host facing interfaces
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
@@ -426,7 +439,7 @@ cat > $temp_file << EOF
 }
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
-exitcode=$?
+exitcode+=$?
 fi
 
 if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]]; then
@@ -459,6 +472,7 @@ cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr" }
 EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
+exitcode+=$?
 fi
 
 rm -f $temp_file
