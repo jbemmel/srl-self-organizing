@@ -53,13 +53,13 @@ exitcode+=$?
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
 
-# TODO more incremental, interfaces should be added based on LLDP events
+# Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
   "admin-state": "$OSPF_ADMIN_STATE",
   "version": "ospf-v3",
-  "address-family": "ipv6-unicast",
+  "address-family": "ipv4-unicast",
   "max-ecmp-paths": 8,
   "area": [
     {
@@ -67,8 +67,7 @@ cat > $temp_file << EOF
       "interface": [
         {
           "admin-state": "enable",
-          "interface-name": "lo0.0",
-          "interface-type": "broadcast",
+          "interface-name": "${LOOPBACK_IF}0.0",
           "passive": true
         }
       ]
