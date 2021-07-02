@@ -1,6 +1,6 @@
 FROM registry.srlinux.dev/pub/srlinux:latest
 
-RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.10.0/gnmic_0.10.0_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
+RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.16.0/gnmic_0.16.0_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
 
 COPY 42_sr_copy_custom_appmgr.sh /opt/srlinux/bin/bootscript/
 

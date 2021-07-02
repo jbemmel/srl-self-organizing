@@ -24,6 +24,10 @@ import sdk_common_pb2
 
 from logging.handlers import RotatingFileHandler
 
+# To report state back
+import telemetry_service_pb2
+import telemetry_service_pb2_grpc
+
 ############################################################
 ## Agent will start with this name
 ############################################################
@@ -77,6 +81,20 @@ def Subscribe_Notifications(stream_id):
     ##Subscribe to LLDP Neighbor Notifications
     ## Subscribe(stream_id, 'lldp')
 
+############################################################
+## Function to populate state of agent config
+## using telemetry -- add/update info from state
+############################################################
+def Set_LLDP_Desc(desc):
+    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
+    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
+    telemetry_info = telemetry_update_request.state.add()
+    telemetry_info.key.js_path = '.system.lldp.system-description' # js_path
+    telemetry_info.data.json_content = desc # js_data
+    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
+    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=[('agent_name', 'lldp_mgr')])
+    return telemetry_response
+
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path = .fib-agent
@@ -120,7 +138,12 @@ def Handle_Notification(obj, state):
                 if 'use_evpn' in data:
                     state.evpn = '1' if data['use_evpn']['value'] else '0'
                 if 'use_ospfv3' in data:
-                    state.ospfv3 = 'enabled' if data['use_ospfv3']['value'] else 'disabled'
+                    state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
+
+                # JvB Test - fails, wrong path?
+                # lldp_test = Set_LLDP_Desc( "JvB Test" )
+                # logging.info(f'LLDP description test response:{lldp_test}')
+
                 return not state.role is None
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -129,6 +152,8 @@ def Handle_Notification(obj, state):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         peer_sys_name = obj.lldp_neighbor.data.system_name
+        if obj.lldp_neighbor.data.bgp_peer_address:
+           logging.info(f"BGP peer addresses : {obj.lldp_neighbor.data.bgp_peer_address}")
 
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]

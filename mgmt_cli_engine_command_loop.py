@@ -148,6 +148,10 @@ class CommandLoop(object):
                _path = build_path( _root )
                _store = self._state.server.get_data_store( DataStore.State )
                _data = _store.get_data(_path,recursive=False,include_field_defaults=True)
+
+               # Test to set LLDP system description - nope, fails
+               # _store.set_json( build_path('/system/lldp/system-description'), "JvB test" )
+
              else:
                _path = build_path( _root )
                _data = self._state.server_data_store.get_data(_path,recursive=False,include_field_defaults=True)

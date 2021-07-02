@@ -1,7 +1,8 @@
 {
   "auto_config_agent:auto-config-agent": {
     "role": "leaf",
-    "leaf-as": 65000
+    "leaf-as": 65000,
+    "use-ospfv3": true
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
@@ -13,7 +14,7 @@
             "description": "Accept incoming ICMP unreachable messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -36,7 +37,7 @@
             "description": "Accept incoming ICMP time-exceeded messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -51,7 +52,7 @@
             "description": "Accept incoming ICMP parameter problem messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -66,7 +67,7 @@
             "description": "Accept incoming ICMP echo messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -81,7 +82,7 @@
             "description": "Accept incoming ICMP echo-reply messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -96,7 +97,7 @@
             "description": "Accept incoming SSH when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -112,7 +113,7 @@
             "description": "Accept incoming SSH when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -128,7 +129,7 @@
             "description": "Accept incoming Telnet when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -144,7 +145,7 @@
             "description": "Accept incoming Telnet when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -160,7 +161,7 @@
             "description": "Accept incoming TACACS+ when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -176,7 +177,7 @@
             "description": "Accept incoming TACACS+ when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -192,7 +193,7 @@
             "description": "Accept incoming DNS response messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -208,7 +209,7 @@
             "description": "Accept incoming DHCP messages targeted for BOOTP/DHCP client",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -224,7 +225,7 @@
             "description": "Accept incoming TFTP read-request and write-request messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -240,7 +241,7 @@
             "description": "Accept incoming HTTP(JSON-RPC) when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -256,7 +257,7 @@
             "description": "Accept incoming HTTP(JSON-RPC) when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -272,7 +273,7 @@
             "description": "Accept incoming NTP messages from servers",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -288,7 +289,7 @@
             "description": "Accept incoming SNMP GET/GETNEXT messages from servers",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -304,7 +305,7 @@
             "description": "Accept incoming BGP when the other router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -320,7 +321,7 @@
             "description": "Accept incoming BGP when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -336,7 +337,7 @@
             "description": "Accept incoming HTTPS(JSON-RPC) when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -352,7 +353,7 @@
             "description": "Accept incoming HTTPS(JSON-RPC) when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -368,7 +369,7 @@
             "description": "Accept incoming single-hop BFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -384,7 +385,7 @@
             "description": "Accept incoming multi-hop BFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -400,7 +401,7 @@
             "description": "Accept incoming uBFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -416,7 +417,7 @@
             "description": "Accept incoming gNMI messages when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -432,7 +433,7 @@
             "description": "Accept incoming UDP traceroute messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -450,7 +451,7 @@
             "description": "Accept incoming ICMP timestamp messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -465,7 +466,7 @@
             "description": "Accept incoming OSPF messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -477,7 +478,7 @@
             "description": "Accept incoming DHCP relay messages targeted for BOOTP/DHCP server",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -493,7 +494,7 @@
             "description": "Accept ICMP fragment packets",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -520,7 +521,7 @@
             "description": "Accept incoming ICMPv6 unreachable messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -544,7 +545,7 @@
             "description": "Accept incoming ICMPv6 packet-too-big messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -559,7 +560,7 @@
             "description": "Accept incoming ICMPv6 time-exceeded messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -574,7 +575,7 @@
             "description": "Accept incoming ICMPv6 parameter problem messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -589,7 +590,7 @@
             "description": "Accept incoming ICMPv6 echo-request messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -604,7 +605,7 @@
             "description": "Accept incoming ICMPv6 echo-reply messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -619,7 +620,7 @@
             "description": "Accept incoming ICMPv6 router-advertisement messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -634,7 +635,7 @@
             "description": "Accept incoming ICMPv6 neighbor-solicitation messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -649,7 +650,7 @@
             "description": "Accept incoming ICMPv6 neighbor-advertisement messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -664,7 +665,7 @@
             "description": "Accept incoming SSH when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -680,7 +681,7 @@
             "description": "Accept incoming SSH when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -696,7 +697,7 @@
             "description": "Accept incoming Telnet when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -712,7 +713,7 @@
             "description": "Accept incoming Telnet when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -728,7 +729,7 @@
             "description": "Accept incoming TACACS+ when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -744,7 +745,7 @@
             "description": "Accept incoming TACACS+ when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -760,7 +761,7 @@
             "description": "Accept incoming DNS response messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -776,7 +777,7 @@
             "description": "Accept incoming TFTP read-request and write-request messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -792,7 +793,7 @@
             "description": "Accept incoming HTTP(JSON-RPC) when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -808,7 +809,7 @@
             "description": "Accept incoming HTTP(JSON-RPC) when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -824,7 +825,7 @@
             "description": "Accept incoming NTP messages from servers",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -840,7 +841,7 @@
             "description": "Accept incoming SNMP GET/GETNEXT messages from servers",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -856,7 +857,7 @@
             "description": "Accept incoming BGP when the other router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -872,7 +873,7 @@
             "description": "Accept incoming BGP when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -888,7 +889,7 @@
             "description": "Accept incoming HTTPS(JSON-RPC) when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -904,7 +905,7 @@
             "description": "Accept incoming HTTPS(JSON-RPC) when this router initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -920,7 +921,7 @@
             "description": "Accept incoming DHCPv6 client messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -936,7 +937,7 @@
             "description": "Accept incoming single-hop BFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -952,7 +953,7 @@
             "description": "Accept incoming multi-hop BFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -968,7 +969,7 @@
             "description": "Accept incoming uBFD session messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -984,7 +985,7 @@
             "description": "Accept incoming gNMI messages when the other host initiates the TCP connection",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1000,7 +1001,7 @@
             "description": "Accept incoming UDP traceroute messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1018,7 +1019,7 @@
             "description": "Accept incoming IPV6 hop-in-hop messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1030,7 +1031,7 @@
             "description": "Accept incoming IPV6 fragment header messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1042,7 +1043,7 @@
             "description": "Accept incoming OSPF messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1054,7 +1055,7 @@
             "description": "Accept incoming DHCPv6 relay messages",
             "action": {
               "accept": {
-                
+
               }
             },
             "match": {
@@ -1130,12 +1131,12 @@
           "admin-state": "enable",
           "ipv4": {
             "srl_nokia-interfaces-ip-dhcp:dhcp-client": {
-              
+
             }
           },
           "ipv6": {
             "srl_nokia-interfaces-ip-dhcp:dhcp-client": {
-              
+
             }
           }
         }
