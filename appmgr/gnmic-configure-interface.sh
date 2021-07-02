@@ -54,6 +54,7 @@ $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF
 exitcode+=$?
 
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
+# Still requires static (link local) IPv4 addresses on each interface
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
@@ -441,7 +442,8 @@ $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_f
 exitcode+=$?
 fi
 
-if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]]; then
+if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && \
+   [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
 _IP="$PEER_IP"
 # if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
 # PEER_GROUP="hosts"
