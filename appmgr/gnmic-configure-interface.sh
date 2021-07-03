@@ -104,12 +104,6 @@ cat > $temp_file << EOF
           "action": { "accept": { } }
         }
       ]
-    },
-    {
-      "name": "accept-with-lower-pref",
-      "default-action": {
-       "accept": { "bgp": { "local-preference": { "set": 171 } } }
-      }
     }
   ]
 }
@@ -209,7 +203,6 @@ DEFAULT_DYNAMIC_HOST_PEERING=""
 IFS='' read -r -d '' EVPN_RR_GROUP << EOF
 {
   "group-name": "evpn-rr",
-  "import-policy": "accept-with-lower-pref",
   "admin-state": "enable",
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],
@@ -269,6 +262,7 @@ fi
 
 #
 # By default, the global AS and local AS get prepended to all routes sent out
+# Set lower preference for ibgp routes via EVPN
 #
 cat > $temp_file << EOF
 {
@@ -292,7 +286,8 @@ cat > $temp_file << EOF
   },
   "route-advertisement": {
     "rapid-withdrawal": true
-  }
+  },
+  "preference": { "ibgp": 171 }
 }
 
 EOF
