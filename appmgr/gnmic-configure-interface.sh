@@ -201,7 +201,7 @@ if [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
 IFS='' read -r -d '' EVPN_RR_GROUP << EOF
-,{
+{
   "group-name": "evpn-rr",
   "admin-state": "enable",
   "peer-as": $PEER_AS_MIN,
@@ -212,7 +212,7 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
 EOF
 
 else
-DEFAULT_HOSTS_GROUP="$HOSTS_GROUP,"
+DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
 DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
 EVPN_RR_GROUP=""
 fi
@@ -229,6 +229,13 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "local-as": [ { "as-number": $AS } ]
 }
 EOF
+fi
+
+if [[ "$DEFAULT_HOSTS_GROUP" != "" ]] && [[ "$SPINES_GROUP" != "" ]]; then
+SPINES_GROUP=",$SPINES_GROUP"
+fi
+if [[ "$SPINES_GROUP" != "" ]] && [[ "$EVPN_RR_GROUP" != "" ]]; then
+EVPN_RR_GROUP=",$EVPN_RR_GROUP"
 fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
