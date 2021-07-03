@@ -104,6 +104,12 @@ cat > $temp_file << EOF
           "action": { "accept": { } }
         }
       ]
+    },
+    {
+      "name": "accept-with-lower-pref",
+      "default-action": {
+       "accept": { "bgp": { "local-preference": { "set": 171 } } }
+      }
     }
   ]
 }
@@ -203,6 +209,7 @@ DEFAULT_DYNAMIC_HOST_PEERING=""
 IFS='' read -r -d '' EVPN_RR_GROUP << EOF
 {
   "group-name": "evpn-rr",
+  "import-policy": "accept-with-lower-pref",
   "admin-state": "enable",
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],
@@ -439,12 +446,13 @@ $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::str
 exitcode+=$?
 
 # Add it to OSPF (even if disabled)
+# Note: info from state bfd shows failures, disabling for now
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
  "interface-type": "point-to-point",
  "failure-detection": {
-   "enable-bfd": true
+   "enable-bfd": false
  }
 }
 EOF
