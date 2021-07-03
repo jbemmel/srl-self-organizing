@@ -217,20 +217,26 @@ DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
 EVPN_RR_GROUP=""
 fi
 
+if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+IFS='' read -r -d '' SPINES_GROUP << EOF
+{
+  "group-name": "spines",
+  "admin-state": "enable",
+  "import-policy": "select-loopbacks",
+  "export-policy": "select-loopbacks",
+  "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  "peer-as": $PEER_AS_MIN,
+  "local-as": [ { "as-number": $AS } ]
+}
+EOF
+fi
+
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "evpn": { "rapid-update": true },
 $DEFAULT_DYNAMIC_HOST_PEERING
 "group": [
     $DEFAULT_HOSTS_GROUP
-    {
-      "group-name": "spines",
-      "admin-state": "enable",
-      "import-policy": "select-loopbacks",
-      "export-policy": "select-loopbacks",
-      "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
-      "peer-as": $PEER_AS_MIN,
-      "local-as": [ { "as-number": $AS } ]
-    }
+    $SPINES_GROUP
     $EVPN_RR_GROUP
 ],
 EOF

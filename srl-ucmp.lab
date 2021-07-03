@@ -16,8 +16,9 @@ topology:
     leaf1:  { kind: srl, config: auto-leaf.cfg.json }
     leaf2:  { kind: srl, config: auto-leaf.cfg.json }
     leaf3:  { kind: srl, config: auto-leaf.cfg.json }
-    i-spine1: { kind: srl, config: auto-spine.cfg.json }
-    i-spine2: { kind: srl, config: auto-spine.cfg.json }
+    # Can use "i-" in name for iBGP peering
+    spine1: { kind: srl, config: auto-spine.cfg.json }
+    spine2: { kind: srl, config: auto-spine.cfg.json }
 
     h1: { kind: srl, config: auto-host-with-vip.cfg.json }
     h2: { kind: srl, config: auto-host-with-vip.cfg.json }
@@ -25,12 +26,12 @@ topology:
     h4: { kind: srl, config: auto-host.cfg.json }
 
   links:
-    - endpoints: ["leaf1:e1-1","i-spine1:e1-1"]
-    - endpoints: ["leaf2:e1-1","i-spine1:e1-2"]
-    - endpoints: ["leaf3:e1-1","i-spine1:e1-3"]
-    - endpoints: ["leaf1:e1-2","i-spine2:e1-1"]
-    - endpoints: ["leaf2:e1-2","i-spine2:e1-2"]
-    - endpoints: ["leaf3:e1-2","i-spine2:e1-3"]
+    - endpoints: ["leaf1:e1-1","spine1:e1-1"]
+    - endpoints: ["leaf2:e1-1","spine1:e1-2"]
+    - endpoints: ["leaf3:e1-1","spine1:e1-3"]
+    - endpoints: ["leaf1:e1-2","spine2:e1-1"]
+    - endpoints: ["leaf2:e1-2","spine2:e1-2"]
+    - endpoints: ["leaf3:e1-2","spine2:e1-3"]
 
     - endpoints: ["h1:e1-1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
     - endpoints: ["h2:e1-1","leaf1:e1-4"]
