@@ -2,7 +2,8 @@
   "auto_config_agent:auto-config-agent": {
     "role": "leaf",
     "leaf-as": 65000,
-    "use-ospfv3": true
+    "use-ospfv3": true,
+    "use-evpn": true
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {

@@ -115,17 +115,24 @@ exitcode+=$?
 
 if [[ "$ROLE" == "spine" ]]; then
 IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+
+if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
+{
+  "prefix": "$LINK_PREFIX",
+  "peer-group": "leaves",
+  "allowed-peer-as": [
+    "$PEER_AS_MIN..$PEER_AS_MAX"
+  ]
+},
+EOF
+fi
+
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
     "accept": {
       "match": [
-        {
-          "prefix": "$LINK_PREFIX",
-          "peer-group": "leaves",
-          "allowed-peer-as": [
-            "$PEER_AS_MIN..$PEER_AS_MAX"
-          ]
-        },
+        $EBGP_NEIGHBORS
         {
           "prefix": "$ip1.$ip2.$ip3.0/22",
           "peer-group": "evpn",
@@ -422,7 +429,10 @@ exitcode+=$?
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
- "interface-type": "point-to-point"
+ "interface-type": "point-to-point",
+ "failure-detection": {
+   "enable-bfd": true
+ }
 }
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
@@ -460,7 +470,8 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "$PEER_GROUP"
+  "peer-group": "$PEER_GROUP",
+  "description": "$PEER"
 }
 EOF
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
@@ -470,7 +481,7 @@ fi
 # Peer router ID only set for spines when this node is a leaf
 if [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": "evpn-rr" }
+{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
 EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
