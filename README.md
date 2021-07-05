@@ -44,7 +44,7 @@ The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessf
 ## Using LLDP for signalling topology changes
 To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modifies the system name:
 1. LLDP Port ethernet/1-1: h1 event received
-2. Leaf1 modifies its system name: <system ID>-1-1h1 (e.g. "1.1.1.1-1-1h1")
+2. Leaf1 modifies its system name: \<system ID\>-1-1h1 (e.g. "1.1.1.1-1-1h1")
 3. Spine1 receives this and - being a spine - modifies its system name in response, to the same string
 4. Leaf1 and Leaf2 both receive this change through LLDP
    + Leaf1, recognizing its own system ID, restores its hostname to the regular value (which triggers another update)
