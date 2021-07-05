@@ -47,7 +47,6 @@ To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modif
 2. Leaf1 modifies its system name: <system ID>-1-1h1 (e.g. "1.1.1.1-1-1h1")
 3. Spine1 receives this and - being a spine - modifies its system name in response, to the same string
 4. Leaf1 and Leaf2 both receive this change through LLDP
-   Leaf1, recognizing its own system ID, restores its hostname to the regular value (which triggers another update)
-   Leaf2, recognizing that the update comes from its peer via the spine layer, updates its internal state to record 'h1'
+   + Leaf1, recognizing its own system ID, restores its hostname to the regular value (which triggers another update)
+   + Leaf2, recognizing that the update comes from its peer via the spine layer, updates its internal state to record 'h1'
 5. Spine1 upon receiving the restored hostname via LLDP, resets its hostname
-  4. 
