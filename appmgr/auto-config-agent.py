@@ -18,8 +18,6 @@ import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
 import config_service_pb2
-import route_service_pb2
-import route_service_pb2_grpc
 import sdk_common_pb2
 
 from logging.handlers import RotatingFileHandler
@@ -27,6 +25,9 @@ from logging.handlers import RotatingFileHandler
 # To report state back
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
+
+# Local gNMI connection
+from pygnmi.client import gNMIclient, telemetryParser
 
 ############################################################
 ## Agent will start with this name
@@ -41,7 +42,10 @@ agent_name='auto_config_agent'
 channel = grpc.insecure_channel('127.0.0.1:50053')
 metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
-pushed_routes = 0
+
+# Requires Unix socket to be enabled in config
+# gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+#                  username="admin",password="admin",insecure=True)
 
 ############################################################
 ## Subscribe to required event
@@ -56,10 +60,6 @@ def Subscribe(stream_id, option):
     elif option == 'cfg':
         entry = config_service_pb2.ConfigSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
-    elif option == 'route':
-        # This includes all network namespaces, i.e. including mgmt
-        entry = route_service_pb2.IpRouteSubscriptionRequest()
-        request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, route=entry)
 
     subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     print('Status of subscription response for {}:: {}'.format(option, subscription_response.status))
@@ -85,15 +85,52 @@ def Subscribe_Notifications(stream_id):
 ## Function to populate state of agent config
 ## using telemetry -- add/update info from state
 ############################################################
-def Set_LLDP_Desc(desc):
-    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
-    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
-    telemetry_info = telemetry_update_request.state.add()
-    telemetry_info.key.js_path = '.system.lldp.system-description' # js_path
-    telemetry_info.data.json_content = desc # js_data
-    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
-    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=[('agent_name', 'lldp_mgr')])
-    return telemetry_response
+def Set_LLDP_Systemname(name):
+   value = { "host-name" : name }
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="admin",insecure=True) as c:
+      c.set( encoding='json_ietf', update=[('/system/name',value)] )
+
+def Set_Default_Systemname(state):
+    Set_LLDP_Systemname( f"{state.role}-{state.node_id}-{state.router_id}" )
+
+def Announce_LLDP_peer(state,name,port):
+    logging.info(f"Announce_LLDP_peer :: name={name} port={port}")
+    if (state.announcing):
+        state.pending_announcements.append( (name,port) )
+    else:
+        state.announcing = True
+        Set_LLDP_Systemname( f"{state.router_id}-{port}-{name}" )
+
+def HandleLLDPChange(state,peername,my_port,their_port):
+    m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+-\d+)-(.*)$", peername )
+    if m:
+        peer_ip = m.groups()[0]
+        peer_if = m.groups()[1]
+        peer_hostnode = m.groups()[2]
+        logging.info(f"HandleLLDPChange :: peer_id={peer_ip} if={peer_if}")
+
+        if state.router_id == peer_ip:
+            if state.pending_announcements!=[]:
+                name, port = state.pending_announcements.pop(0)
+                logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
+                Set_LLDP_Systemname( f"{state.router_id}-{port}-{name}" )
+            else:
+                state.announcing = False
+                Set_Default_Systemname( state )
+        else:
+            # Peer announcement, pass it on as spine
+            if state.role == "spine":
+               state.announcing = True
+               Set_LLDP_Systemname( peername )
+            else:
+               logging.info(f"TODO process peer LLDP event")
+
+    else:
+        logging.info(f"HandleLLDPChange :: no match name={peername}")
+        if state.announcing:
+            state.announcing = False
+            Set_Default_Systemname(state)
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -140,10 +177,6 @@ def Handle_Notification(obj, state):
                 if 'use_ospfv3' in data:
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
 
-                # JvB Test - fails, wrong path?
-                # lldp_test = Set_LLDP_Desc( "JvB Test" )
-                # logging.info(f'LLDP description test response:{lldp_test}')
-
                 return not state.role is None
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -152,8 +185,6 @@ def Handle_Notification(obj, state):
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         peer_sys_name = obj.lldp_neighbor.data.system_name
-        if obj.lldp_neighbor.data.bgp_peer_address:
-           logging.info(f"BGP peer addresses : {obj.lldp_neighbor.data.bgp_peer_address}")
 
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
@@ -162,6 +193,9 @@ def Handle_Notification(obj, state):
             to_port_id = m.groups()[1]
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
+
+          if obj.lldp_neighbor.op == "Change":
+              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           # First figure out this node's relative id in its group. Don't depend on hostname
           if not hasattr(state,"node_id"):
@@ -176,6 +210,7 @@ def Handle_Notification(obj, state):
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
             state.router_id = determine_router_id( state, state.role, state.node_id )
             router_id_changed = True
+            Set_Default_Systemname( state )
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
@@ -184,34 +219,6 @@ def Handle_Notification(obj, state):
              for intf in state.pending_peers:
                  _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc = state.pending_peers[intf]
                  configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
-
-    elif obj.HasField('route'):
-        addr = ipaddress.ip_address(obj.route.key.ip_prefix.ip_addr.addr).__str__()
-        prefix = obj.route.key.ip_prefix.prefix_length
-        netins = obj.route.key.net_inst_name
-        logging.info( f"ROUTE notification: {addr}/{prefix} net_instance={netins}" )
-        # nhg_id = obj.route.data.nhg_id
-        # owner_id = obj.route.data.owner_id # To correlate Delete later on
-        # "1" == "default" instance
-        if obj.route.data.metric!=10 and prefix==32 and netins=="1":
-           route_stub = route_service_pb2_grpc.SdkMgrRouteServiceStub(channel)
-           route_request = route_service_pb2.RouteAddRequest()
-           route_info = route_request.routes.add()
-           route_info.key.net_inst_name = "default" # obj.route.key.net_inst_name
-           route_info.key.ip_prefix.ip_addr.addr = obj.route.key.ip_prefix.ip_addr.addr
-           route_info.key.ip_prefix.prefix_length = obj.route.key.ip_prefix.prefix_length
-           route_info.data.metric = 10 # test
-           logging.info(f"ROUTE REQUEST :: {route_request}")
-           try:
-              route_stub.SyncStart(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
-              route_response = route_stub.RouteAddOrUpdate(request=route_request,metadata=metadata)
-              logging.info(f"ROUTE RESPONSE:: {route_response} status={route_response.status}")
-              route_sync_response = route_stub.SyncEnd(request=sdk_common_pb2.SyncRequest(),metadata=metadata)
-              logging.info(route_sync_response)
-           except Exception as e:
-              logging.error(e)
-        else:
-           logging.info("Ignored")
 
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -266,7 +273,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _as = state.base_as
   elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    spineId = re.match(".*spine(\d+).*", lldp_peer_name)
+    spineId = re.match(".*spine[-]?(\d+).*", lldp_peer_name)
     _masterSpine = state.role == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.role=='leaf') else 1
     _i = 1
@@ -277,12 +284,16 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
-    else: # XXX hardcoded max hosts per leaf: 32
+    else:
       link_index = (state.max_spines * state.max_leaves +
                     state.max_hosts_per_leaf * (state.node_id-1) +
                     state.max_lag_links * (lldp_peer_port - 1) +
                     (lldp_my_port - 1))
       peer_type = 'host'
+
+      # For access ports, announce LLDP events
+      Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
+
   else:
     _r = 1
     _i = 2
@@ -361,6 +372,9 @@ class State(object):
         self.role = None        # May not be set in config
         self.pending_peers = {} # LLDP data received before we can determine ID
 
+        self.announcing = False
+        self.pending_announcements = []
+
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
 
@@ -405,7 +419,6 @@ def Run():
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
-                       Subscribe(stream_id, 'route')
                        lldp_subscribed = True
 
                     # Program router_id only when changed

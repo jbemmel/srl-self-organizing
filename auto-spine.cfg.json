@@ -1168,7 +1168,10 @@
           "port": 57400,
           "tls-profile": "tls-profile-1"
         }
-      ]
+      ],
+      "unix-socket": {
+        "admin-state": "enable"
+      }
     },
     "srl_nokia-tls:tls": {
       "server-profile": [

@@ -22,14 +22,19 @@ function main()
     # source the virtual-environment, which is used to ensure the correct python packages are installed,
     # and the correct python version is used
     source "${virtual_env}"
-    export  PYTHONPATH="$PYTHONPATH:/etc/opt/srlinux/appmgr/:/opt/srlinux/bin:/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
+
+    # Include local paths where custom packages are installed
+    P1="/usr/local/lib/python3.6/site-packages"
+    P2="/usr/local/lib64/python3.6/site-packages"
+    NDK="/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
+    export PYTHONPATH="$P1:$P2:$NDK:$PYTHONPATH"
 
     export http_proxy=""
     export https_proxy=""
     export no_proxy=""
     python3 ${main_module} &
 
-    child=$! 
+    child=$!
     wait "$child"
 
 }

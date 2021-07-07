@@ -287,7 +287,8 @@ cat > $temp_file << EOF
   "route-advertisement": {
     "rapid-withdrawal": true
   },
-  "preference": { "ibgp": 171 }
+  "preference": {
+   "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" }
 }
 
 EOF
@@ -442,6 +443,7 @@ exitcode+=$?
 
 # Add it to OSPF (even if disabled)
 # Note: info from state bfd shows failures, disabling for now
+if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -455,7 +457,6 @@ $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instanc
 exitcode+=$?
 
 # Enable BFD, except for host facing interfaces
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",

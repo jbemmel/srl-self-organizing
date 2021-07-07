@@ -38,4 +38,6 @@ topology:
 
     - endpoints: ["h3:e1-1","leaf2:e1-3"]
 
-    - endpoints: ["h4:e1-1","leaf3:e1-3"]
+    # Connect as LAG, test auto-create lag logic
+    - endpoints: ["h4:e1-1","leaf3:e1-4"]
+    - endpoints: ["h4:e1-2","leaf2:e1-4"]
