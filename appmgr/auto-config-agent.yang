@@ -11,6 +11,11 @@ module auto_config_agent {
     //    prefix srl_nokia-comm;
     // }
 
+    // Note that this module needs to be in the path for source-directories
+    import srl_nokia-extensions {
+      prefix srl_nokia-ext;
+    }
+
     revision "2021-04-11" {
         description "Initial revision";
         reference "TBD";
@@ -87,6 +92,34 @@ module auto_config_agent {
                 description "Provision OSPFv3 on fabric interfaces";
                 type boolean;
                 default false;
+            }
+
+            // info from state
+            list leaf {
+                key leaf-id;
+                config false;
+
+                leaf leaf-id {
+                  type string;
+                }
+                container lldp {
+                 srl_nokia-ext:delivery-node-override true;
+                 presence "State LLDP operational parameters";
+
+                 list port {
+                  key port-name;
+                  leaf port-name {
+                    type string;
+                  }
+                  container neighbor {
+                   srl_nokia-ext:delivery-node-override true;
+                   presence "State LLDP neighbor operational parameters";
+                   leaf host-name {
+                    type string;
+                   }
+                  }
+                 }
+                }
             }
         }
     }

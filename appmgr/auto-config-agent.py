@@ -85,6 +85,31 @@ def Subscribe_Notifications(stream_id):
 ## Function to populate state of agent config
 ## using telemetry -- add/update info from state
 ############################################################
+def Add_Telemetry(js_path, js_data):
+    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
+    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
+    telemetry_info = telemetry_update_request.state.add()
+    telemetry_info.key.js_path = js_path
+    telemetry_info.data.json_content = js_data
+    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
+    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
+    return telemetry_response
+
+############################################################
+## Function to populate state fields of the agent
+## It updates command: info from state auto-config-agent
+############################################################
+def Update_Peer_State(leaf_ip, port, lldp_peer_name):
+    _ip_key = '.'.join([i.zfill(3) for i in leaf_ip.split('.')]) # sortable
+    js_path = '.' + agent_name + '.leaf{.leaf_id=="' + _ip_key + '"}.lldp.port{.port_name=="'+port+'"}.neighbor'
+    value = { "host_name" : { "value": lldp_peer_name } }
+    response = Add_Telemetry( js_path=js_path, js_data=json.dumps(value) )
+    logging.info(f"Telemetry_Update_Response :: {response}")
+
+############################################################
+## Function to populate state of agent config
+## using telemetry -- add/update info from state
+############################################################
 def Set_LLDP_Systemname(name):
    logging.info(f"Set_LLDP_Systemname :: name={name}")
    value = { "host-name" : name }
@@ -135,10 +160,11 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                    Set_LLDP_Systemname( peername )
             else:
                logging.info(f"TODO LEAF process peer LLDP event {peername} on {my_port}")
+               Update_Peer_State( peer_ip, peer_if, peer_hostnode )
 
     else:
-        logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing}")
-        if state.role == "spine" and state.announcing:
+        logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
+        if state.role == "spine" and state.announcing != False:
             if state.pending_announcements!=[]:
                 next_port, nextpeer = state.pending_announcements.pop(0)
                 state.announcing = next_port

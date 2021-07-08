@@ -9,7 +9,8 @@ auto_config_agent:
    author: 'Nokia'
    version-command: ' cat build_version'
    yang-modules:
-       names: 
+       names:
            - "auto-config-agent"
        source-directories:
            - "/etc/opt/srlinux/appmgr/"
+           - "/opt/srlinux/models/srl_nokia/models/common/"
