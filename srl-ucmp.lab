@@ -11,6 +11,8 @@ topology:
       license: ../license.key
       env:
         SPINES: 2 # TODO subtract this from host ID
+      binds:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
 
   nodes:
     leaf1:  { kind: srl, config: auto-leaf.cfg.json }

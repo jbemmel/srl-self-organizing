@@ -251,7 +251,8 @@ def Handle_Notification(obj, state):
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
             state.router_id = determine_router_id( state, state.role, state.node_id )
             router_id_changed = True
-            Set_Default_Systemname( state )
+            if state.role != "endpoint":
+               Set_Default_Systemname( state )
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
@@ -523,7 +524,7 @@ if __name__ == '__main__':
     log_filename = '{}/auto_config_agent.log'.format(stdout_dir)
     logging.basicConfig(
       handlers=[RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)],
-      format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+      format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
       datefmt='%H:%M:%S', level=logging.INFO)
 
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
