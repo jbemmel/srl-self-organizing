@@ -86,6 +86,7 @@ def Subscribe_Notifications(stream_id):
 ## using telemetry -- add/update info from state
 ############################################################
 def Set_LLDP_Systemname(name):
+   logging.info(f"Set_LLDP_Systemname :: name={name}")
    value = { "host-name" : name }
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
@@ -94,43 +95,57 @@ def Set_LLDP_Systemname(name):
 def Set_Default_Systemname(state):
     Set_LLDP_Systemname( f"{state.role}-{state.node_id}-{state.router_id}" )
 
+# Only used on LEAVES
 def Announce_LLDP_peer(state,name,port):
-    logging.info(f"Announce_LLDP_peer :: name={name} port={port}")
-    if (state.announcing):
+    logging.info(f"Announce_LLDP_peer :: name={name} port={port} ann={state.announcing}")
+    if not re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", name ):
+      if (state.announcing):
         state.pending_announcements.append( (name,port) )
-    else:
-        state.announcing = True
-        Set_LLDP_Systemname( f"{state.router_id}-{port}-{name}" )
+      else:
+        state.announcing = f"{state.router_id}-{port}-{name}"
+        Set_LLDP_Systemname( state.announcing )
 
 def HandleLLDPChange(state,peername,my_port,their_port):
-    m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+-\d+)-(.*)$", peername )
+    # XXX assumes port=single digit, only ethernet-1/x
+    m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
     if m:
         peer_ip = m.groups()[0]
         peer_if = m.groups()[1]
         peer_hostnode = m.groups()[2]
-        logging.info(f"HandleLLDPChange :: peer_id={peer_ip} if={peer_if}")
+        logging.info(f"HandleLLDPChange :: on={my_port} leaf={peer_ip}:{peer_if} ann={state.announcing}")
 
-        if state.router_id == peer_ip:
+        # XXX should wait for ALL spines to ACK?
+        if state.announcing == peername: # Only happens for LEAVES
             if state.pending_announcements!=[]:
                 name, port = state.pending_announcements.pop(0)
                 logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
-                Set_LLDP_Systemname( f"{state.router_id}-{port}-{name}" )
+                state.announcing = f"{state.router_id}-{port}-{name}"
+                Set_LLDP_Systemname( state.announcing )
             else:
-                state.announcing = False
+                logging.info("LEAF: No more pending announcements")
+                state.announcing = ""
                 Set_Default_Systemname( state )
         else:
             # Peer announcement, pass it on as spine
             if state.role == "spine":
-               state.announcing = True
-               Set_LLDP_Systemname( peername )
+               if state.announcing!=False and state.announcing != my_port:
+                   state.pending_announcements.append( (my_port,peername) )
+               else:
+                   state.announcing = my_port
+                   Set_LLDP_Systemname( peername )
             else:
-               logging.info(f"TODO process peer LLDP event")
+               logging.info(f"TODO LEAF process peer LLDP event {peername} on {my_port}")
 
     else:
-        logging.info(f"HandleLLDPChange :: no match name={peername}")
-        if state.announcing:
-            state.announcing = False
-            Set_Default_Systemname(state)
+        logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing}")
+        if state.role == "spine" and state.announcing:
+            if state.pending_announcements!=[]:
+                next_port, nextpeer = state.pending_announcements.pop(0)
+                state.announcing = next_port
+                Set_LLDP_Systemname( nextpeer )
+            else:
+                state.announcing = False
+                Set_Default_Systemname(state)
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -181,7 +196,7 @@ def Handle_Notification(obj, state):
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
-        logging.info(f"process LLDP notification : {obj}")
+        logging.info(f"process LLDP notification : {obj} op='{type(obj.lldp_neighbor.op)}'")
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         peer_sys_name = obj.lldp_neighbor.data.system_name
@@ -194,7 +209,7 @@ def Handle_Notification(obj, state):
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
 
-          if obj.lldp_neighbor.op == "Change":
+          if obj.lldp_neighbor.op == 1: # Change, class 'int'
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           # First figure out this node's relative id in its group. Don't depend on hostname
@@ -480,11 +495,11 @@ if __name__ == '__main__':
     if not os.path.exists(stdout_dir):
         os.makedirs(stdout_dir, exist_ok=True)
     log_filename = '{}/auto_config_agent.log'.format(stdout_dir)
-    logging.basicConfig(filename=log_filename, filemode='a',\
-                        format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',\
-                        datefmt='%H:%M:%S', level=logging.INFO)
-    handler = RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)
-    logging.getLogger().addHandler(handler)
+    logging.basicConfig(
+      handlers=[RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)],
+      format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+      datefmt='%H:%M:%S', level=logging.INFO)
+
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
     if Run():
         logging.info('Agent unregistered and agent routes withdrawed from dut')
