@@ -106,6 +106,16 @@ def Update_Peer_State(leaf_ip, port, lldp_peer_name):
     response = Add_Telemetry( js_path=js_path, js_data=json.dumps(value) )
     logging.info(f"Telemetry_Update_Response :: {response}")
 
+def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
+    Update_Peer_State(leaf_ip, port, lldp_peer_name)
+    if lldp_peer_name in state.lag_state:
+        cur = state.lag_state[ lldp_peer_name ]
+        cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
+        if state.router_id in cur and len(cur) >= 2:
+            Convert_to_lag( cur[state.router_id] )
+    else:
+        state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
+
 ############################################################
 ## Function to populate state of agent config
 ## using telemetry -- add/update info from state
@@ -166,7 +176,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                   Set_LLDP_Systemname( state.announcing )
 
                logging.info(f"TODO LEAF process peer LLDP event {peername} on {my_port}")
-               Update_Peer_State( peer_ip, peer_if, peer_hostnode )
+               Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
@@ -181,6 +191,39 @@ def HandleLLDPChange(state,peername,my_port,their_port):
         elif state.announcing == "ACK":
             state.announcing = ""
             Set_Default_Systemname(state)
+
+###
+# Converts an ethernet interface to a lag
+##
+def Convert_to_lag(port):
+   logging.info(f"Convert_to_lag :: port={port}")
+   eth = f'name=ethernet-1/{port}'
+   deletes=[ f'/network-instance[name=overlay]/interface[{eth}.0]',
+             f'/interface[{eth}]/subinterface[index=*]',
+             f'/interface[{eth}]/vlan-tagging' ]
+   lag = {
+      "admin-state": "enable",
+      "srl_nokia-interfaces-vlans:vlan-tagging": True,
+      "subinterface": [
+       {
+         "index": 0,
+         "type": "srl_nokia-interfaces:bridged",
+         "srl_nokia-interfaces-vlans:vlan": {
+           "encap": { "single-tagged": { "vlan-id": 1 } }
+         }
+       }
+      ],
+      "srl_nokia-interfaces-lag:lag": {
+       "lag-type": "static",
+       "member-speed": "25G"
+      }
+   }
+   updates=[ (f'/interface[name=lag{port}]',lag),
+             (f'/interface[{eth}]/ethernet',
+              { 'aggregate-id' : { 'value' : f"lag{port}" } } ) ]
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="admin",insecure=True) as c:
+      c.set( encoding='json_ietf', delete=deletes, update=updates )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -425,6 +468,8 @@ class State(object):
 
         self.announcing = False
         self.pending_announcements = []
+
+        self.lag_state = {}     # Used for auto-provisioning of LAGs
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
