@@ -12,6 +12,7 @@ RUN printf '%s\n' \
   sudo chmod a+x /opt/srlinux/bin/bootscript/42_sr_copy_custom_appmgr.sh
 
 # Install pyGNMI to /usr/local/lib[64]/python3.6/site-packages
+RUN sudo yum-config-manager --disable ipdcentos ipdrepo ius && sudo yum clean all
 RUN sudo yum install -y python3-pip gcc-c++ && \
     sudo python3 -m pip install pip --upgrade && \
     sudo python3 -m pip install pygnmi

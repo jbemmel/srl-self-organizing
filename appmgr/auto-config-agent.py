@@ -170,7 +170,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
-        if state.role == "spine" and state.announcing != False:
+        if state.role == "spine" and state.announcing==my_port:
             if state.pending_announcements!=[]:
                 next_port, nextpeer = state.pending_announcements.pop(0)
                 state.announcing = next_port
