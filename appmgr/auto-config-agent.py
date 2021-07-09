@@ -194,7 +194,8 @@ def HandleLLDPChange(state,peername,my_port,their_port):
             Set_Default_Systemname(state)
 
 ###
-# Converts an ethernet interface to a lag
+# Converts an ethernet interface to a lag, creating a mac-vrf, irb,
+# bgp-evpn l2 vni, ethernet segment with ESI
 ##
 def Convert_to_lag(port):
    logging.info(f"Convert_to_lag :: port={port}")
@@ -219,9 +220,84 @@ def Convert_to_lag(port):
        "member-speed": "25G"
       }
    }
+
+   irb_if = {
+    "admin-state": "enable",
+    "subinterface": [
+    {
+      "index": int(port),
+      "admin-state": "enable",
+      "ipv4": {
+        "address": [
+          {
+            "ip-prefix": "10.10.10.1/24",
+            "anycast-gw": True,
+            "primary": '[null]'  # type 'empty', used as source for bcast
+          }
+        ]
+      },
+      "ipv6": {},
+      "anycast-gw": {}
+    }
+    ]
+   }
+
+   sys_bgp_evpn = {
+    "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
+    "evpn": {
+     "ethernet-segments": {
+      "bgp-instance": [
+        {
+          "id": 1,
+          "ethernet-segment": [
+            {
+              "name": f"lag{port}",
+              "admin-state": "enable",
+              "esi": f"00:12:12:12:12:12:12:00:00:{int(port):02x}",
+              "interface": f"lag{port}",
+              "multi-homing-mode": "all-active"
+            }
+          ]
+        }
+      ]
+     }
+    }
+   }
+
+   vxlan_if = {
+      "type": "srl_nokia-interfaces:bridged",
+      "ingress": { "vni": int(port) },
+      "egress": { "source-ip": "use-system-ipv4-address" }
+   }
+
+   mac_vrf = {
+     "type": "srl_nokia-network-instance:mac-vrf",
+     "admin-state": "enable",
+     "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
+     "vxlan-interface": [ { "name": f"vxlan1.{port}" } ],
+     "protocols": {
+      "bgp-evpn": {
+       "srl_nokia-bgp-evpn:bgp-instance": [
+        {
+          "id": 1,
+          "admin-state": "enable",
+          "vxlan-interface": f"vxlan1.{port}",
+          "evi": int(port),
+          "ecmp": 8
+        }
+       ]
+      },
+      "srl_nokia-bgp-vpn:bgp-vpn": { "bgp-instance": [ { "id": 1 } ] }
+     }
+   }
+
    updates=[ (f'/interface[name=lag{port}]',lag),
-             (f'/interface[{eth}]/ethernet/aggregate-id', # XXX fails on 21.3.2
-              { 'value' : f"lag{port}" } )
+             (f'/interface[name=irb0]', irb_if),
+             (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
+             ('/system/network-instance/protocols', sys_bgp_evpn ),
+             (f'/tunnel-interface[name=vxlan1]/vxlan-interface[index={port}]', vxlan_if ),
+             (f'/network-instance[name=lag{port}]', mac_vrf),
+             ('/network-instance[name=overlay]/interface', { 'name' : f'irb0.{port}' } ),
            ]
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
