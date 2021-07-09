@@ -159,6 +159,12 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                    state.announcing = my_port
                    Set_LLDP_Systemname( peername )
             else:
+               # To avoid deadlock on spine, re-announce if match
+               if state.announcing == "" and peer_ip == state.router_id:
+                  logging.info(f"LEAF ACK {peername} on {my_port}")
+                  state.announcing = "ACK"
+                  Set_LLDP_Systemname( state.announcing )
+
                logging.info(f"TODO LEAF process peer LLDP event {peername} on {my_port}")
                Update_Peer_State( peer_ip, peer_if, peer_hostnode )
 
@@ -172,6 +178,9 @@ def HandleLLDPChange(state,peername,my_port,their_port):
             else:
                 state.announcing = False
                 Set_Default_Systemname(state)
+        elif state.announcing == "ACK":
+            state.announcing = ""
+            Set_Default_Systemname(state)
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
