@@ -107,6 +107,7 @@ def Update_Peer_State(leaf_ip, port, lldp_peer_name):
     logging.info(f"Telemetry_Update_Response :: {response}")
 
 def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
+    logging.info(f"Add_Discovered_Node :: {leaf_ip}:{port}={lldp_peer_name}")
     Update_Peer_State(leaf_ip, port, lldp_peer_name)
     if lldp_peer_name in state.lag_state:
         cur = state.lag_state[ lldp_peer_name ]
@@ -151,6 +152,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
         # XXX should wait for ALL spines to ACK?
         if state.announcing == peername: # Only happens for LEAVES
+            Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
             if state.pending_announcements!=[]:
                 name, port = state.pending_announcements.pop(0)
                 logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
@@ -175,7 +177,6 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                   state.announcing = "ACK"
                   Set_LLDP_Systemname( state.announcing )
 
-               logging.info(f"TODO LEAF process peer LLDP event {peername} on {my_port}")
                Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
 
     else:
@@ -219,8 +220,9 @@ def Convert_to_lag(port):
       }
    }
    updates=[ (f'/interface[name=lag{port}]',lag),
-             (f'/interface[{eth}]/ethernet',
-              { 'aggregate-id' : { 'value' : f"lag{port}" } } ) ]
+             (f'/interface[{eth}]/ethernet/aggregate-id', # XXX fails on 21.3.2
+              { 'value' : f"lag{port}" } )
+           ]
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', delete=deletes, update=updates )
