@@ -5,7 +5,7 @@ topology:
     srl:
       # Need IXR D2 or D3 for EVPN/VXLAN support
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
-      # Uses custom container image containing auto-config agent
+      # Uses custom container image containing auto-startup-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
       license: ../license.key
@@ -15,17 +15,17 @@ topology:
       - /sys/fs/cgroup:/sys/fs/cgroup:ro
 
   nodes:
-    leaf1:  { kind: srl, config: auto-leaf.cfg.json }
-    leaf2:  { kind: srl, config: auto-leaf.cfg.json }
-    leaf3:  { kind: srl, config: auto-leaf.cfg.json }
+    leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf3:  { kind: srl, startup-config: auto-leaf.cfg.json }
     # Can use "i-" in name for iBGP peering
-    spine1: { kind: srl, config: auto-spine.cfg.json }
-    spine2: { kind: srl, config: auto-spine.cfg.json }
+    spine1: { kind: srl, startup-config: auto-spine.cfg.json }
+    spine2: { kind: srl, startup-config: auto-spine.cfg.json }
 
-    h1: { kind: srl, config: auto-host-with-vip.cfg.json }
-    h2: { kind: srl, config: auto-host-with-vip.cfg.json }
-    h3: { kind: srl, config: auto-host-with-vip.cfg.json }
-    h4: { kind: srl, config: auto-host.cfg.json }
+    h1: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
+    h2: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
+    h3: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
+    h4: { kind: srl, startup-config: auto-host.cfg.json }
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]

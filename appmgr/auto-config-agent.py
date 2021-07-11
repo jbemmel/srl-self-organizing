@@ -270,18 +270,19 @@ def Convert_to_lag(port):
       "egress": { "source-ip": "use-system-ipv4-address" }
    }
 
+   # Could configure MAC table size here
    mac_vrf = {
      "type": "srl_nokia-network-instance:mac-vrf",
      "admin-state": "enable",
      "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
-     "vxlan-interface": [ { "name": f"vxlan1.{port}" } ],
+     "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
      "protocols": {
       "bgp-evpn": {
        "srl_nokia-bgp-evpn:bgp-instance": [
         {
           "id": 1,
           "admin-state": "enable",
-          "vxlan-interface": f"vxlan1.{port}",
+          "vxlan-interface": f"vxlan0.{port}",
           "evi": int(port),
           "ecmp": 8
         }
@@ -295,9 +296,9 @@ def Convert_to_lag(port):
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
              ('/system/network-instance/protocols', sys_bgp_evpn ),
-             (f'/tunnel-interface[name=vxlan1]/vxlan-interface[index={port}]', vxlan_if ),
+             (f'/tunnel-interface[name=0]/vxlan-interface[index={port}]', vxlan_if ),
              (f'/network-instance[name=lag{port}]', mac_vrf),
-             ('/network-instance[name=overlay]/interface', { 'name' : f'irb0.{port}' } ),
+             (f'/network-instance[name=overlay]/interface[name=irb0.{port}]', {} ),
            ]
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:

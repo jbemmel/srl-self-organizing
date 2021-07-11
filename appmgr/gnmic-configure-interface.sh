@@ -323,7 +323,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --update-path /tunnel-interface[name=vxlan1] --update-file $temp_file
+$GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
 exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
@@ -333,7 +333,7 @@ cat > $temp_file << EOF
     "type": "srl_nokia-network-instance:ip-vrf",
     "_annotate_type": "routed",
     "admin-state": "enable",
-    "vxlan-interface": [ { "name": "vxlan1.0" } ],
+    "vxlan-interface": [ { "name": "vxlan0.0" } ],
     "protocols": {
       "bgp": {
         "admin-state": "enable",
@@ -364,7 +364,7 @@ cat > $temp_file << EOF
           {
             "id": 1,
             "admin-state": "enable",
-            "vxlan-interface": "vxlan1.0",
+            "vxlan-interface": "vxlan0.0",
             "evi": 10000,
             "ecmp": 8
           }
