@@ -106,7 +106,7 @@ def Update_Peer_State(leaf_ip, port, lldp_peer_name):
     response = Add_Telemetry( js_path=js_path, js_data=json.dumps(value) )
     logging.info(f"Telemetry_Update_Response :: {response}")
 
-def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
+def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name,chassis_mac):
     logging.info(f"Add_Discovered_Node :: {leaf_ip}:{port}={lldp_peer_name}")
     Update_Peer_State(leaf_ip, port, lldp_peer_name)
     if lldp_peer_name in state.lag_state:
@@ -116,6 +116,16 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
             Convert_to_lag( cur[state.router_id] )
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
+
+    # Also create an extended community encoding the neighbor's MAC(4b) and port
+    Create_Ext_Community(chassis_mac,port)
+
+def Create_Ext_Community(chassis_mac,port):
+    bytes = [ int(b,16) for b in chassis_mac.split(':')[:4] ]
+    value = { "member": [ f"origin:{bytes.join('.')}:{port}" ] }
+    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                      username="admin",password="admin",insecure=True) as c:
+       c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
 
 ############################################################
 ## Function to populate state of agent config
@@ -141,7 +151,7 @@ def Announce_LLDP_peer(state,name,port):
         state.announcing = f"{state.router_id}-{port}-{name}"
         Set_LLDP_Systemname( state.announcing )
 
-def HandleLLDPChange(state,peername,my_port,their_port):
+def HandleLLDPChange(state,peername,my_port,their_port,chassis_mac):
     # XXX assumes port=single digit, only ethernet-1/x
     m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
     if m:
@@ -152,7 +162,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
         # XXX should wait for ALL spines to ACK?
         if state.announcing == peername: # Only happens for LEAVES
-            Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
+            Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode, chassis_mac )
             if state.pending_announcements!=[]:
                 name, port = state.pending_announcements.pop(0)
                 logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
@@ -177,7 +187,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                   state.announcing = "ACK"
                   Set_LLDP_Systemname( state.announcing )
 
-               Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
+               Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode, chassis_mac )
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
@@ -296,7 +306,7 @@ def Convert_to_lag(port):
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
              ('/system/network-instance/protocols', sys_bgp_evpn ),
-             (f'/tunnel-interface[name=0]/vxlan-interface[index={port}]', vxlan_if ),
+             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
              (f'/network-instance[name=lag{port}]', mac_vrf),
              (f'/network-instance[name=overlay]/interface[name=irb0.{port}]', {} ),
            ]
@@ -367,7 +377,7 @@ def Handle_Notification(obj, state):
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
-              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
+              return HandleLLDPChange( state, peer_sys_name, my_port, to_port, obj.lldp_neighbor.key.chassis_id )
 
           # First figure out this node's relative id in its group. Don't depend on hostname
           if not hasattr(state,"node_id"):
