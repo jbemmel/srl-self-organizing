@@ -69,6 +69,7 @@ class CommandLoop(object):
         self._stop_on_error = stop_on_error
         self._error_count = 0
         self._observer = observer or Observer()
+        self._env = {} # JvB added
 
     def loop(self):
         try:
@@ -177,8 +178,16 @@ class CommandLoop(object):
                 _result = "" # For non-existent objects, resolve to empty string
              self._output.print_warning_line( f'root={_root} leaf={_leaf} -> {_result} type={type(_result)}' )
           else:
-             self._output.print_warning_line( f'Lookup ENV var={_path_parts[0]}' )
-             _result = os.environ[ _path_parts[0] ]
+             self._output.print_warning_line( f'Process ENV var={_path_parts[0]}' )
+             # If a value is defined, set it
+             if len(_expr_eval)>1:
+                 self._output.print_warning_line( f'Set ENV {_path_parts[0]}={_expr_eval[1]}' )
+                 self._env[ _path_parts[0] ] = _expr_eval[1]
+                 return ""
+             elif _path_parts[0] in self._env:
+                 _result = self._env[ _path_parts[0] ]
+             else:
+                 _result = os.environ[ _path_parts[0] ]
 
           if len(_expr_eval) > 1:
               # Make result available as '_' in locals, and ipaddress
