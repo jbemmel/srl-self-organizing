@@ -106,7 +106,7 @@ def Update_Peer_State(leaf_ip, port, lldp_peer_name):
     response = Add_Telemetry( js_path=js_path, js_data=json.dumps(value) )
     logging.info(f"Telemetry_Update_Response :: {response}")
 
-def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name,chassis_mac):
+def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
     logging.info(f"Add_Discovered_Node :: {leaf_ip}:{port}={lldp_peer_name}")
     Update_Peer_State(leaf_ip, port, lldp_peer_name)
     if lldp_peer_name in state.lag_state:
@@ -117,14 +117,11 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name,chassis_mac):
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
-    # Also create an extended community encoding the neighbor's MAC(4b) and port
-    if state.router_id == leaf_ip:
-        Create_Ext_Community(chassis_mac,port)
-
 def Create_Ext_Community(chassis_mac,port):
     logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
     bytes = [ str(int(b,16)) for b in chassis_mac.split(':')[:4] ]
-    value = { "member": [ f"origin:{'.'.join(bytes)}:{port}" ] }
+    marker = "origin:65537:0" # Well-known LLDP event community, static
+    value = { "member": [ f"origin:{'.'.join(bytes)}:{port}", marker ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
@@ -164,7 +161,7 @@ def HandleLLDPChange(state,peername,my_port,their_port,chassis_mac):
 
         # XXX should wait for ALL spines to ACK?
         if state.announcing == peername: # Only happens for LEAVES
-            Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode, chassis_mac )
+            Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
             if state.pending_announcements!=[]:
                 name, port = state.pending_announcements.pop(0)
                 logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
@@ -189,7 +186,7 @@ def HandleLLDPChange(state,peername,my_port,their_port,chassis_mac):
                   state.announcing = "ACK"
                   Set_LLDP_Systemname( state.announcing )
 
-               Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode, chassis_mac )
+               Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
@@ -379,7 +376,7 @@ def Handle_Notification(obj, state):
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
-              return HandleLLDPChange( state, peer_sys_name, my_port, to_port, obj.lldp_neighbor.key.chassis_id )
+              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           # First figure out this node's relative id in its group. Don't depend on hostname
           if not hasattr(state,"node_id"):
@@ -399,6 +396,8 @@ def Handle_Notification(obj, state):
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
+
+          Create_Ext_Community( my_port, obj.lldp_neighbor.key.chassis_id )
 
           if router_id_changed:
              for intf in state.pending_peers:
