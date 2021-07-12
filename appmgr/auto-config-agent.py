@@ -118,11 +118,13 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name,chassis_mac):
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
     # Also create an extended community encoding the neighbor's MAC(4b) and port
-    Create_Ext_Community(chassis_mac,port)
+    if state.router_id == leaf_ip:
+        Create_Ext_Community(chassis_mac,port)
 
 def Create_Ext_Community(chassis_mac,port):
-    bytes = [ int(b,16) for b in chassis_mac.split(':')[:4] ]
-    value = { "member": [ f"origin:{bytes.join('.')}:{port}" ] }
+    logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
+    bytes = [ str(int(b,16)) for b in chassis_mac.split(':')[:4] ]
+    value = { "member": [ f"origin:{'.'.join(bytes)}:{port}" ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
