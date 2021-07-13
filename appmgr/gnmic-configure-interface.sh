@@ -326,6 +326,23 @@ EOF
 $GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
 exitcode+=$?
 
+# Configure lo0.0 with special loopback IP to advertise communities
+cat > $temp_file << EOF
+{
+  "admin-state": "enable",
+  "subinterface": [
+    {
+      "index": 0,
+      "admin-state": "enable",
+      "ipv4": { "address": [ { "ip-prefix": "192.0.2.0/32" } ] },
+      "ipv6": { "address": [ { "ip-prefix": "2001:db8::192:0:2:0/128" } ] }
+    }
+  ]
+}
+EOF
+$GNMIC set --replace-path /interface[name=lo0.0] --replace-file $temp_file
+exitcode+=$?
+
 # Set autonomous system & router-id for BGP to hosts
 # Assumes a L3 service, TODO allow eBGP for hosts too?
 cat > $temp_file << EOF
@@ -333,6 +350,7 @@ cat > $temp_file << EOF
     "type": "srl_nokia-network-instance:ip-vrf",
     "_annotate_type": "routed",
     "admin-state": "enable",
+    "interfaces": [ { "name": "lo0.0" } ],
     "vxlan-interface": [ { "name": "vxlan0.0" } ],
     "protocols": {
       "bgp": {

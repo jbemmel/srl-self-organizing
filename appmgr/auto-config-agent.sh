@@ -27,7 +27,9 @@ function main()
     P1="/usr/local/lib/python3.6/site-packages"
     P2="/usr/local/lib64/python3.6/site-packages"
     NDK="/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
-    export PYTHONPATH="$P1:$P2:$NDK:$PYTHONPATH"
+    # since 21.6
+    SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
+    export PYTHONPATH="$P1:$P2:$NDK:$SDK2:$PYTHONPATH"
 
     export http_proxy=""
     export https_proxy=""

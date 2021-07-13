@@ -150,7 +150,7 @@ def Announce_LLDP_peer(state,name,port):
         state.announcing = f"{state.router_id}-{port}-{name}"
         Set_LLDP_Systemname( state.announcing )
 
-def HandleLLDPChange(state,peername,my_port,their_port,chassis_mac):
+def HandleLLDPChange(state,peername,my_port,their_port):
     # XXX assumes port=single digit, only ethernet-1/x
     m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
     if m:
@@ -397,7 +397,7 @@ def Handle_Notification(obj, state):
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
-          Create_Ext_Community( my_port, obj.lldp_neighbor.key.chassis_id )
+          Create_Ext_Community( obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
 
           if router_id_changed:
              for intf in state.pending_peers:

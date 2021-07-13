@@ -1,7 +1,7 @@
 ARG SR_LINUX_RELEASE
 FROM registry.srlinux.dev/pub/srlinux:$SR_LINUX_RELEASE
 
-RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.16.0/gnmic_0.16.0_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
+RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.16.2/gnmic_0.16.2_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
 
 RUN printf '%s\n' \
   '#!/bin/bash' \
@@ -13,7 +13,7 @@ RUN printf '%s\n' \
   sudo chmod a+x /opt/srlinux/bin/bootscript/42_sr_copy_custom_appmgr.sh
 
 # Install pyGNMI to /usr/local/lib[64]/python3.6/site-packages
-RUN sudo yum-config-manager --disable ipdcentos ipdrepo ius && sudo yum clean all
+# RUN sudo yum-config-manager --disable ipdcentos ipdrepo ius && sudo yum clean all
 RUN sudo yum install -y python3-pip gcc-c++ && \
     sudo python3 -m pip install pip --upgrade && \
     sudo python3 -m pip install pygnmi
