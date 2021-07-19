@@ -13,9 +13,9 @@ topology:
       image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 
   nodes:
-    leaf1:  { kind: srl, config: auto-auto.cfg.json }
-    leaf2:  { kind: srl, config: auto-leaf.cfg.json }
-    spine1: { kind: srl, config: auto-spine.cfg.json }
+    leaf1:  { kind: srl, startup-config: auto-auto.cfg.json }
+    leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    spine1: { kind: srl, startup-config: auto-spine.cfg.json }
 
     #h1: { kind: srl, config: auto-host-with-vip.cfg.json }
     #h2: { kind: srl, config: auto-host-with-vip.cfg.json }

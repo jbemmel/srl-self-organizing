@@ -11,7 +11,7 @@ import re
 import ipaddress
 import json
 import signal
-import subprocess # JvB for git pull call
+import subprocess
 import traceback
 
 import sdk_service_pb2
@@ -138,7 +138,7 @@ def Set_LLDP_Systemname(name):
       c.set( encoding='json_ietf', update=[('/system/name',value)] )
 
 def Set_Default_Systemname(state):
-    Set_LLDP_Systemname( f"{state.role}-{state.node_id}-{state.router_id}" )
+    Set_LLDP_Systemname( f"{state.get_role()}-{state.node_id}-{state.router_id}" )
 
 # Only used on LEAVES
 def Announce_LLDP_peer(state,name,port):
@@ -173,7 +173,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                 Set_Default_Systemname( state )
         else:
             # Peer announcement, pass it on as spine
-            if state.role == "spine":
+            if state.is_spine():
                if state.announcing!=False and state.announcing != my_port:
                    state.pending_announcements.append( (my_port,peername) )
                else:
@@ -190,7 +190,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
-        if state.role == "spine" and state.announcing==my_port:
+        if state.is_spine() and state.announcing==my_port:
             if state.pending_announcements!=[]:
                 next_port, nextpeer = state.pending_announcements.pop(0)
                 state.announcing = next_port
@@ -379,6 +379,11 @@ def Handle_Notification(obj, state):
             to_port_id = m.groups()[1]
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
+            if not state.host_lldp_seen and state.role == 'auto':
+               logging.info( "Received host LLDP (no portname match); auto switching to leaf")
+               state.host_lldp_seen = True
+               delattr(state,"router_id")  # Re-determine IDs
+               delattr(state,"node_id")
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
@@ -420,10 +425,10 @@ def Handle_Notification(obj, state):
 ## Depends on LLDP system naming for now (but not local system name)
 #####
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
-    if state.role == "spine":
+   if state.is_spine():
        # TODO spine-spine link case
        return lldp_peer_port
-    elif state.role == "leaf":
+   elif state.get_role() == "leaf":
         if "spine" in lldp_peer_name:
             return lldp_peer_port
         else:
@@ -454,7 +459,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
   # For spine-spine connections, build iBGP
   peer_router_id = ""
-  if (state.role == 'spine') and 'spine' not in lldp_peer_name:
+  if state.is_spine() and ('spine' not in lldp_peer_name):
     _r = 0
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
@@ -462,12 +467,12 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _as = state.base_as
   elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    spineId = re.match(".*spine[-]?(\d+).*", lldp_peer_name)
-    _masterSpine = state.role == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
-    _r = 0 if _masterSpine or (not spineId and state.role=='leaf') else 1
+    spineId = re.match(".*(?:spine|auto)[-]?(\d+).*", lldp_peer_name)
+    _masterSpine = state.get_role() == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
+    _r = 0 if _masterSpine or (not spineId and state.get_role()=='leaf') else 1
     _i = 1
     _as = state.leaf_as if state.leaf_as!=0 else (
-           state.base_as + (0 if state.role == 'spine' # Use i- for iBGP
+           state.base_as + (0 if state.get_role() == 'spine' # Use i- for iBGP
                              or 'i-' in lldp_peer_name else state.node_id))
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
@@ -514,11 +519,11 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          intf_name,
          _ip + '/31',
          lldp_peer_desc,
-         _peer if state.role != 'spine' else '*',
+         _peer if state.get_role() != 'spine' else '*',
          _as,
          state.router_id if set_router_id else "",
          state.base_as, # For spine, allow both iBGP (same AS) and eBGP
-         state.base_as if (state.role != 'spine') else state.base_as + state.max_leaves,
+         state.base_as if (state.get_role() != 'spine') else state.base_as + state.max_leaves,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id
@@ -542,11 +547,11 @@ def get_app_id(app_name):
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
 def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
-    logging.info(f'Calling update script: role={state.role} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
+    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
-                                       state.role,name,ip,peer,peer_ip,str(_as),router_id,
+                                       state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.ospfv3,state.evpn],
@@ -558,7 +563,8 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
 
 class State(object):
     def __init__(self):
-        self.role = None        # May not be set in config
+        self.role = None        # May not be set in config, default 'auto'
+        self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
         self.pending_peers = {} # LLDP data received before we can determine ID
 
         self.announcing = False
@@ -568,6 +574,16 @@ class State(object):
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
+
+    def get_role(self):
+        # TODO could return "spine" when all active ports have LLDP
+        if self.state=="auto":
+           return "leaf" if self.host_lldp_seen else "spine"
+        else:
+           return self.state
+
+    def is_spine(self):
+        return self.get_role() == "spine"
 
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
