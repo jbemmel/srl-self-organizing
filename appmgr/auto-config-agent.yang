@@ -32,12 +32,14 @@ module auto_config_agent {
             leaf role {
                 description "Role of this node in the fabric (layer in the network)";
                 type enumeration {
+                 enum auto;      // Auto-determined: Start as spine, become leaf
                  enum leaf;
                  enum spine;
                  enum endpoint;  // Use SRL to emulate a Linux host
                  // TODO enum superspine;
                  // enum leaf-with-evpn; // Leaf with BGP EVPN/VXLAN overlay enabled?
                 }
+                default "auto";
             }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";

@@ -340,7 +340,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=lo0.0] --replace-file $temp_file
+$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
 exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
@@ -350,7 +350,7 @@ cat > $temp_file << EOF
     "type": "srl_nokia-network-instance:ip-vrf",
     "_annotate_type": "routed",
     "admin-state": "enable",
-    "interfaces": [ { "name": "lo0.0" } ],
+    "interface": [ { "name": "lo0.0" } ],
     "vxlan-interface": [ { "name": "vxlan0.0" } ],
     "protocols": {
       "bgp": {

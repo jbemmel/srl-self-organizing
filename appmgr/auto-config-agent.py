@@ -157,7 +157,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
         peer_ip = m.groups()[0]
         peer_if = m.groups()[1]
         peer_hostnode = m.groups()[2]
-        logging.info(f"HandleLLDPChange :: on={my_port} leaf={peer_ip}:{peer_if} ann={state.announcing}")
+        logging.info(f"HandleLLDPChange :: on={my_port} leaf={peer_ip}:{peer_if} name={peername} ann={state.announcing}")
 
         # XXX should wait for ALL spines to ACK?
         if state.announcing == peername: # Only happens for LEAVES
@@ -362,7 +362,12 @@ def Handle_Notification(obj, state):
 
     elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
-        logging.info(f"process LLDP notification : {obj} op='{type(obj.lldp_neighbor.op)}'")
+        logging.info(f"process LLDP notification : {obj} op='{obj.lldp_neighbor.op}'")
+
+        # Since 21.6 there are 'Delete' events too
+        if obj.lldp_neighbor.op == 2: # Delete, class 'int'
+            return False
+
         my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x
         to_port = obj.lldp_neighbor.data.port_id
         peer_sys_name = obj.lldp_neighbor.data.system_name

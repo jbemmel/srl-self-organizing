@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "leaf",
+    "role": "auto",
     "leaf-as": 65000,
     "use-ospfv3": true,
     "use-evpn": true

@@ -1,7 +1,7 @@
 ARG SR_LINUX_RELEASE
 FROM registry.srlinux.dev/pub/srlinux:$SR_LINUX_RELEASE
 
-RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.16.2/gnmic_0.16.2_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
+RUN sudo curl -sL https://github.com/karimra/gnmic/releases/download/v0.17.1/gnmic_0.17.1_Linux_x86_64.rpm -o /tmp/gnmic.rpm && sudo yum localinstall -y /tmp/gnmic.rpm
 
 RUN printf '%s\n' \
   '#!/bin/bash' \

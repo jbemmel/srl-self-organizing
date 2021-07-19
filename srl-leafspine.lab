@@ -9,9 +9,11 @@ topology:
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
       license: ../license.key
+    linux:
+      image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 
   nodes:
-    leaf1:  { kind: srl, config: auto-leaf.cfg.json }
+    leaf1:  { kind: srl, config: auto-auto.cfg.json }
     leaf2:  { kind: srl, config: auto-leaf.cfg.json }
     spine1: { kind: srl, config: auto-spine.cfg.json }
 
@@ -19,11 +21,9 @@ topology:
     #h2: { kind: srl, config: auto-host-with-vip.cfg.json }
     h1:
       kind: linux
-      image: alpine:latest # or frrouting/frr:latest
+
     h2:
       kind: linux
-      image: alpine:latest # or frrouting/frr:latest
-    
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
@@ -31,5 +31,3 @@ topology:
 
     - endpoints: ["h1:e1-1","leaf1:e1-3"]
     - endpoints: ["h2:e1-1","leaf2:e1-3"]
-
-
