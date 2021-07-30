@@ -309,6 +309,7 @@ def Convert_to_lag(port):
              (f'/network-instance[name=lag{port}]', mac_vrf),
              (f'/network-instance[name=overlay]/interface[name=irb0.{port}]', {} ),
            ]
+   logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', delete=deletes, update=updates )
