@@ -433,7 +433,7 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
             return lldp_peer_port
         else:
             return 0 # Cannot determine yet
-    else:
+   else:
         leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
         if leafId:
             # Disambiguate assuming N ports per leaf
@@ -532,17 +532,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   else:
      logging.info(f"Link index {link_index} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
 
-
-##################################################################################################
-## This functions get the app_id from idb for a given app_name
-##################################################################################################
-def get_app_id(app_name):
-    logging.info(f'Metadata {metadata} ')
-    appId_req = sdk_service_pb2.AppIdRequest(name=app_name)
-    app_id_response=stub.GetAppId(request=appId_req, metadata=metadata)
-    logging.info(f'app_id_response {app_id_response.status} {app_id_response.id} ')
-    return app_id_response.id
-
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
@@ -577,10 +566,10 @@ class State(object):
 
     def get_role(self):
         # TODO could return "spine" when all active ports have LLDP
-        if self.state=="auto":
+        if self.role=="auto":
            return "leaf" if self.host_lldp_seen else "spine"
         else:
-           return self.state
+           return self.role
 
     def is_spine(self):
         return self.get_role() == "spine"
@@ -596,12 +585,6 @@ def Run():
 
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
-
-    app_id = get_app_id(agent_name)
-    if not app_id:
-        logging.error(f'idb does not have the appId for {agent_name} : {app_id}')
-    else:
-        logging.info(f'Got appId {app_id} for {agent_name}')
 
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)

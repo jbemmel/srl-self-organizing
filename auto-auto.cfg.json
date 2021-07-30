@@ -1,7 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
     "role": "auto",
-    "leaf-as": 65000,
     "use-ospfv3": true,
     "use-evpn": true
   },
@@ -1344,6 +1343,10 @@
     }
   },
   "srl_nokia-network-instance:network-instance": [
+    {
+      "name": "default",
+      "admin-state": "enable"
+    },
     {
       "name": "mgmt",
       "type": "srl_nokia-network-instance:ip-vrf",
