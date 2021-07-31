@@ -538,13 +538,14 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid}' )
+                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
-                                       state.ospfv3,state.evpn],
+                                       state.ospfv3,
+                                       state.evpn],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
