@@ -514,7 +514,7 @@ exitcode+=$?
 fi
 
 # Peer router ID only set for spines when this node is a leaf
-if [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
 EOF

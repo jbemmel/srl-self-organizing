@@ -397,7 +397,7 @@ def Handle_Notification(obj, state):
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            state.router_id = determine_router_id( state, state.role, state.node_id )
+            state.router_id = determine_router_id( state, state.get_role(), state.node_id )
             router_id_changed = True
             if state.role != "endpoint":
                Set_Default_Systemname( state )
