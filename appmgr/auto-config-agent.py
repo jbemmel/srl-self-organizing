@@ -386,9 +386,6 @@ def Handle_Notification(obj, state):
                delattr(state,"router_id")  # Re-determine IDs
                delattr(state,"node_id")
 
-          if obj.lldp_neighbor.op == 1: # Change, class 'int'
-              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
-
           # First figure out this node's relative id in its group. Don't depend on hostname
           if not hasattr(state,"node_id"):
              node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
@@ -404,6 +401,9 @@ def Handle_Notification(obj, state):
             router_id_changed = True
             if state.role != "endpoint":
                Set_Default_Systemname( state )
+
+          if obj.lldp_neighbor.op == 1: # Change, class 'int'
+              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
