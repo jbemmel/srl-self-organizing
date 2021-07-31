@@ -152,7 +152,7 @@ def Announce_LLDP_peer(state,name,port):
 
 def HandleLLDPChange(state,peername,my_port,their_port):
     # XXX assumes port=single digit, only ethernet-1/x
-    m = re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
+    m = re.match( r"^(?:spine-)?(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
     if m:
         peer_ip = m.groups()[0]
         peer_if = m.groups()[1]
@@ -174,6 +174,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
         else:
             # Peer announcement, pass it on as spine
             if state.is_spine():
+               peername = "spine-" + peername # For node_id calc on auto leaves
                if state.announcing!=False and state.announcing != my_port:
                    state.pending_announcements.append( (my_port,peername) )
                else:
@@ -194,7 +195,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
             if state.pending_announcements!=[]:
                 next_port, nextpeer = state.pending_announcements.pop(0)
                 state.announcing = next_port
-                Set_LLDP_Systemname( nextpeer )
+                Set_LLDP_Systemname(nextpeer)
             else:
                 state.announcing = False
                 Set_Default_Systemname(state)
