@@ -13,7 +13,7 @@ topology:
       image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 
   nodes:
-    leaf1:  { kind: srl, startup-config: auto-auto.cfg.json }
+    leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json } # TODO test 'auto'
     leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
     spine1: { kind: srl, startup-config: auto-spine.cfg.json }
 

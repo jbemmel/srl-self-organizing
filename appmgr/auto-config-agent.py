@@ -143,6 +143,13 @@ def Set_Default_Systemname(state):
 # Only used on LEAVES
 def Announce_LLDP_peer(state,name,port):
     logging.info(f"Announce_LLDP_peer :: name={name} port={port} ann={state.announcing}")
+
+    # Need to filter out duplicate events, happens rarely but does occur
+    if port in state.announced and state.announced[port] == name:
+        logging.info("Filtering out duplicate LLDP event")
+        return
+    state.announced[port] = name
+
     if not re.match( r"^(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", name ):
       if (state.announcing):
         state.pending_announcements.append( (name,port) )
@@ -160,7 +167,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
         logging.info(f"HandleLLDPChange :: on={my_port} leaf={peer_ip}:{peer_if} name={peername} ann={state.announcing}")
 
         # XXX should wait for ALL spines to ACK?
-        if state.announcing == peername: # Only happens for LEAVES
+        if ("spine-" + str(state.announcing)) == peername: # Only happens for LEAVES
             Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
             if state.pending_announcements!=[]:
                 name, port = state.pending_announcements.pop(0)
@@ -561,6 +568,7 @@ class State(object):
 
         self.announcing = False
         self.pending_announcements = []
+        self.announced = {}     # To filter duplicate LLDP events
 
         self.lag_state = {}     # Used for auto-provisioning of LAGs
 
