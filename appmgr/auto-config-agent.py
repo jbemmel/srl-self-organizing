@@ -384,7 +384,8 @@ def Handle_Notification(obj, state):
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           m = re.match("^ethernet-(\d+)/(\d+)$", to_port)
-          if m:
+          # Allow SRL-based emulated hosts called h1, h2...
+          if m and not re.match("^h[0-9]+", peer_sys_name):
             to_port_id = m.groups()[1]
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name

@@ -45,9 +45,9 @@ module auto_config_agent {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";
                 // type srl_nokia-comm:as-number;
                 type uint32;
-                default 65000; // Use 2-byte AS for easier RT interop
+                // default 65000; // Use 2-byte AS for easier RT interop
                 // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
-                // default 4200000000; // Spines get this, each leaf gets base+rank
+                default 4200000000; // Spines get this, each leaf gets base+rank
             }
             leaf leaf-as {
                 description "AS to use for leaves, 0=auto (eBGP)";
