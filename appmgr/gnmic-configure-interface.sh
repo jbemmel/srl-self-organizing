@@ -176,8 +176,8 @@ IFS='' read -r -d '' HOSTS_GROUP << EOF
   "group-name": "hosts",
   "admin-state": "enable",
   "ipv6-unicast" : { "admin-state" : "enable" },
-  "peer-as": $AS,
-  "local-as": [ { "as-number": $AS } ]
+  "peer-as": $PEER_AS_MIN,
+  "local-as": [ { "as-number": $PEER_AS_MIN } ]
 }
 EOF
 
@@ -189,7 +189,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
           "prefix": "$LINK_PREFIX",
           "peer-group": "hosts",
           "allowed-peer-as": [
-            "$AS"
+            "$PEER_AS_MIN"
           ]
         }
       ]

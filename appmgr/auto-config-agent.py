@@ -489,10 +489,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else:
-      link_index = (state.max_spines * state.max_leaves +
-                    state.max_hosts_per_leaf * (state.node_id-1) +
-                    state.max_lag_links * (lldp_peer_port - 1) +
-                    (lldp_my_port - 1))
+      link_index = (lldp_my_port - 1) # Reuse underlay address space
       peer_type = 'host'
 
       # For access ports, announce LLDP events
@@ -501,18 +498,12 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   else:
     _r = 1
     _i = 2
+    _as = state.base_as # iBGP to leaves uses same AS as spines
     peer_type = 'leaf'
-    leafId = re.match(".*leaf(\d+).*", lldp_peer_name)
-    if leafId:
-      leaf = leafId.groups()[0] # typically 1,2,3,...
-      link_index = (state.max_spines * state.max_leaves +
-                    state.max_hosts_per_leaf * (int(leaf)-1) +
-                    state.max_lag_links * (lldp_my_port - 1) +
-                    (lldp_peer_port - 1))
-      _as = state.leaf_as if state.leaf_as!=0 else (state.base_as + int(leaf))
-    else: # Only supports hosts connected to different ports of leaves
-      link_index = state.max_spines * state.max_leaves + (lldp_peer_port - 1)
-      _as = state.leaf_as if state.leaf_as!=0 else (state.base_as + lldp_peer_port)
+
+    # For IP addressing, reuse same link space as underlay, purely by leaf port
+    # TODO lag addressing is different
+    link_index = (lldp_peer_port - 1)
 
   if link_index >= len(state.peerlinks):
       logging.error(f'Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}')
@@ -607,6 +598,8 @@ def Run():
 
     stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
     stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
+
+    # TODO enable all detected interfaces through gNMI? Currently static in config
 
     state = State()
     count = 1

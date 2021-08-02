@@ -1175,17 +1175,6 @@
         }
       ]
     },
-    "srl_nokia-sflow:sflow": {
-      "admin-state": "enable",
-      "collector": [
-        {
-          "collector-id": 1,
-          "collector-address": "172.20.20.10",
-          "network-instance": "default",
-          "source-address": "192.168.0.1"
-        }
-      ]
-    },
     "srl_nokia-lldp:lldp": {
       "admin-state": "enable"
     },
@@ -1344,47 +1333,6 @@
     }
   },
   "srl_nokia-network-instance:network-instance": [
-    {
-      "name": "default",
-      "interface": [
-        {
-          "name": "ethernet-1/1.0"
-        },
-        {
-          "name": "ethernet-1/2.0"
-        },
-        {
-          "name": "lo0.0"
-        }
-      ],
-      "protocols": {
-        "srl_nokia-bgp:bgp": {
-          "admin-state": "disable",
-          "autonomous-system": 65001,
-          "export-policy": "export-hosts",
-          "router-id": "1.1.1.1",
-	  "ebgp-default-policy": {
-           "import-reject-all": false,
-           "export-reject-all": false
-          },
-          "ipv4-unicast": {
-            "multipath": {
-              "max-paths-level-1": 4,
-              "max-paths-level-2": 4
-            }
-          },
-          "ipv6-unicast": {
-            "multipath": {
-              "max-paths-level-1": 4,
-              "max-paths-level-2": 4
-            }
-          },
-          "route-advertisement": {
-            "rapid-withdrawal": true
-          }
-        }
-      }
-    },
     {
       "name": "mgmt",
       "type": "srl_nokia-network-instance:ip-vrf",

@@ -8,7 +8,7 @@ topology:
       # Uses custom container image containing auto-startup-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
-      license: ../license.key
+      # license: ../license.key
       env:
         SPINES: 2 # TODO subtract this from host ID
       binds:
