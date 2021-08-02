@@ -15,17 +15,15 @@ topology:
       - /sys/fs/cgroup:/sys/fs/cgroup:ro
 
   nodes:
-    leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json }
-    leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
-    leaf3:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf1:  { kind: srl, group: leaves, startup-config: auto-leaf.cfg.json }
+    leaf2:  { kind: srl, group: leaves, startup-config: auto-leaf.cfg.json }
+    leaf3:  { kind: srl, group: leaves, startup-config: auto-leaf.cfg.json }
     # Can use "i-" in name for iBGP peering
-    spine1: { kind: srl, startup-config: auto-spine.cfg.json }
-    spine2: { kind: srl, startup-config: auto-spine.cfg.json }
+    spine1: { kind: srl, group: spines, startup-config: auto-spine.cfg.json }
+    spine2: { kind: srl, group: spines, startup-config: auto-spine.cfg.json }
 
-    h1: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
-    h2: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
-    h3: { kind: srl, startup-config: auto-host-with-vip.cfg.json }
-    h4: { kind: srl, startup-config: auto-host.cfg.json }
+    h1: { kind: srl, group: hosts, startup-config: auto-host-with-vip.cfg.json }
+    h2: { kind: srl, group: hosts, startup-config: auto-host.cfg.json }
 
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
@@ -36,10 +34,6 @@ topology:
     - endpoints: ["leaf3:e1-2","spine2:e1-3"]
 
     - endpoints: ["h1:e1-1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
-    - endpoints: ["h2:e1-1","leaf1:e1-4"]
+    - endpoints: ["h2:e1-1","leaf2:e1-3"] # LAG
+    - endpoints: ["h2:e1-2","leaf3:e1-3"]
 
-    - endpoints: ["h3:e1-1","leaf2:e1-3"]
-
-    # Connect as LAG, test auto-create lag logic
-    - endpoints: ["h4:e1-1","leaf3:e1-4"]
-    - endpoints: ["h4:e1-2","leaf2:e1-4"]

@@ -113,7 +113,8 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur = state.lag_state[ lldp_peer_name ]
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
-            Convert_to_lag( cur[state.router_id] )
+            _ip = str( list(state.peerlinks[int(port) - 1].hosts())[0] ) + '/31'
+            Convert_to_lag( cur[state.router_id], _ip, True ) # EVPN MC-lag
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
@@ -216,8 +217,8 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
 # bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(port):
-   logging.info(f"Convert_to_lag :: port={port}")
+def Convert_to_lag(port,ip,evpn):
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/network-instance[name=overlay]/interface[{eth}.0]',
              f'/interface[{eth}]/subinterface[index=*]',
@@ -249,13 +250,13 @@ def Convert_to_lag(port):
       "ipv4": {
         "address": [
           {
-            "ip-prefix": "10.10.10.1/24",
-            "anycast-gw": True,
+            "ip-prefix": ip, # /31 link IP
+            "anycast-gw": evpn,
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ]
       },
-      "ipv6": {},
+      "ipv6": {}, # TODO could add ipv6 link IP too
       "anycast-gw": {}
     }
     ]
@@ -311,14 +312,18 @@ def Convert_to_lag(port):
      }
    }
 
+   vrf = "overlay" if evpn else "default"
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
-             ('/system/network-instance/protocols', sys_bgp_evpn ),
-             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
              (f'/network-instance[name=lag{port}]', mac_vrf),
-             (f'/network-instance[name=overlay]/interface[name=irb0.{port}]', {} ),
+             (f'/network-instance[name={vrf}]/interface[name=irb0.{port}]', {}),
            ]
+   if evpn:
+       updates += [
+             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
+             ('/system/network-instance/protocols', sys_bgp_evpn ),
+       ]
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
@@ -419,7 +424,8 @@ def Handle_Notification(obj, state):
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
-          Create_Ext_Community( obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
+          if state.get_role() == "leaf":
+             Create_Ext_Community( obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
 
           if router_id_changed:
              for intf in state.pending_peers:

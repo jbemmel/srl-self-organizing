@@ -190,7 +190,11 @@ IFS='' read -r -d '' HOSTS_GROUP << EOF
   "admin-state": "enable",
   "ipv6-unicast" : { "admin-state" : "enable" },
   "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": $PEER_AS_MIN } ]
+  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "send-default-route": {
+    "ipv4-unicast": true,
+    "ipv6-unicast": true
+  }
 }
 EOF
 
