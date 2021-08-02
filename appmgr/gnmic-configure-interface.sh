@@ -240,6 +240,8 @@ fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "evpn": { "rapid-update": true },
+"preference": {
+ "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },
 $DEFAULT_DYNAMIC_HOST_PEERING
 "group": [
     $DEFAULT_HOSTS_GROUP
@@ -253,6 +255,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     {
       "group-name": "leaf-ibgp",
       "admin-state": "enable",
+      "export-policy": "select-loopbacks",
       "ipv6-unicast" : { "admin-state" : "enable" },
       "peer-as": $AS
     }
@@ -286,9 +289,7 @@ cat > $temp_file << EOF
   },
   "route-advertisement": {
     "rapid-withdrawal": true
-  },
-  "preference": {
-   "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" }
+  }
 }
 
 EOF
