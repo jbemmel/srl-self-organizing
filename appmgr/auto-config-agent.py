@@ -191,22 +191,24 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                # To avoid deadlock on spine, re-announce if match
                if state.announcing == "" and peer_ip == state.router_id:
                   logging.info(f"LEAF ACK {peername} on {my_port}")
-                  state.announcing = "ACK"
+                  state.announcing = peername.replace( "spine", "ACK" )
                   Set_LLDP_Systemname( state.announcing )
 
                Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
 
     else:
         logging.info(f"HandleLLDPChange :: no match on={my_port} name={peername} ann={state.announcing} pending={state.pending_announcements}")
-        if state.is_spine() and state.announcing==my_port:
-            if state.pending_announcements!=[]:
-                next_port, nextpeer = state.pending_announcements.pop(0)
-                state.announcing = next_port
-                Set_LLDP_Systemname(nextpeer)
-            else:
-                state.announcing = False
-                Set_Default_Systemname(state)
-        elif state.announcing == "ACK":
+        if state.is_spine():
+            if state.announcing==my_port:
+               logging.info( f"TODO check if not ACK, or ACK matching our systemname: {peername}" )
+               if state.pending_announcements!=[]:
+                   next_port, nextpeer = state.pending_announcements.pop(0)
+                   state.announcing = next_port
+                   Set_LLDP_Systemname(nextpeer)
+               else:
+                   state.announcing = False
+                   Set_Default_Systemname(state)
+        elif re.match( "^ACK-.*", state.announcing ): # For leaves
             state.announcing = ""
             Set_Default_Systemname(state)
 
