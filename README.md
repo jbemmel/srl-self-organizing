@@ -26,9 +26,10 @@ YANG model provides parameters:
 * Max number of spines/leaves in the topology
 
 ## Deploy lab
-1. Checkout the project from git
-2. `cd Docker && make build` -> this creates a local Docker image called 'srl/auto-config'
-3. `sudo clab deploy -t ./srl-leafspine.lab`
+1. Checkout and build the base image from https://github.com/jbemmel/srl-baseimage
+2. Checkout the project from git
+3. `cd Docker && make build` -> this creates a local Docker image called 'srl/auto-config'
+4. `sudo clab deploy -t ./srl-leafspine.lab`
 
 ## BGP design details
 This example uses eBGP peering to exchange routes within the fabric, and iBGP towards Linux hosts
