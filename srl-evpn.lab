@@ -1,4 +1,4 @@
-name: ucmp-lab # Unequal Cost Multiple Paths
+name: evpn-lab # Auto-configuring CLOS fabric with EVPN VXLAN overlay and EVPN MC-LAG 
 
 topology:
   kinds:
