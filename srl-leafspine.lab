@@ -1,4 +1,4 @@
-name: evpn-lab
+name: manual-evpn-lab
 
 topology:
   kinds:
@@ -17,8 +17,8 @@ topology:
       image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 
   nodes:
-    leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json } # TODO test 'auto'
-    leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf1:  { kind: srl, startup-config: auto-leaf-no-evpn.cfg.json }
+    leaf2:  { kind: srl, startup-config: auto-leaf-no-evpn.cfg.json }
     spine1: { kind: srl, startup-config: auto-spine.cfg.json }
 
     #h1: { kind: srl, config: auto-host-with-vip.cfg.json }

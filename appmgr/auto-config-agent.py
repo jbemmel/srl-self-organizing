@@ -141,7 +141,7 @@ def Set_LLDP_Systemname(name):
 def Set_Default_Systemname(state):
     Set_LLDP_Systemname( f"{state.get_role()}-{state.node_id}-{state.router_id}" )
 
-# Only used on LEAVES
+# Only used on LEAVES when auto_lags==True
 def Announce_LLDP_peer(state,name,port):
     logging.info(f"Announce_LLDP_peer :: name={name} port={port} ann={state.announcing}")
 
@@ -373,6 +373,8 @@ def Handle_Notification(obj, state):
                     state.evpn = '1' if data['use_evpn']['value'] else '0'
                 if 'use_ospfv3' in data:
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
+                if 'auto_lags' in data:
+                    state.auto_lags = data['auto_lags']['value']
 
                 return not state.role is None
 
@@ -500,8 +502,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       link_index = (lldp_my_port - 1) # Reuse underlay address space
       peer_type = 'host'
 
-      # For access ports, announce LLDP events
-      Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
+      # For access ports, announce LLDP events if auto_lags is enabled
+      if state.auto_lags:
+         Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
   else:
     _r = 1

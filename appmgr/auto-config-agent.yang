@@ -97,6 +97,11 @@ module auto_config_agent {
                 type boolean;
                 default false;
             }
+            leaf auto-lags {
+                description "Discover and provision LAGs on leaves, using LLDP";
+                type boolean;
+                default true;
+            }
 
             // info from state
             list leaf {
