@@ -3,7 +3,7 @@
     "role": "leaf",
     "use-ospfv3": true,
     "use-evpn": false,
-    "auto-lag": false
+    "auto-lags": false
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {

@@ -665,7 +665,7 @@ def Run():
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister fib_agent".format(signum))
+    logging.info("Caught signal :: {}\n will unregister auto_config_agent".format(signum))
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
         logging.error('try: Unregister response:: {}'.format(response))
@@ -676,7 +676,7 @@ def Exit_Gracefully(signum, frame):
 
 ##################################################################################################
 ## Main from where the Agent starts
-## Log file is written to: /var/log/srlinux/stdout/<dutName>_fibagent.log
+## Log file is written to: /var/log/srlinux/stdout/auto_config_agent.log
 ## Signals handled for graceful exit: SIGTERM
 ##################################################################################################
 if __name__ == '__main__':
@@ -693,6 +693,6 @@ if __name__ == '__main__':
 
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
     if Run():
-        logging.info('Agent unregistered and agent routes withdrawed from dut')
+        logging.info('Agent unregistered')
     else:
         logging.info('Should not happen')

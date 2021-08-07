@@ -3,29 +3,27 @@ FROM srl/custombase:$SR_LINUX_RELEASE
 # FROM ghcr.io/nokia/srlinux:$SR_LINUX_RELEASE
 # FROM registry.srlinux.dev/pub/srlinux:$SR_LINUX_RELEASE
 
-RUN printf '%s\n' \
-  '#!/bin/bash' \
-  '' \
-  'mkdir -p /etc/opt/srlinux/appmgr && cp /home/appmgr/* /etc/opt/srlinux/appmgr/' \
-  'exit $?' \
-  \
-> /tmp/42.sh && sudo mv /tmp/42.sh /opt/srlinux/bin/bootscript/42_sr_copy_custom_appmgr.sh && \
-  sudo chmod a+x /opt/srlinux/bin/bootscript/42_sr_copy_custom_appmgr.sh
-
-# RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ && sudo cp /home/appmgr/* /etc/opt/srlinux/appmgr/
-
 # Install balena, a modern Docker application to run containers within SRL
 # Requires cSRL to be started using
 # sudo docker run -it --privileged -v /tmp/var_lib_docker:/var/lib/balena-engine srl/auto-config:latest
 # RUN curl -sfL https://balena.io/engine/install.sh | sh
+
+# Install FRR stable, enable BGP daemon
+#RUN curl https://rpm.frrouting.org/repo/frr-stable-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
+#    sudo yum install -y /tmp/repo.rpm && \
+#    sudo yum install -y frr frr-pythontools && \
+#    sudo sed -i 's/bgpd=no/bgpd=yes/g' /etc/frr/daemons && \
+#    rm -f /tmp/repo.rpm
 
 # Add Paris traceroute
 # COPY --from=paris-traceroute /usr/local/bin/paris-* /usr/local/bin/
 # COPY --from=paris-traceroute /usr/local/lib/* /usr/local/lib/
 
 # --chown=srlinux:srlinux
-# COPY ./appmgr/ /etc/opt/srlinux/appmgr/ # doesn't stick
-COPY ./appmgr/ /home/appmgr
+# COPY ./appmgr/ /home/appmgr
+# RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ && sudo cp /home/appmgr/* /etc/opt/srlinux/appmgr/
+RUN sudo mkdir -p /etc/opt/srlinux/appmgr/
+COPY ./appmgr/ /etc/opt/srlinux/appmgr
 
 # Add FIB agent
 # COPY ./srl-demo-agent/demo_* /home/appmgr/
