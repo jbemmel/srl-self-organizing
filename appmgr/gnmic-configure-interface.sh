@@ -250,6 +250,23 @@ DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
 EVPN_RR_GROUP=""
 fi
 
+IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
+"ipv4-unicast": {
+  "admin-state": "enable",
+  "multipath": {
+    "max-paths-level-1": 8,
+    "max-paths-level-2": 8
+  }
+},
+"ipv6-unicast": {
+  "admin-state": "enable",
+  "multipath": {
+    "max-paths-level-1": 8,
+    "max-paths-level-2": 8
+  }
+},
+EOF
+
 if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
 IFS='' read -r -d '' SPINES_GROUP << EOF
 {
@@ -262,6 +279,8 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "local-as": [ { "as-number": $AS } ]
 }
 EOF
+else
+BGP_IP_UNDERLAY=""
 fi
 
 if [[ "$DEFAULT_HOSTS_GROUP" != "" ]] && [[ "$SPINES_GROUP" != "" ]]; then
@@ -306,20 +325,7 @@ cat > $temp_file << EOF
   "autonomous-system": $AS,
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
-  "ipv4-unicast": {
-    "admin-state": "enable",
-    "multipath": {
-      "max-paths-level-1": 8,
-      "max-paths-level-2": 8
-    }
-  },
-  "ipv6-unicast": {
-    "admin-state": "enable",
-    "multipath": {
-      "max-paths-level-1": 8,
-      "max-paths-level-2": 8
-    }
-  },
+  $BGP_IP_UNDERLAY
   "route-advertisement": {
     "rapid-withdrawal": true
   }
