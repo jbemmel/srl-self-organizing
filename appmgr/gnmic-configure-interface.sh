@@ -141,6 +141,23 @@ IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 EOF
 fi
 
+if [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
+,
+{
+  "group-name": "evpn",
+  "admin-state": "enable",
+  "peer-as": $AS,
+  "evpn": { "admin-state": "enable" },
+  "ipv4-unicast": { "admin-state": "disable" },
+  "ipv6-unicast": { "admin-state": "disable" },
+  "route-reflector": {
+    "client": true,
+    "cluster-id": "$ROUTER_ID"
+  }
+}
+fi
+
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
     "accept": {
@@ -167,19 +184,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "admin-state": "enable",
       "import-policy": "select-loopbacks",
       "export-policy": "select-loopbacks"
-    },
-    {
-      "group-name": "evpn",
-      "admin-state": "enable",
-      "peer-as": $AS,
-      "evpn": { "admin-state": "enable" },
-      "ipv4-unicast": { "admin-state": "disable" },
-      "ipv6-unicast": { "admin-state": "disable" },
-      "route-reflector": {
-        "client": true,
-        "cluster-id": "$ROUTER_ID"
-      }
     }
+    ${EVPN_SPINE_GROUP}
   ],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then

@@ -8,11 +8,8 @@ topology:
       # Uses custom container image containing auto-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
-      #binds:
-      # Must be owned by user:group 1001:1001 with 644 permissions
-      #- ./authorized_keys:/home/linuxadmin/.ssh/authorized_keys:ro
-      # Patched sshd_config to enable global authorized_keys file; must be owned by root
-      #- ./authorized_keys:/authorized_keys:ro
+    #binds:
+    #  - ./appmgr:/etc/opt/srlinux/appmgr:ro
     linux:
       image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 

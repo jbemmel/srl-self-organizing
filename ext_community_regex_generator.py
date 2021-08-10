@@ -2,6 +2,9 @@
 
 import re
 
+#
+# Note: Only correct for 0 <= min <= 9
+#
 def GenerateRegex( min: int, max: int ):
     output = ""
     strmax = f"{max}"
@@ -14,8 +17,9 @@ def GenerateRegex( min: int, max: int ):
             output += f"[0-9]{{{ r-2 }}}"
          output += "|"
     output += f"[1-{int(strmax[0])-1}][0-9]{{{ len(strmax)-1 }}}|"
-    output += f"[1-9][0-9]{{1,{len(strmax)-2}}}|"
-    output += f"[{min}-9]"
+    output += f"[1-9][0-9]{{1,{len(strmax)-2}}}"
+    if min <= 9:
+       output += f"|[{min}-9]"
     return output
 
 def Test( min: int, max: int ):
@@ -40,4 +44,4 @@ oc_route_distinguisher = ('^(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|'
 
 oc_p = re.compile( oc_route_distinguisher )
 print( f'09999:0 { oc_p.match("09999:0") }')
-print( f'0:2000000000: { oc_p.match("0:2000000000") }')
+print( f'0:2000000000 { oc_p.match("0:2000000000") }')
