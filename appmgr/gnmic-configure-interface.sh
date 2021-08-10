@@ -158,6 +158,18 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 EOF
 fi
 
+if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
+,
+{
+  "group-name": "leaves",
+  "admin-state": "enable",
+  "import-policy": "select-loopbacks",
+  "export-policy": "select-loopbacks"
+}
+EOF
+fi
+
 IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
@@ -180,13 +192,8 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "group-name": "fellow-spines",
       "admin-state": "enable",
       "peer-as": $AS
-    },
-    {
-      "group-name": "leaves",
-      "admin-state": "enable",
-      "import-policy": "select-loopbacks",
-      "export-policy": "select-loopbacks"
     }
+    ${BGP_LEAVES_GROUP}
     ${EVPN_SPINE_GROUP}
   ],
 EOF
