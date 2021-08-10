@@ -156,6 +156,7 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
     "cluster-id": "$ROUTER_ID"
   }
 }
+EOF
 fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
