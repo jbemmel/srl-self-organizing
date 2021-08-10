@@ -127,7 +127,6 @@ $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
 if [[ "$ROLE" == "spine" ]]; then
-IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
 if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
@@ -158,6 +157,8 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 }
 EOF
 fi
+
+IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
