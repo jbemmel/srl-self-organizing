@@ -309,7 +309,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "admin-state": "enable",
       "export-policy": "select-loopbacks",
       "ipv6-unicast" : { "admin-state" : "enable" },
-      "peer-as": $AS
+      "peer-as": $PEER_AS_MIN
     }
 ],
 EOF
