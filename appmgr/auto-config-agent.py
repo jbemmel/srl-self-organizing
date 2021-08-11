@@ -213,6 +213,8 @@ def HandleLLDPChange(state,peername,my_port,their_port):
             state.announcing = ""
             Set_Default_Systemname(state)
 
+    return False
+
 ###
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
 # bgp-evpn l2 vni, ethernet segment with ESI
@@ -376,8 +378,7 @@ def Handle_Notification(obj, state):
                 if 'auto_lags' in data:
                     state.auto_lags = data['auto_lags']['value']
 
-                return not state.role is None
-
+                return state.role is not None
     elif obj.HasField('lldp_neighbor') and not state.role is None:
         # Update the config based on LLDP info, if needed
         logging.info(f"process LLDP notification : {obj} op='{obj.lldp_neighbor.op}'")
@@ -570,7 +571,7 @@ class State(object):
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
         self.pending_peers = {} # LLDP data received before we can determine ID
 
-        self.announcing = False
+        self.announcing = ""    # Becomes Boolean for spines
         self.pending_announcements = []
         self.announced = {}     # To filter duplicate LLDP events
 
