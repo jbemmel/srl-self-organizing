@@ -55,6 +55,13 @@ module auto_config_agent {
                 type uint32;
                 default 0; // Default base+rank = eBGP
             }
+            leaf host-as {
+                description "AS to use for hosts, 0=same as leaf (iBGP)";
+                // type srl_nokia-comm:as-number;
+                type uint32;
+                default 0;
+            }
+
             leaf peerlinks-prefix {
                 description "IPv4 prefix range to use for auto-assigned peering links /31";
                 // type srl_nokia-comm:ipv4-prefix;

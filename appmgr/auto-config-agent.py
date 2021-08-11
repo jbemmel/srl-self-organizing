@@ -363,6 +363,8 @@ def Handle_Notification(obj, state):
                     state.base_as = int( data['base_as']['value'] )
                 if 'leaf_as' in data:
                     state.leaf_as = int( data['leaf_as']['value'] )
+                if 'host_as' in data:
+                    state.host_as = int( data['host_as']['value'] )
                 if 'max_spines' in data:
                     state.max_spines = int( data['max_spines']['value'] )
                 if 'max_leaves' in data:
@@ -485,7 +487,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _i = 0
     link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
     peer_type = 'leaf'
-    _as = state.base_as
+    min_peer_as = _as = state.base_as
+    max_peer_as = min_peer_as + state.max_leaves
   elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*(?:spine|auto)[-]?(\d+).*", lldp_peer_name)
@@ -495,6 +498,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _as = state.leaf_as if state.leaf_as!=0 else (
            state.base_as + (0 if state.get_role() == 'spine' # Use i- for iBGP
                              or 'i-' in lldp_peer_name else state.node_id))
+    min_peer_as = max_peer_as = (state.host_as if state.host_as!=0 else state.base_as)
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
@@ -510,7 +514,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   else:
     _r = 1
     _i = 2
-    _as = state.base_as # iBGP to leaves uses same AS as spines
+    _as = state.host_as if state.host_as!=0 else state.base_as # iBGP to leaves uses same AS as spines
+    min_peer_as = max_peer_as = state.base_as
     peer_type = 'leaf'
 
     # For IP addressing, reuse same link space as underlay, purely by leaf port
@@ -536,8 +541,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _peer if state.get_role() != 'spine' else '*',
          _as,
          state.router_id if set_router_id else "",
-         state.base_as, # For spine, allow both iBGP (same AS) and eBGP
-         state.base_as if (state.get_role() != 'spine') else state.base_as + state.max_leaves,
+         min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
+         max_peer_as,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id
