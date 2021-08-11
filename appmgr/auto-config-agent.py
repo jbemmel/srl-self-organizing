@@ -498,7 +498,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     _as = state.leaf_as if state.leaf_as!=0 else (
            state.base_as + (0 if state.get_role() == 'spine' # Use i- for iBGP
                              or 'i-' in lldp_peer_name else state.node_id))
-    min_peer_as = max_peer_as = (state.host_as if state.host_as!=0 else state.base_as)
+    min_peer_as = state.base_as # Overlay AS
+    max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
       peer_type = 'spine'
@@ -556,7 +557,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
-                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn}' )
+                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn}' +
+                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
        script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,

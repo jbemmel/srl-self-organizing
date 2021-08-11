@@ -11,8 +11,8 @@ PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
 AS="$6"
 ROUTER_ID="$7"
-PEER_AS_MIN="$8"
-PEER_AS_MAX="$9"
+PEER_AS_MIN="$8"     # Overlay AS in case of leaf-host
+PEER_AS_MAX="$9"     # Host AS in case of leaf-host
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
@@ -204,7 +204,7 @@ IFS='' read -r -d '' HOSTS_GROUP << EOF
   "group-name": "hosts",
   "admin-state": "enable",
   "ipv6-unicast" : { "admin-state" : "enable" },
-  "peer-as": $PEER_AS_MIN,
+  "peer-as": $PEER_AS_MAX,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],
   "send-default-route": {
     "ipv4-unicast": true,
@@ -221,7 +221,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
           "prefix": "$LINK_PREFIX",
           "peer-group": "hosts",
           "allowed-peer-as": [
-            "$PEER_AS_MIN"
+            "$PEER_AS_MAX"
           ]
         }
       ]
