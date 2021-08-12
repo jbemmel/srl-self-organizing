@@ -19,11 +19,9 @@ FROM srl/custombase:$SR_LINUX_RELEASE
 # COPY --from=paris-traceroute /usr/local/bin/paris-* /usr/local/bin/
 # COPY --from=paris-traceroute /usr/local/lib/* /usr/local/lib/
 
-# --chown=srlinux:srlinux
-# COPY ./appmgr/ /home/appmgr
-# RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ && sudo cp /home/appmgr/* /etc/opt/srlinux/appmgr/
-RUN sudo mkdir -p /etc/opt/srlinux/appmgr/
-COPY ./appmgr/ /etc/opt/srlinux/appmgr
+RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/
+COPY --chown=srlinux:srlinux ./auto-config-agent.yml /etc/opt/srlinux/appmgr
+COPY ./src /opt/srlinux/agents/
 
 # Add FIB agent
 # COPY ./srl-demo-agent/demo_* /home/appmgr/

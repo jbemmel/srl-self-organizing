@@ -560,7 +560,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn}' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
-       script_proc = subprocess.Popen(['/etc/opt/srlinux/appmgr/gnmic-configure-interface.sh',
+       script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,

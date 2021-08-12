@@ -17,7 +17,7 @@ function main()
 {
     trap _term SIGTERM
     local virtual_env="/opt/srlinux/python/virtual-env/bin/activate"
-    local main_module="/etc/opt/srlinux/appmgr/auto-config-agent.py"
+    local main_module="/opt/srlinux/agents/auto-config-agent/auto-config-agent.py"
 
     # source the virtual-environment, which is used to ensure the correct python packages are installed,
     # and the correct python version is used
