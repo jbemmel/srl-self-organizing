@@ -1,0 +1,35 @@
+name: dci-evpn-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # Uses custom container image containing auto-config agent
+      # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      image: srl/auto-config:latest
+
+  nodes:
+    pe2: { kind: srl, group: dc1, startup-config: auto-leaf.cfg.json }
+    pe4: { kind: srl, group: dc1, startup-config: auto-spine.cfg.json }
+
+    pe3: { kind: srl, group: dc2, startup-config: auto-leaf.cfg.json }
+    pe5: { kind: srl, group: dc2, startup-config: auto-spine.cfg.json }
+
+    pe6: { kind: srl, group: wan, startup-config: auto-leaf.cfg.json }
+
+    h2: { kind: srl, group: hosts, startup-config: auto-host.cfg.json }
+    h3: { kind: srl, group: hosts, startup-config: auto-host.cfg.json }
+    h6: { kind: srl, group: hosts, startup-config: auto-host-with-vip.cfg.json }
+
+  links:
+    - endpoints: ["pe2:e1-1","pe4:e1-1"]
+    - endpoints: ["pe3:e1-1","pe5:e1-1"]
+
+    - endpoints: ["pe4:e1-2","pe6:e1-1"]
+    - endpoints: ["pe5:e1-2","pe6:e1-2"]
+
+    - endpoints: ["h2:e1-1","pe2:e1-2"]
+    - endpoints: ["h3:e1-1","pe3:e1-2"]
+
+    - endpoints: ["h6:e1-1","pe6:e1-3"]
