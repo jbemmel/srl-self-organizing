@@ -116,7 +116,6 @@ cat > $temp_file << EOF
       ]
     }
   ]
-}
 EOF
 
 $GNMIC set --update-path /routing-policy --update-file $temp_file
