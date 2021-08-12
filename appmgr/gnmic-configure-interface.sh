@@ -372,12 +372,8 @@ exitcode+=$?
 # Create a sample BGP policy to convert customer AS to ext community (origin)
 cat > $temp_file << EOF
 {
-  "as-path-set": [
-    { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" }
-  ],
-  "community-set": [
-    { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] }
-  ],
+  "as-path-set": [ { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" } ],
+  "community-set": [ { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] } ],
   "policy": [
     {
       "name": "overlay-export-as-to-community",
@@ -530,20 +526,23 @@ fi
 $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
 exitcode+=$?
 
-# Add it to OSPF (even if disabled)
-# Note: info from state bfd shows failures, disabling for now
+# Add it to OSPF (if enabled)
+# Note: To view: info from state /bfd
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+
+if [[ "$OSPF_ADMIN_STATE" == "enable" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
  "interface-type": "point-to-point",
  "failure-detection": {
-   "enable-bfd": false
+   "enable-bfd": true
  }
 }
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
+fi
 
 # Enable BFD, except for host facing interfaces
 cat > $temp_file << EOF
