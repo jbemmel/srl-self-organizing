@@ -53,154 +53,6 @@ exitcode+=$?
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
 
-# For leaves, create VXLAN tunnel interface vxlan0 for overlay VRF
-if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
-
-cat > $temp_file << EOF
-{
-  "vxlan-interface": [
-    {
-      "index": 0,
-      "type": "srl_nokia-interfaces:routed",
-      "ingress": {
-        "vni": 10000
-      },
-      "egress": {
-        "source-ip": "use-system-ipv4-address"
-      }
-    }
-  ]
-}
-EOF
-$GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
-exitcode+=$?
-
-# Create a sample BGP policy to convert customer AS to ext community (origin)
-cat > $temp_file << EOF
-{
-  "as-path-set": [
-    {
-      "name": "CUSTOMER1",
-      "expression": "${PEER_AS_MAX}"
-    }
-  ],
-  "community-set": [
-    {
-      "name": "CUSTOMER1",
-      "member": [
-        "origin:${PEER_AS_MAX}:0"
-      ]
-    }
-  ],
-  "policy": [
-    {
-      "name": "overlay-export-as-to-community",
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": {
-            "bgp": {
-              "as-path-set": "CUSTOMER1"
-            }
-          },
-          "action": {
-            "accept": {
-              "bgp": {
-                "communities": {
-                  "add": "CUSTOMER1"
-                }
-              }
-            }
-          }
-        }
-      ]
-    }
-  ]
-EOF
-
-$GNMIC set --update-path /routing-policy --update-file $temp_file
-exitcode+=$?
-
-# Configure lo0.0 with special loopback IP to advertise communities
-cat > $temp_file << EOF
-{
-  "admin-state": "enable",
-  "subinterface": [
-    {
-      "index": 0,
-      "admin-state": "enable",
-      "ipv4": { "address": [ { "ip-prefix": "192.0.2.0/32" } ] },
-      "ipv6": { "address": [ { "ip-prefix": "2001:db8::192:0:2:0/128" } ] }
-    }
-  ]
-}
-EOF
-$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
-exitcode+=$?
-
-# Set autonomous system & router-id for BGP to hosts
-# Assumes a L3 service
-cat > $temp_file << EOF
-{
-    "type": "srl_nokia-network-instance:ip-vrf",
-    "_annotate_type": "routed",
-    "admin-state": "enable",
-    "interface": [ { "name": "lo0.0" } ],
-    "vxlan-interface": [ { "name": "vxlan0.0" } ],
-    "protocols": {
-      "bgp": {
-        "admin-state": "enable",
-        "autonomous-system": $PEER_AS_MIN,
-        "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
-        "ipv4-unicast": {
-          "admin-state": "enable",
-          "multipath": {
-            "max-paths-level-1": 32,
-            "max-paths-level-2": 32
-          }
-        },
-        "ipv6-unicast": {
-          "admin-state": "enable",
-          "multipath": {
-            "max-paths-level-1": 32,
-            "max-paths-level-2": 32
-          }
-        },
-        $DYNAMIC_HOST_PEERING,
-        "group" : [ $HOSTS_GROUP ],
-        "route-advertisement": {
-          "rapid-withdrawal": true
-        }
-      },
-      "bgp-evpn": {
-        "bgp-instance": [
-          {
-            "id": 1,
-            "admin-state": "enable",
-            "vxlan-interface": "vxlan0.0",
-            "evi": 10000,
-            "ecmp": 8
-          }
-        ]
-      },
-      "bgp-vpn": {
-        "bgp-instance": [
-          {
-            "id": 1,
-            "route-target": {
-              "export-rt": "target:$PEER_AS_MIN:10000",
-              "import-rt": "target:$PEER_AS_MIN:10000"
-            }
-          }
-        ]
-      }
-    }
-  }
-EOF
-$GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_file
-exitcode+=$?
-fi
-
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 # Still requires static (link local) IPv4 addresses on each interface
 if [[ "$OSPF_ADMIN_STATE" == "enable" ]]; then
@@ -494,6 +346,135 @@ EOF
 
 $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
+
+# For leaves, create VXLAN tunnel interface vxlan0 for overlay VRF
+if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+
+cat > $temp_file << EOF
+{
+  "vxlan-interface": [
+    {
+      "index": 0,
+      "type": "srl_nokia-interfaces:routed",
+      "ingress": {
+        "vni": 10000
+      },
+      "egress": {
+        "source-ip": "use-system-ipv4-address"
+      }
+    }
+  ]
+}
+EOF
+$GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
+exitcode+=$?
+
+# Create a sample BGP policy to convert customer AS to ext community (origin)
+cat > $temp_file << EOF
+{
+  "as-path-set": [
+    { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" }
+  ],
+  "community-set": [
+    { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] }
+  ],
+  "policy": [
+    {
+      "name": "overlay-export-as-to-community",
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
+          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
+        }
+      ]
+    }
+  ]
+EOF
+
+$GNMIC set --update-path /routing-policy --update-file $temp_file
+exitcode+=$?
+
+# Configure lo0.0 with special loopback IP to advertise communities
+cat > $temp_file << EOF
+{
+  "admin-state": "enable",
+  "subinterface": [
+    {
+      "index": 0,
+      "admin-state": "enable",
+      "ipv4": { "address": [ { "ip-prefix": "192.0.2.0/32" } ] },
+      "ipv6": { "address": [ { "ip-prefix": "2001:db8::192:0:2:0/128" } ] }
+    }
+  ]
+}
+EOF
+$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
+exitcode+=$?
+
+# Set autonomous system & router-id for BGP to hosts
+# Assumes a L3 service
+cat > $temp_file << EOF
+{
+    "type": "srl_nokia-network-instance:ip-vrf",
+    "_annotate_type": "routed",
+    "admin-state": "enable",
+    "interface": [ { "name": "lo0.0" } ],
+    "vxlan-interface": [ { "name": "vxlan0.0" } ],
+    "protocols": {
+      "bgp": {
+        "admin-state": "enable",
+        "autonomous-system": $PEER_AS_MIN,
+        "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
+        "ipv4-unicast": {
+          "admin-state": "enable",
+          "multipath": {
+            "max-paths-level-1": 32,
+            "max-paths-level-2": 32
+          }
+        },
+        "ipv6-unicast": {
+          "admin-state": "enable",
+          "multipath": {
+            "max-paths-level-1": 32,
+            "max-paths-level-2": 32
+          }
+        },
+        $DYNAMIC_HOST_PEERING,
+        "group" : [ $HOSTS_GROUP ],
+        "route-advertisement": {
+          "rapid-withdrawal": true
+        }
+      },
+      "bgp-evpn": {
+        "bgp-instance": [
+          {
+            "id": 1,
+            "admin-state": "enable",
+            "vxlan-interface": "vxlan0.0",
+            "evi": 10000,
+            "ecmp": 8
+          }
+        ]
+      },
+      "bgp-vpn": {
+        "bgp-instance": [
+          {
+            "id": 1,
+            "route-target": {
+              "export-rt": "target:$PEER_AS_MIN:10000",
+              "import-rt": "target:$PEER_AS_MIN:10000"
+            }
+          }
+        ]
+      }
+    }
+  }
+EOF
+$GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_file
+exitcode+=$?
+
+fi # leaf with EVPN enabled
 
 fi # if router_id provided, first time only
 
