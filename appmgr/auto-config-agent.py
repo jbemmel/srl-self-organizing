@@ -183,7 +183,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
             # Peer announcement, pass it on as spine
             if state.is_spine():
                peername = "spine-" + peername # For node_id calc on auto leaves
-               if state.announcing!=False and state.announcing != my_port:
+               if state.announcing!="" and state.announcing != my_port:
                    state.pending_announcements.append( (my_port,peername) )
                else:
                    state.announcing = my_port
@@ -207,7 +207,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                    state.announcing = next_port
                    Set_LLDP_Systemname(nextpeer)
                else:
-                   state.announcing = False
+                   state.announcing = ""
                    Set_Default_Systemname(state)
         elif re.match( "^ACK-.*", state.announcing ): # For leaves
             state.announcing = ""
