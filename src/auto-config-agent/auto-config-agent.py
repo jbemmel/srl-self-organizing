@@ -217,12 +217,12 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
 ###
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
-# bgp-evpn l2 vni, ethernet segment with ESI
+# optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(port,ip,evpn):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn}")
+def Convert_to_lag(port,ip,evpn,vrf="overlay"):
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
-   deletes=[ f'/network-instance[name=overlay]/interface[{eth}.0]',
+   deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
              f'/interface[{eth}]/subinterface[index=*]',
              f'/interface[{eth}]/vlan-tagging' ]
    lag = {
@@ -297,24 +297,27 @@ def Convert_to_lag(port,ip,evpn):
      "type": "srl_nokia-network-instance:mac-vrf",
      "admin-state": "enable",
      "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
-     "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
-     "protocols": {
-      "bgp-evpn": {
-       "srl_nokia-bgp-evpn:bgp-instance": [
-        {
-          "id": 1,
-          "admin-state": "enable",
-          "vxlan-interface": f"vxlan0.{port}",
-          "evi": int(port),
-          "ecmp": 8
-        }
-       ]
-      },
-      "srl_nokia-bgp-vpn:bgp-vpn": { "bgp-instance": [ { "id": 1 } ] }
-     }
    }
+   if evpn:
+      mac_vrf.update(
+      {
+        "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
+        "protocols": {
+         "bgp-evpn": {
+          "srl_nokia-bgp-evpn:bgp-instance": [
+           {
+             "id": 1,
+             "admin-state": "enable",
+             "vxlan-interface": f"vxlan0.{port}",
+             "evi": int(port),
+             "ecmp": 8
+           }
+          ]
+         },
+         "srl_nokia-bgp-vpn:bgp-vpn": { "bgp-instance": [ { "id": 1 } ] }
+        }
+      })
 
-   vrf = "overlay" if evpn else "default"
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
@@ -379,6 +382,8 @@ def Handle_Notification(obj, state):
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
                 if 'auto_lags' in data:
                     state.auto_lags = data['auto_lags']['value']
+                if 'host_use_irb' in data:
+                    state.host_use_irb = data['host_use_irb']['value']
 
                 return state.role is not None
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -531,13 +536,13 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Reuse link IPs between overlay and underlay
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
-     _ip = str( list(state.peerlinks[link_index].hosts())[_r] )
+     _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
      _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
      logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
      script_update_interface(
          state,
          intf_name,
-         _ip + '/31',
+         _ip,
          lldp_peer_desc,
          _peer if state.get_role() != 'spine' else '*',
          _as,
@@ -549,6 +554,11 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          peer_router_id
      )
      setattr( state, link_name, _ip )
+
+     # For access ports, convert to L2 service if requested
+     if peer_type=='host' and state.host_use_irb:
+        Convert_to_lag( lldp_my_port, _ip, False ) # No EVPN LAG yet
+
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
 
@@ -583,6 +593,7 @@ class State(object):
         self.announced = {}     # To filter duplicate LLDP events
 
         self.lag_state = {}     # Used for auto-provisioning of LAGs
+        self.host_use_irb = True
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)

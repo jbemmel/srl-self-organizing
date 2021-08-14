@@ -104,6 +104,11 @@ module auto_config_agent {
                 type boolean;
                 default false;
             }
+            leaf host-use-irb {
+                description "Use IRB interface for L2 service towards hosts";
+                type boolean;
+                default true;
+            }
             leaf auto-lags {
                 description "Discover and provision LAGs on leaves, using LLDP";
                 type boolean;
