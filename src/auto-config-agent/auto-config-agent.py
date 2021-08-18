@@ -558,6 +558,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      # For access ports, convert to L2 service if requested
      if peer_type=='host' and state.host_use_irb:
         Convert_to_lag( lldp_my_port, _ip, False ) # No EVPN LAG yet
+     else:
+       logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB" )    
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
