@@ -496,7 +496,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     max_peer_as = min_peer_as + state.max_leaves
   elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    spineId = re.match(".*(?:spine|auto)[-]?(\d+).*", lldp_peer_name)
+    spineId = re.match(".*(?:spine)[-]?(\d+).*", lldp_peer_name)
     _masterSpine = state.get_role() == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.get_role()=='leaf') else 1
     _i = 1
@@ -559,7 +559,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      if peer_type=='host' and state.host_use_irb:
         Convert_to_lag( lldp_my_port, _ip, False ) # No EVPN LAG yet
      else:
-       logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB" )    
+       logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
