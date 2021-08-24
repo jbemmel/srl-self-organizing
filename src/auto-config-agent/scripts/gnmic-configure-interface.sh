@@ -442,7 +442,7 @@ cat > $temp_file << EOF
         "route-advertisement": {
           "rapid-withdrawal": true
         },
-        "ebgp-default-policy" {
+        "ebgp-default-policy": {
           "import-reject-all": false,
           "export-reject-all": false
         }
