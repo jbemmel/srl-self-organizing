@@ -441,6 +441,10 @@ cat > $temp_file << EOF
         "group" : [ $HOSTS_GROUP ],
         "route-advertisement": {
           "rapid-withdrawal": true
+        },
+        "ebgp-default-policy" {
+          "import-reject-all": false,
+          "export-reject-all": false
         }
       },
       "bgp-evpn": {
