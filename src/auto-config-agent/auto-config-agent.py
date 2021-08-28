@@ -342,6 +342,7 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
    logging.info(f"Configure_BGP_unnumbered :: port={port}")
    eth = f'name=ethernet-1/{port}'
 
+   # This gets updated every time an interface is added
    frr = {
     "admin-state": "enable",
     "router-id" : router_id,
@@ -352,7 +353,7 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
    }
    bgp_u = { "bgp-unnumbered-peer-as": "external" }
    updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
-             (f'/network-instance[name=default]/interface[name={eth}]', bgp_u ),
+             (f'/network-instance[name=default]/interface[{eth}]', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
