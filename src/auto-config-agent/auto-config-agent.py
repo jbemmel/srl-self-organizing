@@ -340,7 +340,7 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
 ##
 def Configure_BGP_unnumbered(router_id,local_as,port):
    logging.info(f"Configure_BGP_unnumbered :: port={port}")
-   eth = f'name=ethernet-1/{port}.0'
+   eth = f'name=ethernet-1/{port}'
 
    # This gets updated every time an interface is added
    frr = {
@@ -351,9 +351,24 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
      "admin-state": "enable",
     }
    }
+
+   # BGP unnumbered interfaces must have ipv4 and ipv6 enabled
+   intf = {
+    "admin-state": "enable",
+    "subinterface": [
+     {
+      "index": 0,
+      "admin-state": "enable",
+      "ipv4": {},
+      "ipv6": {},
+     }
+    ]
+   }
+
    bgp_u = { "bgp-unnumbered-peer-as": "external" }
-   updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
-             (f'/network-instance[name=default]/interface[{eth}]', bgp_u ),
+   updates=[ (f'/interface[{eth}]', intf ),
+             (f'/network-instance[name=default]/protocols/experimental-frr', frr),
+             (f'/network-instance[name=default]/interface[{eth}.0]', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
