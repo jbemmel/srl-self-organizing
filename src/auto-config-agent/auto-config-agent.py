@@ -568,7 +568,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Reuse link IPs between overlay and underlay
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
-     if not state.use_bgp_unnumbered:
+     if not state.use_bgp_unnumbered or peer_type=='host':
        _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
        _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
      else:
