@@ -104,6 +104,15 @@ module auto_config_agent {
                 type boolean;
                 default false;
             }
+            leaf use-bgp-unnumbered {
+                description "Provision BGP unnumbered on fabric interfaces, using FRR agent";
+                type boolean;
+                default false;
+
+                must ". = false() or ../use-ospfv3 = false()" {
+                  error-message "Cannot use both BGP unnumbered and OSPFv3";
+                }
+            }
             leaf host-use-irb {
                 description "Use IRB interface for L2 service towards hosts";
                 type boolean;

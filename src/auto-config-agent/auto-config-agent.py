@@ -334,6 +334,31 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
                      username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', delete=deletes, update=updates )
 
+###
+# Configures the default network instance to use BGP unnumbered between
+# spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
+##
+def Configure_BGP_unnumbered(router_id,local_as,port):
+   logging.info(f"Configure_BGP_unnumbered :: port={port}")
+   eth = f'name=ethernet-1/{port}'
+
+   frr = {
+    "admin-state": "enable",
+    "router-id" : router_id,
+    "autonomous-system" : local_as,
+    "bgp" : {
+     "admin-state": "enable",
+    }
+   }
+   bgp_u = { "bgp-unnumbered-peer-as": "external" }
+   updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
+             (f'/network-instance[name=default]/interface[name={eth}]', bgp_u ),
+           ]
+   logging.info(f"gNMI SET updates={updates}" )
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="admin",insecure=True) as c:
+      c.set( encoding='json_ietf', update=updates )
+
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path = .fib-agent
@@ -380,6 +405,8 @@ def Handle_Notification(obj, state):
                     state.evpn = '1' if data['use_evpn']['value'] else '0'
                 if 'use_ospfv3' in data:
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
+                if 'use_bgp_unnumbered' in data:
+                    state.bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'auto_lags' in data:
                     state.auto_lags = data['auto_lags']['value']
                 if 'host_use_irb' in data:
@@ -536,8 +563,12 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Reuse link IPs between overlay and underlay
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
-     _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
-     _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+     if not state.use_bgp_unnumbered:
+       _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
+       _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+     else:
+       _ip = ""
+       _peer = "*"
      logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
      script_update_interface(
          state,
@@ -560,6 +591,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
         Convert_to_lag( lldp_my_port, _ip, False ) # No EVPN LAG yet
      else:
        logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
+
+     if state.use_bgp_unnumbered:
+         if (peer_type!='host' and state.get_role() != 'endpoint'):
+             Configure_BGP_unnumbered( state.router_id, _as, lldp_my_port )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
@@ -596,6 +631,7 @@ class State(object):
 
         self.lag_state = {}     # Used for auto-provisioning of LAGs
         self.host_use_irb = True
+        self.use_bgp_unnumbered = False
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)

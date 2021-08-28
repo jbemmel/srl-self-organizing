@@ -479,7 +479,6 @@ fi # leaf with EVPN enabled
 
 fi # if router_id provided, first time only
 
-_IP127="${IP_PREFIX//\/31/\/127}"
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
 fi
@@ -487,6 +486,14 @@ if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
   _VLAN_TAGGING='"vlan-tagging" : true,'
   _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
 fi
+if [[ "${IP_PREFIX}" != "" ]]; then
+_IP127="${IP_PREFIX//\/31/\/127}"
+IFS='' read -r -d '' _IP_ADDRESSING << EOF
+,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
+"ipv6": { "address": [ { "ip-prefix": "2001::${_IP127//\./:}" } ] }
+EOF
+fi
+
 cat > $temp_file << EOF
 {
   "description": "To $PEER",
@@ -497,21 +504,8 @@ cat > $temp_file << EOF
       "index": 0,
       $_ROUTED
       $_VLAN
-      "admin-state": "enable",
-      "ipv4": {
-        "address": [
-          {
-            "ip-prefix": "$IP_PREFIX"
-          }
-        ]
-      },
-      "ipv6": {
-        "address": [
-          {
-            "ip-prefix": "2001::${_IP127//\./:}"
-          }
-        ]
-      }
+      "admin-state": "enable"
+      $_IP_ADDRESSING
     }
   ]
 }
