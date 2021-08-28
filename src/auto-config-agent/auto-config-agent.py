@@ -406,7 +406,7 @@ def Handle_Notification(obj, state):
                 if 'use_ospfv3' in data:
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
                 if 'use_bgp_unnumbered' in data:
-                    state.bgp_unnumbered = data['use_bgp_unnumbered']['value']
+                    state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'auto_lags' in data:
                     state.auto_lags = data['auto_lags']['value']
                 if 'host_use_irb' in data:
