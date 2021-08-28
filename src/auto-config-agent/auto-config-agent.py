@@ -340,7 +340,7 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
 ##
 def Configure_BGP_unnumbered(router_id,local_as,port):
    logging.info(f"Configure_BGP_unnumbered :: port={port}")
-   eth = f'name=ethernet-1/{port}'
+   eth = f'name=ethernet-1/{port}.0'
 
    # This gets updated every time an interface is added
    frr = {
