@@ -352,22 +352,11 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
     }
    }
 
-   # BGP unnumbered interfaces must have ipv4 and ipv6 enabled
-   intf = {
-    "admin-state": "enable",
-    "subinterface": [
-     {
-      "index": 0,
-      "admin-state": "enable",
-      "ipv4": {},
-      "ipv6": {},
-     }
-    ]
-   }
+   # BGP unnumbered interfaces must have ipv4 and ipv6 enabled, now handled
+   # by FRR agent itself
 
    bgp_u = { "bgp-unnumbered-peer-as": "external" }
-   updates=[ (f'/interface[{eth}]', intf ),
-             (f'/network-instance[name=default]/protocols/experimental-frr', frr),
+   updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
              (f'/network-instance[name=default]/interface[{eth}.0]', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
