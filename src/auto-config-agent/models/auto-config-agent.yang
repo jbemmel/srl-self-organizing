@@ -125,7 +125,7 @@ module auto_config_agent {
             }
             leaf anycast-gw {
                 description "IPv4 anycast gateway to provision";
-                type srl_nokia-comm:ipv4-prefix;
+                type srl_nokia-comm:ipv4-prefix-with-host-bits;
             }
 
             // info from state
