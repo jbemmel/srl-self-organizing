@@ -423,7 +423,8 @@ cat > $temp_file << EOF
     "_annotate_type": "routed",
     "admin-state": "enable",
     "interface": [ { "name": "lo0.0" } ],
-    "vxlan-interface": [ { "name": "vxlan0.0", "_annotate_name": "symmetric IRB model using RT5 EVPN routes" } ],
+    "vxlan-interface": [ { "name": "vxlan0.0" } ],
+    "_annotate_vxlan-interface": "this is symmetric IRB model using RT5 EVPN routes",
     "protocols": {
       "bgp": {
         "admin-state": "enable",
