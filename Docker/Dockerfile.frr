@@ -4,7 +4,7 @@ FROM frrouting/frr:latest
 # echo 'lldp : { eth1 : { adminStatus = 3; tlvid00000005 : { enableTx = true; };}; };' >> /var/lib/lldpad/lldpad.conf && \
 # sed -i 's|set -e$|set -e;/usr/sbin/lldpad -d|g' /usr/lib/frr/docker-start
 
-RUN apk add lldpd && \
+RUN apk add lldpd iperf3 && \
  sed -i '3 i /usr/sbin/lldpd' /usr/lib/frr/docker-start
 
 COPY --chown=root:root ./daemons /etc/frr
