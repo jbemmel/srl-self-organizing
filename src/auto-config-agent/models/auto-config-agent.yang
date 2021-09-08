@@ -7,9 +7,9 @@ module auto_config_agent {
 
     prefix "auto_config_agent";
 
-    // import srl_nokia-common {
-    //    prefix srl_nokia-comm;
-    // }
+    import srl_nokia-common {
+        prefix srl_nokia-comm;
+    }
 
     // Note that this module needs to be in the path for source-directories
     import srl_nokia-extensions {
@@ -64,14 +64,14 @@ module auto_config_agent {
 
             leaf peerlinks-prefix {
                 description "IPv4 prefix range to use for auto-assigned peering links /31";
-                // type srl_nokia-comm:ipv4-prefix;
-                type string;
+                type srl_nokia-comm:ipv4-prefix;
+
                 default "192.168.127.0/24"; // enough for 128 /31 links
             }
             leaf loopbacks-prefix {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
-                // type srl_nokia-comm:ipv4-prefix;
-                type string;
+                type srl_nokia-comm:ipv4-prefix;
+
                 default "1.1.0.0/22"; // spines get 1.1.0.x, leaves 1.1.1.x
             }
             leaf max-spines {
@@ -122,6 +122,10 @@ module auto_config_agent {
                 description "Discover and provision LAGs on leaves, using LLDP";
                 type boolean;
                 default true;
+            }
+            leaf anycast-gw {
+                description "IPv4 anycast gateway to provision";
+                type srl_nokia-comm:ipv4-prefix;
             }
 
             // info from state

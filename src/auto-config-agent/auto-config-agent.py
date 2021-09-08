@@ -114,7 +114,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
             _ip = str( list(state.peerlinks[int(port) - 1].hosts())[0] ) + '/31'
-            Convert_to_lag( cur[state.router_id], _ip, True ) # EVPN MC-lag
+            Convert_to_lag( state, cur[state.router_id], _ip, True ) # EVPN MC-lag
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
@@ -219,7 +219,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(port,ip,evpn,vrf="overlay"):
+def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
@@ -233,7 +233,8 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
          "index": 0,
          "type": "srl_nokia-interfaces:bridged",
          "srl_nokia-interfaces-vlans:vlan": {
-           "encap": { "single-tagged": { "vlan-id": 1 } }
+           # "encap": { "single-tagged": { "vlan-id": 1 } }
+           "encap": { "untagged": { } }
          }
        }
       ],
@@ -253,7 +254,6 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
         "address": [
           {
             "ip-prefix": ip, # /31 link IP
-            "anycast-gw": evpn,
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ]
@@ -263,6 +263,11 @@ def Convert_to_lag(port,ip,evpn,vrf="overlay"):
     }
     ]
    }
+   if hasattr(state,'anycast_gw'):
+       irb_if['subinterface'][0]['ipv4']['address'][1] = {
+         "ip-prefix": state.anycast_gw,
+         "anycast-gw": True
+       }
 
    sys_bgp_evpn = {
     "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
@@ -416,6 +421,8 @@ def Handle_Notification(obj, state):
                     state.auto_lags = data['auto_lags']['value']
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
+                if 'anycast_gw' in data:
+                    state.anycast_gw = data['anycast_gw']['value']
 
                 return state.role is not None
     elif obj.HasField('lldp_neighbor') and not state.role is None:
@@ -593,7 +600,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      # For access ports, convert to L2 service if requested
      if peer_type=='host' and state.host_use_irb:
-        Convert_to_lag( lldp_my_port, _ip, False ) # No EVPN LAG yet
+        Convert_to_lag( state, lldp_my_port, _ip, False ) # No EVPN LAG yet
      else:
        logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
