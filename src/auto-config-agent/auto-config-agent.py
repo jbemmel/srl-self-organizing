@@ -264,10 +264,10 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
     ]
    }
    if hasattr(state,'anycast_gw'):
-       irb_if['subinterface'][0]['ipv4']['address'][1] = {
+       irb_if['subinterface'][0]['ipv4']['address'].append( {
          "ip-prefix": state.anycast_gw,
          "anycast-gw": True
-       }
+       } )
 
    sys_bgp_evpn = {
     "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
