@@ -482,10 +482,10 @@ fi # if router_id provided, first time only
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
 fi
-if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
-  _VLAN_TAGGING='"vlan-tagging" : true,'
-  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
-fi
+#if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
+#  _VLAN_TAGGING='"vlan-tagging" : true,'
+#  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
+#fi
 if [[ "${IP_PREFIX}" != "" ]]; then
 _IP127="${IP_PREFIX//\/31/\/127}"
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
@@ -500,16 +500,15 @@ IFS='' read -r -d '' _IP_ADDRESSING << EOF
 EOF
 fi
 
+# Removed $_VLAN_TAGGING and $_VLAN
 cat > $temp_file << EOF
 {
   "description": "To $PEER",
-  $_VLAN_TAGGING
   "admin-state": "enable",
   "subinterface": [
     {
       "index": 0,
       $_ROUTED
-      $_VLAN
       "admin-state": "enable"
       $_IP_ADDRESSING
     }
