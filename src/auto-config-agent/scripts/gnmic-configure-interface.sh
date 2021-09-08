@@ -416,13 +416,14 @@ exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
 # Assumes a L3 service
+# This is symmetric IRB (with VXLAN interfaces in both mac-vrf and ip-vrf)
 cat > $temp_file << EOF
 {
     "type": "srl_nokia-network-instance:ip-vrf",
     "_annotate_type": "routed",
     "admin-state": "enable",
     "interface": [ { "name": "lo0.0" } ],
-    "vxlan-interface": [ { "name": "vxlan0.0" } ],
+    "vxlan-interface": [ { "name": "vxlan0.0", "_annotate_name": "symmetric IRB model using RT5 EVPN routes" } ],
     "protocols": {
       "bgp": {
         "admin-state": "enable",
