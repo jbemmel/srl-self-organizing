@@ -307,6 +307,8 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
    }
    if state.evpn == '1':
       rt = f"target:{state.base_as}:{port}"
+
+      # Not currently used
       export_policy = {
         "community-set": [ { "name": f"LAG{port}", "member": [ rt ], } ],
         "policy": [
@@ -341,7 +343,7 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
          "srl_nokia-bgp-vpn:bgp-vpn": {
            "bgp-instance": [
             { "id": 1,
-              "export-policy": f"add-rt-{state.base_as}-{port}",
+              # "export-policy": f"add-rt-{state.base_as}-{port}",
               "route-target": { "export-rt": rt, "import-rt": rt }
             }
            ]
@@ -358,7 +360,7 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
    if state.evpn == '1':
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
-         ('/routing-policy', export_policy)
+         # ('/routing-policy', export_policy)
        ]
    if evpn_mclag:
        updates += [ ('/system/network-instance/protocols', sys_bgp_evpn ) ]
