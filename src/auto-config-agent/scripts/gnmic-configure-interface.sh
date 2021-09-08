@@ -424,7 +424,6 @@ cat > $temp_file << EOF
     "admin-state": "enable",
     "interface": [ { "name": "lo0.0" } ],
     "vxlan-interface": [ { "name": "vxlan0.0" } ],
-    "_annotate_vxlan-interface": "this is symmetric IRB model using RT5 EVPN routes",
     "protocols": {
       "bgp": {
         "admin-state": "enable",
