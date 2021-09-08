@@ -5,6 +5,6 @@ FROM frrouting/frr:latest
 # sed -i 's|set -e$|set -e;/usr/sbin/lldpad -d|g' /usr/lib/frr/docker-start
 
 RUN apk add lldpd && \
- sed -i 's|set -e$|set -e;/usr/sbin/lldpd|g' /usr/lib/frr/docker-start
+ sed -i '3 i /usr/sbin/lldpd' /usr/lib/frr/docker-start
 
 COPY --chown=root:root ./daemons /etc/frr
