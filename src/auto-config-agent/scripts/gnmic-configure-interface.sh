@@ -119,6 +119,10 @@ cat > $temp_file << EOF
           "action": { "reject": { } }
         }
       ]
+    },
+    {
+      "name": "accept-all",
+      "default-action": { "accept": { } }
     }
   ]
 }
@@ -239,7 +243,8 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
 {
   "group-name": "evpn-rr",
   "admin-state": "enable",
-  "export-policy": "reject-local-routes",
+  "import-policy": "accept-all",
+  "export-policy": "accept-all",
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],
   "evpn": { "admin-state": "enable" },
