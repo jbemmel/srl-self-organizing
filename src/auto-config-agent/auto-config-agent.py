@@ -219,7 +219,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
+def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
@@ -269,6 +269,7 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
          "anycast-gw": True
        } )
 
+   # EVPN MC-LAG
    sys_bgp_evpn = {
     "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
     "evpn": {
@@ -291,6 +292,7 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
     }
    }
 
+   # EVPN VXLAN interface
    vxlan_if = {
       "type": "srl_nokia-interfaces:bridged",
       "ingress": { "vni": int(port) },
@@ -303,7 +305,24 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
      "admin-state": "enable",
      "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
    }
-   if evpn:
+   if state.evpn == '1':
+      rt = f"target:{state.base_as}:{port}"
+      export_policy = {
+        "community-set": [ { "name": f"LAG{port}", "member": [ rt ], } ],
+        "policy": [
+        {
+         "name": f"add-rt-{state.base_as}-{port}",
+         "statement": [
+          {
+           "sequence-id": 10,
+           "action": {
+            "accept": { "bgp": { "communities": { "add": f"LAG{port}" } } }
+           }
+          }
+         ]
+        }]
+      }
+
       mac_vrf.update(
       {
         "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
@@ -319,7 +338,14 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
            }
           ]
          },
-         "srl_nokia-bgp-vpn:bgp-vpn": { "bgp-instance": [ { "id": 1 } ] }
+         "srl_nokia-bgp-vpn:bgp-vpn": {
+           "bgp-instance": [
+            { "id": 1,
+              "export-policy": f"add-rt-{state.base_as}-{port}",
+              "route-target": { "export-rt": rt, "import-rt": rt }
+            }
+           ]
+         }
         }
       })
 
@@ -329,11 +355,14 @@ def Convert_to_lag(state,port,ip,evpn,vrf="overlay"):
              (f'/network-instance[name=lag{port}]', mac_vrf),
              (f'/network-instance[name={vrf}]/interface[name=irb0.{port}]', {}),
            ]
-   if evpn:
+   if state.evpn == '1':
        updates += [
-             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
-             ('/system/network-instance/protocols', sys_bgp_evpn ),
+         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
+         ('/routing-policy', export_policy)
        ]
+   if evpn_mclag:
+       updates += [ ('/system/network-instance/protocols', sys_bgp_evpn ) ]
+
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
@@ -600,7 +629,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      # For access ports, convert to L2 service if requested
      if peer_type=='host' and state.host_use_irb:
-        Convert_to_lag( state, lldp_my_port, _ip, False ) # No EVPN LAG yet
+        Convert_to_lag( state, lldp_my_port, _ip, False ) # No EVPN MC-LAG yet
      else:
        logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
