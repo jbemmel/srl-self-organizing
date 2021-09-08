@@ -220,7 +220,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
 def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn={evpn} vrf={vrf}")
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn_mclag={evpn_mclag} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
              f'/interface[{eth}]/subinterface[index=*]',
