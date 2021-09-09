@@ -94,10 +94,14 @@ module auto_config_agent {
                 type uint8;
                 default 4; // Too high -> out of peer link IP space
             }
-            leaf use-evpn {
-                description "Provision BGP EVPN control plane and VXLAN endpoints";
-                type boolean;
-                default false;
+            leaf evpn {
+                description "BGP EVPN control plane model to use for VXLAN endpoints";
+                type enumeration {
+                  enum asymmetric-irb;
+                  enum symmetric-irb;
+                  enum disabled
+                }
+                default "disabled";
             }
             leaf use-ospfv3 {
                 description "Provision OSPFv3 on fabric interfaces";

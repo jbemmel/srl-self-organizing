@@ -305,7 +305,7 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
      "admin-state": "enable",
      "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
    }
-   if state.evpn == '1':
+   if state.evpn != 'disabled':
       rt = f"target:{state.base_as}:{port}"
 
       # Not currently used
@@ -357,7 +357,7 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
              (f'/network-instance[name=lag{port}]', mac_vrf),
              (f'/network-instance[name={vrf}]/interface[name=irb0.{port}]', {}),
            ]
-   if state.evpn == '1':
+   if state.evpn != 'disabled':
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
          # ('/routing-policy', export_policy)
@@ -442,8 +442,8 @@ def Handle_Notification(obj, state):
                     state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
                 if 'max_lag_links' in data:
                     state.max_lag_links = int( data['max_lag_links']['value'] )
-                if 'use_evpn' in data:
-                    state.evpn = '1' if data['use_evpn']['value'] else '0'
+                if 'evpn' in data:
+                    state.evpn = data['evpn'][5:] # strip "EVPN_"
                 if 'use_ospfv3' in data:
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
                 if 'use_bgp_unnumbered' in data:

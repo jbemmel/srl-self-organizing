@@ -17,7 +17,7 @@ LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
 OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
-USE_EVPN_OVERLAY="${14}" # '1' or '0'
+USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric-irb' or 'asymmetric-irb'
 
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
@@ -146,7 +146,7 @@ IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 EOF
 fi
 
-if [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 ,
 {
@@ -236,7 +236,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 }
 EOF
 
-if [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
 IFS='' read -r -d '' EVPN_RR_GROUP << EOF
@@ -352,9 +352,10 @@ EOF
 $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
-# For leaves, create VXLAN tunnel interface vxlan0 for overlay VRF
-if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+# For leaves, create L3 VXLAN tunnel interface vxlan0 for overlay VRF
+if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 
+if [[ "$USE_EVPN_OVERLAY" == "symmetric-irb" ]]; then
 cat > $temp_file << EOF
 {
   "vxlan-interface": [
@@ -373,6 +374,35 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
 exitcode+=$?
+
+L3_VXLAN_INTERFACE='"vxlan-interface": [ { "name": "vxlan0.0" } ],'
+
+IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
+,"bgp-evpn": {
+  "bgp-instance": [
+    {
+      "id": 1,
+      "admin-state": "enable",
+      "vxlan-interface": "vxlan0.0",
+      "evi": 10000,
+      "ecmp": 8
+    }
+  ]
+},
+"bgp-vpn": {
+  "bgp-instance": [
+    {
+      "id": 1,
+      "route-target": {
+        "export-rt": "target:$PEER_AS_MIN:10000",
+        "import-rt": "target:$PEER_AS_MIN:10000"
+      }
+    }
+  ]
+}
+EOF
+
+fi
 
 # Create a sample BGP policy to convert customer AS to ext community (origin)
 cat > $temp_file << EOF
@@ -423,7 +453,7 @@ cat > $temp_file << EOF
     "_annotate_type": "routed",
     "admin-state": "enable",
     "interface": [ { "name": "lo0.0" } ],
-    "vxlan-interface": [ { "name": "vxlan0.0" } ],
+    $L3_VXLAN_INTERFACE
     "protocols": {
       "bgp": {
         "admin-state": "enable",
@@ -452,29 +482,8 @@ cat > $temp_file << EOF
           "import-reject-all": false,
           "export-reject-all": false
         }
-      },
-      "bgp-evpn": {
-        "bgp-instance": [
-          {
-            "id": 1,
-            "admin-state": "enable",
-            "vxlan-interface": "vxlan0.0",
-            "evi": 10000,
-            "ecmp": 8
-          }
-        ]
-      },
-      "bgp-vpn": {
-        "bgp-instance": [
-          {
-            "id": 1,
-            "route-target": {
-              "export-rt": "target:$PEER_AS_MIN:10000",
-              "import-rt": "target:$PEER_AS_MIN:10000"
-            }
-          }
-        ]
       }
+      $IP_VRF_BGP_EVPN
     }
   }
 EOF
@@ -527,7 +536,7 @@ $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode+=$?
 
 # Add it to the correct instance
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 VRF="overlay"
 else
 VRF="default"
@@ -593,7 +602,7 @@ exitcode+=$?
 fi
 
 # Peer router ID only set for spines when this node is a leaf
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" == "1" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
 EOF
