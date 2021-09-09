@@ -432,7 +432,7 @@ def Handle_Notification(obj, state):
                     peerlinks = data['peerlinks']
                     state.peerlinks_prefix = peerlinks['prefix']['value']
                     state.peerlinks_size = int( peerlinks['subnet_size']['value'] )
-                    state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=state.peerlinks_size))
+                    state.peerlinks = list(ipaddress.ip_network(state.peerlinks_prefix).subnets(new_prefix=state.peerlinks_size))
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                     state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
