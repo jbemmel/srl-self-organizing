@@ -17,7 +17,7 @@ LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
 OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
-USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric-irb' or 'asymmetric-irb'
+USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
@@ -355,7 +355,7 @@ exitcode+=$?
 # For leaves, create L3 VXLAN tunnel interface vxlan0 for overlay VRF
 if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 
-if [[ "$USE_EVPN_OVERLAY" == "symmetric-irb" ]]; then
+if [[ "$USE_EVPN_OVERLAY" == "symmetric_irb" ]]; then
 cat > $temp_file << EOF
 {
   "vxlan-interface": [
