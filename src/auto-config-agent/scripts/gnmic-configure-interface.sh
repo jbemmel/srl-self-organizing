@@ -375,7 +375,7 @@ EOF
 $GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
 exitcode+=$?
 
-L3_VXLAN_INTERFACE='"vxlan-interface": [ { "name": "vxlan0.0" } ],'
+L3_VXLAN_INTERFACE='"vxlan-interface": [ { "name": "vxlan0.0", "_annotate": "This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes" } ],'
 
 IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
 ,"bgp-evpn": {
