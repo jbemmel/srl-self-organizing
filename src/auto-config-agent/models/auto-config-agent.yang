@@ -68,10 +68,10 @@ module auto_config_agent {
                  type srl_nokia-comm:ipv4-prefix;
                  default "192.168.127.0/24"; // enough for 128 /31 links
                }
-               leaf subnet-size {
-                 description "Size of link subnet to use, default /31";
+               leaf host-subnet-size {
+                 description "Size of subnet to use towards hosts, default /31";
                  type uint8 {
-                   range "28 .. 31";
+                   range "24 .. 31";
                  }
                  default 31;
                }
