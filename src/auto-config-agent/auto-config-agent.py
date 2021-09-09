@@ -114,8 +114,8 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
             _p = f"/{state.hostlinks_size}"
-            _i = 0 if state.hostlinks_size==31 else 1
-            _ip = str( list(state.hostlinks[int(port) - 1].hosts())[_i] ) + _p
+            # hosts() lists .1 and .2 in case of /30
+            _ip = str( list(state.hostlinks[int(port) - 1].hosts())[0] ) + _p
             Convert_to_lag( state, cur[state.router_id], _ip, True ) # EVPN MC-lag
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
@@ -621,8 +621,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
        else:
          _p = f"/{state.hostlinks_size}"
-         _ip = str( list(state.hostlinks[link_index].hosts())[1] ) + _p
-         _peer = str( list(state.hostlinks[link_index].hosts())[2] )
+         _ip = str( list(state.hostlinks[link_index].hosts())[0] ) + _p
+         _peer = str( list(state.hostlinks[link_index].hosts())[1] )
      else:
        _ip = ""
        _peer = "*"
