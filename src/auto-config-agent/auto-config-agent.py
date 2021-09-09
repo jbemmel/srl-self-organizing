@@ -260,11 +260,14 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
           }
         ]
       },
-      "ipv6": {}, # TODO could add ipv6 link IP too
       "anycast-gw": {}
     }
     ]
    }
+   if state.host_enable_ipv6:
+       # TODO could add ipv6 link IP too
+       irb_if['subinterface'][0]['ipv6'] = { }
+
    if hasattr(state,'anycast_gw'):
        irb_if['subinterface'][0]['ipv4']['address'].append( {
          "ip-prefix": state.anycast_gw,
@@ -433,6 +436,7 @@ def Handle_Notification(obj, state):
                     state.peerlinks_prefix = peerlinks['prefix']['value']
                     state.peerlinks = list(ipaddress.ip_network(state.peerlinks_prefix).subnets(new_prefix=31))
                     state.hostlinks_size = int( peerlinks['host_subnet_size']['value'] )
+                    state.host_enable_ipv6 = bool( peerlinks['host_enable_ipv6']['value'] )
                     state.hostlinks = list(ipaddress.ip_network(state.peerlinks_prefix).subnets(new_prefix=state.hostlinks_size))
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))

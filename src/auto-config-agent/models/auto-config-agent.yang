@@ -75,6 +75,11 @@ module auto_config_agent {
                  }
                  default 31;
                }
+               leaf host-enable-ipv6 {
+                 description "Whether to enable IPv6 towards hosts, default True";
+                 type boolean;
+                 default true;
+               }
             }
             leaf loopbacks-prefix {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
