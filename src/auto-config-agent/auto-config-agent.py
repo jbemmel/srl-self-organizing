@@ -344,7 +344,11 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
            "bgp-instance": [
             { "id": 1,
               # "export-policy": f"add-rt-{state.base_as}-{port}",
-              "route-target": { "export-rt": rt, "import-rt": rt }
+              "route-target": {
+               "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
+               "export-rt": rt,
+               "import-rt": rt
+              }
             }
            ]
          }
