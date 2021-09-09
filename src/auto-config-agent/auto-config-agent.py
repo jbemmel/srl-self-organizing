@@ -113,7 +113,9 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur = state.lag_state[ lldp_peer_name ]
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
-            _ip = str( list(state.peerlinks[int(port) - 1].hosts())[0] ) + '/31'
+            _p = f"/{state.peerlinks_size}"
+            _i = 0 if state.peerlinks_size==31 else 1
+            _ip = str( list(state.peerlinks[int(port) - 1].hosts())[_i] ) + _p
             Convert_to_lag( state, cur[state.router_id], _ip, True ) # EVPN MC-lag
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
@@ -253,7 +255,7 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
       "ipv4": {
         "address": [
           {
-            "ip-prefix": ip, # /31 link IP
+            "ip-prefix": ip, # /31 link IP (or .1 out of /28-30)
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ]
@@ -426,9 +428,11 @@ def Handle_Notification(obj, state):
                 if 'role' in data:
                     state.role = data['role'][5:] # strip "ROLE_"
                     logging.info(f"Got role :: {state.role}")
-                if 'peerlinks_prefix' in data:
-                    state.peerlinks_prefix = data['peerlinks_prefix']['value']
-                    state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=31))
+                if 'peerlinks' in data:
+                    peerlinks = data['peerlinks']
+                    state.peerlinks_prefix = peerlinks['prefix']['value']
+                    state.peerlinks_size = int( peerlinks['subnet_size']['value'] )
+                    state.peerlinks = list(ipaddress.ip_network(data['peerlinks_prefix']['value']).subnets(new_prefix=state.peerlinks_size))
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                     state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
@@ -611,8 +615,13 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
      if not state.use_bgp_unnumbered or peer_type=='host':
-       _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
-       _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+       if state.peerlinks_size == 31:
+         _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
+         _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+       else:
+         _p = f"/{state.peerlinks_size}"
+         _ip = str( list(state.peerlinks[link_index].hosts())[1] ) + _p
+         _peer = str( list(state.peerlinks[link_index].hosts())[2] )
      else:
        _ip = ""
        _peer = "*"

@@ -503,7 +503,9 @@ fi
 #  _VLAN='"srl_nokia-interfaces-vlans:vlan": { "encap": { "single-tagged": { "vlan-id": 1 } } },'
 #fi
 if [[ "${IP_PREFIX}" != "" ]]; then
-_IP127="${IP_PREFIX//\/31/\/127}"
+
+# XXX TODO fix non-31 prefix for ipv6
+_IP127="${IP_PREFIX//\/[23][0-9]/\/127}"
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
  "ipv6": { "address": [ { "ip-prefix": "2001::${_IP127//\./:}" } ] }
