@@ -38,9 +38,17 @@ This example uses OSPFv3 to exchange loopback routes within the fabric, iBGP v4/
 * Spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
 * Global AS set to unique leaf AS, could also use single global AS such that EVPN auto route-targets would work
+* Host subnet size is configurable, default /31 (but Linux hosts may or may not support that)
 
 ## EVPN overlay
 The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
+
+The agent supports both *asymmetric* and *symmetric* IRB configuration models, and will annotate the configuration to highlight the difference.
+One can use 
+```
+info from state /platform linecard 1 forwarding-complex 0 datapath
+```
+to explore differences in resource usage and scaling.
 
 ## Using LLDP for signalling topology changes
 To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modifies the system name:
