@@ -120,11 +120,17 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
+#
+# Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
+# A:B:C where A is the access port and B,C each include 3 bytes (hex)
+#
 def Create_Ext_Community(chassis_mac,port):
     logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
-    bytes = [ str(int(b,16)) for b in chassis_mac.split(':')[:4] ]
+    bytes = chassis_mac.split(':')
+    c_b = ''.join( bytes[0:3] )
+    c_c = ''.join( bytes[3:6] )
     marker = "origin:65537:0" # Well-known LLDP event community, static
-    value = { "member": [ f"origin:{'.'.join(bytes)}:{port}", marker ] }
+    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}", marker ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
