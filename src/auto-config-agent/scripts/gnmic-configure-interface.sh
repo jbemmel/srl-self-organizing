@@ -504,11 +504,16 @@ fi
 #fi
 if [[ "${IP_PREFIX}" != "" ]]; then
 
-# Replace ipv4 prefix with /64 for ipv6
-_IP64="${IP_PREFIX//\/[23][0-9]/\/64}"
+# Replace ipv4 prefix with /127 for ipv6
+if [[ "$PEER_TYPE" != "host" ]]; then
+_IP127=":${IP_PREFIX//\/31/\/127}"
+else
+# Use /64 towards each host
+_IP127="${IP_PREFIX//\/[23][0-9]/::\/64}"
+fi
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
- "ipv6": { "address": [ { "ip-prefix": "2001:${_IP64//\./:}::" } ] }
+ "ipv6": { "address": [ { "ip-prefix": "2001:${_IP127//\./:}" } ] }
 EOF
 else
 # Enable IPv4+IPv6 but don't put addresses (yet)
