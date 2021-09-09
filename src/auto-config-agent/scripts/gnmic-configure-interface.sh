@@ -401,7 +401,8 @@ IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
   ]
 }
 EOF
-
+else
+L3_VXLAN_INTERFACE='"_annotate": "This is asymmetric IRB, no BGP-EVPN or vxlan interface in this ip-vrf",'
 fi
 
 # Create a sample BGP policy to convert customer AS to ext community (origin)
