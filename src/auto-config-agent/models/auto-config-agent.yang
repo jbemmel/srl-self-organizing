@@ -99,7 +99,7 @@ module auto_config_agent {
                 type enumeration {
                   enum asymmetric-irb;
                   enum symmetric-irb;
-                  enum disabled
+                  enum disabled;
                 }
                 default "disabled";
             }
