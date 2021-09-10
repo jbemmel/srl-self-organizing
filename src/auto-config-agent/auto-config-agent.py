@@ -131,7 +131,7 @@ def Create_Ext_Community(state,chassis_mac,port):
     c_c = ''.join( bytes[3:6] )
     # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
     rt = f"target:{state.base_as}:0" # RT for the cluster AS
-    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}", rt ] }
+    value = { "member": [ rt, f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
