@@ -135,8 +135,8 @@ module auto_config_agent {
                 type boolean;
                 default true;
             }
-            leaf auto-lags {
-                description "Discover and provision LAGs on leaves, using LLDP";
+            leaf evpn-auto-lags {
+                description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
                 type boolean;
                 default true;
             }

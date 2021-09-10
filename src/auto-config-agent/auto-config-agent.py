@@ -593,8 +593,8 @@ def Handle_Notification(obj, state):
                     state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
-                if 'auto_lags' in data:
-                    state.auto_lags = data['auto_lags']['value']
+                if 'evpn_auto_lags' in data:
+                    state.evpn_auto_lags = data['evpn_auto_lags']['value']
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
@@ -729,8 +729,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       peer_type = 'host'
 
       # For access ports, announce LLDP events if auto_lags is enabled
-      if state.auto_lags:
-         Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
+      # if state.auto_lags:
+      #     Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
   else:
     _r = 1
@@ -877,7 +877,8 @@ def Run():
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
-                       EVPNRouteMonitoringThread(state).start()
+                       if state.evpn_auto_lags:
+                          EVPNRouteMonitoringThread(state).start()
 
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
