@@ -8,6 +8,8 @@ topology:
       # Uses custom container image containing auto-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
       image: srl/auto-config:latest
+      extras:
+        srl-agents: [ auto-config-agent.yml ]
     #binds:
     #  - ./appmgr:/etc/opt/srlinux/appmgr:ro
     linux:

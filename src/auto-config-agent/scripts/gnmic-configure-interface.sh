@@ -79,6 +79,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
+cp $temp_file /tmp/debug_ospf_config.json
 $GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
 exitcode+=$?
 fi
