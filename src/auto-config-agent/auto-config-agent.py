@@ -130,8 +130,7 @@ def Create_Ext_Community(state,chassis_mac,port):
     c_b = ''.join( bytes[0:3] )
     c_c = ''.join( bytes[3:6] )
     # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
-    rt = f"target:{state.base_as}:0" # RT for the cluster AS
-    value = { "member": [ rt, f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
+    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
@@ -491,7 +490,9 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
    }
 
    policy_name = "export-lldp-communities-for-mc-lag-discovery"
+   lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS
    lldp_export_policy = {
+     "community-set": [ { "name": "LLDP", "member": [ lldp_rt ], } ],
      "policy": [
       {
        "name": policy_name,
@@ -524,7 +525,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
            "export-policy": policy_name,
            "route-target": {
             "_annotate": "Special RT for EVPN LAG coordination",
-            "import-rt": f"target:{state.base_as}:0"
+            "import-rt": lldp_rt
            }
             }
            ]
