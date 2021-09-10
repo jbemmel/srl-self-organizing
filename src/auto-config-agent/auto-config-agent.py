@@ -172,7 +172,7 @@ class EVPNRouteMonitoringThread(Thread):
                 logging.info( f"Update: {update['update']}")
 
                 # TODO check if routes changed
-                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:0][ethernet-tag-id=0]"
+                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Routes: {data}" )
 
@@ -490,7 +490,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
    }
 
    policy_name = "export-lldp-communities-for-mc-lag-discovery"
-   lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS
+   lldp_rt = f"target:{state.base_as}:1" # RT for the cluster AS
    lldp_export_policy = {
      "community-set": [ { "name": "LLDP", "member": [ lldp_rt ], } ],
      "policy": [
@@ -515,7 +515,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
           "id": 1,
           "admin-state": "enable",
           "vxlan-interface": "vxlan0.1",
-          "evi": 1,
+          "evi": 1, # auto-RD == <router-ID>:1
         }
        ]
       },
