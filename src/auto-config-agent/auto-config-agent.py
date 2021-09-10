@@ -642,6 +642,9 @@ def Handle_Notification(obj, state):
             router_id_changed = True
             if state.role != "endpoint":
                Set_Default_Systemname( state )
+               if state.get_role()=="leaf" and state.evpn_auto_lags:
+                  # XXX assumes router_id wont change after this point
+                  EVPNRouteMonitoringThread(state).start()
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
@@ -877,8 +880,6 @@ def Run():
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
-                       if state.evpn_auto_lags:
-                          EVPNRouteMonitoringThread(state).start()
 
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
