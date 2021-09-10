@@ -131,9 +131,23 @@ def Create_Ext_Community(state,chassis_mac,port):
     c_c = ''.join( bytes[3:6] )
     # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
     value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
+
+    # Toggle a special IP address on lo0.1 to trigger route count updates
+    ip99 = { 'ip-prefix': '99.99.99.99/32' }
+    toggle_ip = (f'/interface[name=lo0]/subinterface[index=1]/ipv4/address', ip99)
+
+    updates = [('/routing-policy/community-set[name=LLDP]',value)]
+    if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
+        state.toggle_route_update = True
+        updates.append( toggle_ip )
+        deletes = []
+    else:
+        state.toggle_route_update = False
+        deletes = [ toggle_ip ]
+
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
-       c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
+       c.set( encoding='json_ietf', update=updates, delete=deletes )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
 from threading import Thread
@@ -171,10 +185,10 @@ class EVPNRouteMonitoringThread(Thread):
             if update['update']:
                 logging.info( f"Update: {update['update']}")
 
-                # TODO check if routes changed
-                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]"
+                # Assume routes changed, get attributes
+                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
-                logging.info( f"Routes: {data}" )
+                logging.info( f"Attribute set IDs: {data}" )
 
     logging.info("Leaving gNMI subscribe loop")
 
