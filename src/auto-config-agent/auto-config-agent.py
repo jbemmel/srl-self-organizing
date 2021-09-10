@@ -136,6 +136,49 @@ def Create_Ext_Community(state,chassis_mac,port):
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
 
+# Upon changes in EVPN route counts, check for updated LAG communities
+from threading import Thread
+class EVPNRouteMonitoringThread(Thread):
+   def __init__(self,state):
+       Thread.__init__(self)
+       self.state = state
+
+   def run(self):
+    subscribe = {
+      'subscription': [
+          {
+              'path': '/network-instance[name=default]/protocols/bgp/evpn',
+              'mode': 'on_change'
+          }
+      ],
+      'use_aliases': False,
+      # 'updates_only': True, # Optional
+      'mode': 'stream',
+      'encoding': 'json'
+    }
+    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                          username="admin",password="admin",
+                          insecure=True, debug=False) as c:
+
+      CreateEVPNCommunicationVRF( self.state, c )
+
+      telemetry_stream = c.subscribe(subscribe=subscribe)
+      for m in telemetry_stream:
+        if m.HasField('update'): # both update and delete events
+            # Filter out only toplevel events
+            parsed = telemetryParser(m)
+            logging.info(f"gNMI change event :: {parsed}")
+            update = parsed['update']
+            if update['update']:
+                logging.info( f"Update: {update['update']}")
+
+                # TODO check if routes changed
+                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:0][ethernet-tag-id=0]"
+                data = c.get(path=[p], encoding='json_ietf')
+                logging.info( f"Routes: {data}" )
+
+    logging.info("Leaving gNMI subscribe loop")
+
 ############################################################
 ## Function to populate state of agent config
 ## using telemetry -- add/update info from state
@@ -415,6 +458,88 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', update=updates )
+
+#
+# Creates a special IP-VRF to announce a loopback RT5 route with extended
+# communities based on discovered LLDP peers (MAC addresses)
+#
+def CreateEVPNCommunicationVRF(state,gnmiClient):
+   logging.info("CreateEVPNCommunicationVRF")
+
+   lo0_1_if = {
+    "admin-state": "enable",
+    "subinterface": [
+     {
+      "index": 1,
+      "admin-state": "enable",
+      "ipv4": {
+        "address": [
+          {
+            "ip-prefix": state.router_id + '/32',
+          }
+        ]
+      }
+     }
+    ]
+   }
+
+   # Routed VXLAN interface
+   vxlan_if = {
+      "type": "srl_nokia-interfaces:routed",
+      "ingress": { "vni": 1 },
+      "egress": { "source-ip": "use-system-ipv4-address" }
+   }
+
+   policy_name = "export-lldp-communities-for-mc-lag-discovery"
+   lldp_export_policy = {
+     "policy": [
+      {
+       "name": policy_name,
+       "default-action": {
+         "accept": { "bgp": { "communities": { "add": "LLDP" } } }
+       }
+      }
+     ]
+   }
+
+   ip_vrf = {
+     "type": "srl_nokia-network-instance:ip-vrf",
+     "admin-state": "enable",
+     "interface": [ { "name": "lo0.1" } ],
+     "vxlan-interface": [ { "name": "vxlan0.1" } ],
+     "protocols": {
+      "bgp-evpn": {
+       "srl_nokia-bgp-evpn:bgp-instance": [
+        {
+          "id": 1,
+          "admin-state": "enable",
+          "vxlan-interface": "vxlan0.1",
+          "evi": 1,
+        }
+       ]
+      },
+      "srl_nokia-bgp-vpn:bgp-vpn": {
+        "bgp-instance": [
+         { "id": 1,
+           "export-policy": policy_name,
+           "route-target": {
+            "_annotate": "Special RT for EVPN LAG coordination",
+            "import-rt": f"target:{state.base_as}:0"
+           }
+            }
+           ]
+         }
+     }
+   }
+
+   updates=[ (f'/interface[name=lo0]', lo0_1_if),
+             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=1]', vxlan_if ),
+             ('/routing-policy', lldp_export_policy),
+             (f'/network-instance[name=evpn-lag-discovery]', ip_vrf),
+           ]
+
+   logging.info(f"gNMI SET updates={updates}" )
+   gnmiClient.set( encoding='json_ietf', update=updates )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -752,6 +877,7 @@ def Run():
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
+                       EVPNRouteMonitoringThread(state).start()
 
                     # Program router_id only when changed
                     # if state.router_id != old_router_id:
