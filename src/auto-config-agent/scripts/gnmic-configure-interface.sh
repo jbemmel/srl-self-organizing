@@ -192,7 +192,11 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
     }
 },
 "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
-"evpn": { "rapid-update": true },
+"evpn": {
+ "rapid-update": true ,
+ "keep-all-routes": true,
+ "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
+},
 "group": [
     {
       "group-name": "fellow-spines",
