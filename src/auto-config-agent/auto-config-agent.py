@@ -132,16 +132,17 @@ def Create_Ext_Community(state,chassis_mac,port):
     # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
     value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
 
-    # Toggle a special IP address on lo0.1 to trigger route count updates
-    ip99 = { 'ip-prefix': '99.99.99.99/32' }
-    toggle_ip = (f'/interface[name=lo0]/subinterface[index=1]/ipv4/address', ip99)
-
     updates = [('/routing-policy/community-set[name=LLDP]',value)]
-    if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
+    deletes = []
+    if state.evpn_auto_lags:
+     # Toggle a special IP address on lo0.1 to trigger route count updates
+     ip99 = { 'ip-prefix': '99.99.99.99/32' }
+     toggle_ip = (f'/interface[name=lo0]/subinterface[index=1]/ipv4/address', ip99)
+
+     if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
         state.toggle_route_update = True
         updates.append( toggle_ip )
-        deletes = []
-    else:
+     else:
         state.toggle_route_update = False
         deletes = [ toggle_ip ]
 
