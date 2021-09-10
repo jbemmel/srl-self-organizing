@@ -136,15 +136,16 @@ def Create_Ext_Community(state,chassis_mac,port):
     deletes = []
     if state.evpn_auto_lags:
      # Toggle a special IP address on lo0.1 to trigger route count updates
-     ip99 = { 'ip-prefix': '99.99.99.99/32' }
-     toggle_ip = (f'/interface[name=lo0]/subinterface[index=1]/ipv4/address', ip99)
+     ip99 = '99.99.99.99/32'
+     ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv4/address'
 
      if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
         state.toggle_route_update = True
-        updates.append( toggle_ip )
+        updates.append( (ip_path, { 'ip-prefix': '99.99.99.99/32' } ) )
      else:
         state.toggle_route_update = False
-        deletes = [ toggle_ip ]
+        deletes = [ ip_path + f"[ip-prefix={ip99}]" ]
+     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
 
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
@@ -186,10 +187,19 @@ class EVPNRouteMonitoringThread(Thread):
             if update['update']:
                 logging.info( f"Update: {update['update']}")
 
-                # Assume routes changed, get attributes
+                # Assume routes changed, get attributes. TODO need RD too
                 p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Attribute set IDs: {data}" )
+                for n in data['notification']:
+                   if 'update' in n: # Update is empty when path is invalid
+                     for u2 in n['update']:
+                        logging.info( f"Update {u2['path']}={u2['val']}" )
+                        attr_id = u2['val']['ip-prefix-routes'][0]['attr-id']
+                        p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
+                        comms = c.get(path=[p2], encoding='json_ietf')
+                        logging.info( f"Communities: {comms}" )
+
 
     logging.info("Leaving gNMI subscribe loop")
 
