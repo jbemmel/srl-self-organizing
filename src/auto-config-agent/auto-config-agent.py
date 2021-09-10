@@ -187,7 +187,7 @@ class EVPNRouteMonitoringThread(Thread):
             if update['update']:
                 logging.info( f"Update: {update['update']}")
 
-                # Assume routes changed, get attributes. TODO need RD too
+                # Assume routes changed, get attributes.
                 p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Attribute set IDs: {data}" )
@@ -195,11 +195,19 @@ class EVPNRouteMonitoringThread(Thread):
                    if 'update' in n: # Update is empty when path is invalid
                      for u2 in n['update']:
                         logging.info( f"Update {u2['path']}={u2['val']}" )
-                        attr_id = u2['val']['ip-prefix-routes'][0]['attr-id']
+                        route = u2['val']['ip-prefix-routes'][0]
+                        attr_id = route['attr-id']
+                        peer_id = route['ip-prefix'] # /32 loopback IP
+
                         p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
                         comms = c.get(path=[p2], encoding='json_ietf')
                         logging.info( f"Communities: {comms}" )
-
+                        for n2 in data['notification']:
+                           if 'update' in n2: # Update is empty when path is invalid
+                             for u3 in n2['update']:
+                                logging.info( f"Update {u3['path']}={u3['val']}" )
+                                lldp_ports = u3['val']['attr-set'][0]['communities']['large-community']
+                                logging.info( f"LLDP Communities from {peer_id}: {lldp_ports}" )
 
     logging.info("Leaving gNMI subscribe loop")
 
