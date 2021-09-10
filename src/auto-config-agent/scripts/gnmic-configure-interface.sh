@@ -19,6 +19,8 @@ PEER_ROUTER_ID="${12}"
 OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
 USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 
+echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
