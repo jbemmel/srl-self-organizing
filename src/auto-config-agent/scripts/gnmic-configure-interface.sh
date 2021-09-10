@@ -299,7 +299,11 @@ EVPN_RR_GROUP=",$EVPN_RR_GROUP"
 fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
-"evpn": { "rapid-update": true },
+"evpn": {
+  "rapid-update": true,
+  "keep-all-routes": true,
+  "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
+},
 "preference": {
  "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },
 $DEFAULT_DYNAMIC_HOST_PEERING
