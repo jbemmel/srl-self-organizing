@@ -610,7 +610,7 @@ def Handle_Notification(obj, state):
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
-                    state.evpn_auto_lags = data['evpn_auto_lags']['value']
+                    state.evpn_auto_lags = data['evpn_auto_lags']['value'] and state.evpn!="disabled"
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
