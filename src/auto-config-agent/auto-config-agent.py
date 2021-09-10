@@ -124,13 +124,14 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 # Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
 # A:B:C where A is the access port and B,C each include 3 bytes (hex)
 #
-def Create_Ext_Community(chassis_mac,port):
+def Create_Ext_Community(state,chassis_mac,port):
     logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
     bytes = chassis_mac.split(':')
     c_b = ''.join( bytes[0:3] )
     c_c = ''.join( bytes[3:6] )
-    marker = "origin:65537:0" # Well-known LLDP event community, static
-    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}", marker ] }
+    # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
+    rt = f"target:{state.base_as}:0" # RT for the cluster AS
+    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}", rt ] }
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=[('/routing-policy/community-set[name=LLDP]',value)] )
@@ -524,7 +525,7 @@ def Handle_Notification(obj, state):
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
           if state.get_role() == "leaf":
-             Create_Ext_Community( obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
+             Create_Ext_Community( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
 
           if router_id_changed:
              for intf in state.pending_peers:
