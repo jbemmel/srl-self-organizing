@@ -196,21 +196,21 @@ class EVPNRouteMonitoringThread(Thread):
 
                 # Assume routes changed, get attributes.
                 # XXX assumes port 1 is not an access port, VXLAN interface ID would overlap
-                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]/attr-id"
+                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:1]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Attribute set IDs: {data}" )
                 for n in data['notification']:
                    if 'update' in n: # Update is empty when path is invalid
                      for u2 in n['update']:
                         logging.info( f"Update {u2['path']}={u2['val']}" )
-                        route = u2['val']['ip-prefix-routes'][0]
-                        attr_id = route['attr-id']
-                        peer_id = route['ip-prefix'].split('/')[0] # /32 loopback IP
+                        for route in u2['val']['ip-prefix-routes']:
+                          attr_id = route['attr-id']
+                          peer_id = route['ip-prefix'].split('/')[0] # /32 loopback IP
 
-                        p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
-                        comms = c.get(path=[p2], encoding='json_ietf')
-                        logging.info( f"Communities: {comms}" )
-                        for n2 in comms['notification']:
+                          p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
+                          comms = c.get(path=[p2], encoding='json_ietf')
+                          logging.info( f"Communities: {comms}" )
+                          for n2 in comms['notification']:
                            if 'update' in n2: # Update is empty when path is invalid
                              for u3 in n2['update']:
                                 logging.info( f"Update {u3['path']}={u3['val']}" )
@@ -223,6 +223,7 @@ class EVPNRouteMonitoringThread(Thread):
                                         lag_port = self.state.lldp_communities[ key ]
                                         logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
                                         try:
+                                           # This repeatedly provisions the same thing...
                                            Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0] )
                                         except Exception as ex:
                                            logging.error( f"BUG: {ex}" )
