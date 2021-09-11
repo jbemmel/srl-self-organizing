@@ -3,7 +3,7 @@
 What if network nodes would auto-configure themselves?
 
 This basic example offers a starting point for a Python-based SR Linux agent that configures the local node.
-Each node has a generic config, and is configured with peering links and eBGP related parameters based on LLDP
+Each node has a generic config, and is configured with peering links and IGP related parameters based on LLDP
 
 What is demonstrated:
 * How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/appmgr)
@@ -14,7 +14,7 @@ What is demonstrated:
 2 roles currently supported: Spine or Leaf
 * All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
 * Could auto-determine role: Some links connected but no LLDP or MAC address instead of SRL port name -> assume this is a leaf node, otherwise spine
-* For now: role is an agent parameter
+* For now and to keep things simple: role is an agent parameter
 
 YANG model provides parameters:
 * role: leaf|spine|superspine
@@ -28,17 +28,21 @@ YANG model provides parameters:
 ## Deploy lab
 1. Checkout and build the base image from https://github.com/jbemmel/srl-baseimage
 2. Checkout the project from git
-3. `cd Docker && make build` -> this creates a local Docker image called 'srl/auto-config'
-4. `sudo clab deploy -t ./srl-leafspine.lab`
+3. `make -C ./Docker` -> this creates a local Docker image called 'srl/auto-config'
+4. `sudo clab deploy -t ./srl-leafspine.lab` -> this creates a lab with 4 leaves and various MC-LAG variations
 
 ## Networking design details
-This example uses OSPFv3 to exchange loopback routes within the fabric, iBGP v4/v6 towards Linux hosts and iBGP EVPN between leaves and spine route-reflectors
-* Spines share a private base AS, each leaf gets a unique leaf AS (though currently not used)
-* Interfaces use /31 IPv4 link addresses (required for VXLAN v4), OSPFv3 uses IPv6 link-local addresses (TODO link-local with BGP unnumbered)
+This example uses:
+* Either OSPFv3 or BGP unnumbered to exchange loopback routes within the fabric, 
+* (optional) eBGP v4/v6 towards Linux hosts
+* iBGP EVPN between leaves and spine route-reflectors, with VXLAN overlay
+* Spines share a private base AS, each leaf gets a unique leaf AS
+* Interfaces use /31 IPv4 link addresses (required for VXLAN v4), OSPFv3 uses IPv6 link-local addresses
 * Spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
 * Global AS set to unique leaf AS, could also use single global AS such that EVPN auto route-targets would work
 * Host subnet size is configurable, default /31 (but Linux hosts may or may not support that)
+* [NEW] EVPN auto LAG discovery based on LLDP and Large Communities (RFC8092)
 
 ## EVPN overlay
 The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
@@ -50,7 +54,72 @@ info from state /platform linecard 1 forwarding-complex 0 datapath
 ```
 to explore differences in resource usage and scaling.
 
-## Using LLDP for signalling topology changes
+## EVPN based signalling for MultiHoming LAGs
+The agent listens for LLDP events from the SR Linux NDK, and populates a BGP Community set with encoded port and MAC information for each neighbor.
+It then configures a special control-plane-only IP VRF with a loopback ( == router ID ) to announce an RT5 IP Prefix route with the LLDP information.
+By listening for route count changes, each agent detects changes in LLDP communities, and updates its local MH configuration (Ethernet Segments with ESI).
+
+Optionally, the agent could stop listening once all links are discovered, and/or one could disable BGP for the IP VRF. For this demo, the agent simply keeps listening indefinitely.
+
+Sample annotated configuration snippets:
+```
+A:leaf-1-1.1.1.1# /system network-instance                                                                                                                                                                         
+--{ + running }--[ system network-instance ]--                                                                                                                                                                     
+A:leaf-1-1.1.1.1# info                                                                                                                                                                                             
+    protocols {
+        evpn {
+            ethernet-segments {
+                bgp-instance 1 {
+                    ethernet-segment mc-lag3 {
+                        admin-state enable
+                        esi 00:12:12:12:12:12:12:00:00:03 !!! EVPN MC-LAG with [('1.1.1.2', '3')]
+                        interface lag3
+                        multi-homing-mode all-active
+                    }
+                    ethernet-segment mc-lag4 {
+                        admin-state enable
+                        esi 00:12:12:12:12:12:12:00:00:04 !!! EVPN MC-LAG with [('1.1.1.2', '4'), ('1.1.1.3', '4'), ('1.1.1.4', '4')]
+                        interface lag4
+                        multi-homing-mode all-active
+                    }
+                }
+            }
+        }
+        bgp-vpn {
+            bgp-instance 1 {
+            }
+        }
+    }
+```
+
+`
+A:leaf-1-1.1.1.1# /interface irb0                                                                                                                                                                                  
+--{ + running }--[ interface irb0 ]--                                                                                                                                                                              
+A:leaf-1-1.1.1.1# info                                                                                                                                                                                             
+    admin-state enable
+    subinterface 3 {
+        admin-state enable
+        ipv4 {
+            address 192.168.127.9/30 {
+                primary
+            }
+            arp {
+                learn-unsolicited true !!! To support MC-LAG, see https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf p72
+                evpn {
+                    advertise dynamic {
+                        !!! for ARP synchronization across MH leaf nodes
+                    }
+                }
+            }
+        }
+        ipv6 {
+        }
+        anycast-gw {
+        }
+    }
+`
+
+## Using LLDP for signalling topology changes (deprecated)
 To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modifies the system name:
 1. LLDP Port ethernet/1-1: h1 event received
 2. Leaf1 modifies its system name: \<system ID\>-1-h1 (e.g. "1.1.1.1-1-h1")
