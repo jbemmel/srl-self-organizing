@@ -92,7 +92,7 @@ A:leaf-1-1.1.1.1# info
     }
 ```
 
-`
+```
 A:leaf-1-1.1.1.1# /interface irb0                                                                                                                                                                                  
 --{ + running }--[ interface irb0 ]--                                                                                                                                                                              
 A:leaf-1-1.1.1.1# info                                                                                                                                                                                             
@@ -117,7 +117,7 @@ A:leaf-1-1.1.1.1# info
         anycast-gw {
         }
     }
-`
+```
 
 ## Using LLDP for signalling topology changes (deprecated)
 To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modifies the system name:
