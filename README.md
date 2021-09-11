@@ -6,9 +6,10 @@ This basic example offers a starting point for a Python-based SR Linux agent tha
 Each node has a generic config, and is configured with peering links and IGP related parameters based on LLDP
 
 What is demonstrated:
-* How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/appmgr)
-* How to [register to receive LLDP events](https://github.com/jbemmel/srl-self-organizing/blob/main/appmgr/auto-config-agent.py#L47)
-* How to [use gnmic to send JSON configuration to the local node](https://github.com/jbemmel/srl-self-organizing/blob/main/appmgr/gnmic-configure-interface.sh) ( note: just as a Proof-of-Concept )
+* How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/src/auto-config-agent)
+* How to [register to receive LLDP events](https://github.com/jbemmel/srl-self-organizing/blob/main/src/auto-config-agent/auto-config-agent.py#L57)
+* How to [use gnmic to send JSON configuration to the local node](https://github.com/jbemmel/srl-self-organizing/blob/main/src/auto-config-agent/scripts/gnmic-configure-interface.sh) ( note: just as a Proof-of-Concept )
+* How to [use Python (pygnmic) to change configuration](https://github.com/jbemmel/srl-self-organizing/blob/main/src/auto-config-agent/auto-config-agent.py#L458)
 * How to [build a custom Docker container](https://github.com/jbemmel/srl-self-organizing/tree/main/Docker) containing the sources
 
 2 roles currently supported: Spine or Leaf
@@ -23,9 +24,10 @@ YANG model provides parameters:
   ( For example: 192.168.0.0/24, spine1=192.168.0.0/31 and leaf1=192.168.0.1/31 )
 * Loopback prefix: IP/mask for generating loopbacks
   ( For example: 1.1.0.0/23, spine1=1.1.0.1 and leaf1=1.1.1.1 )
-* Max number of spines/leaves in the topology
+* Max number of spines/leaves/hosts-per-leaf in the topology
 * Whether to enable EVPN, and what model (symmetric/asymmetric IRB)
 * Whether to enable EVPN based auto provisioning of MC-LAGs (default: true)
+* Whether to use OSPFv3 or BGP Unnumbered (based on FRR agent)
 
 ## Deploy lab
 1. Checkout and build the base image from https://github.com/jbemmel/srl-baseimage
