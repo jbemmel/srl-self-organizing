@@ -165,11 +165,11 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
        pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,3) ]
        # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
        # Set 'local' bit -> 0xfd
-       encoded_ipv6 = f'fd00::{int(port):02x}:{":".join(pairs)}/128'
+       encoded_ipv6 = f'fdad::{int(port):02x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
                    "_annotate": f"for EVPN auto-lag discovery on port {port}" } ] } ) ]
 
-       state.local_lldp[ chassis_mac ] = port
+       state.local_lldp[ chassis_mac ] = port # MAC uses CAPITALS
     else:
         logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
         return False
@@ -276,6 +276,11 @@ class EVPNRouteMonitoringThread(Thread):
              peer_id = route['route-distinguisher']
              encoded_lldp = route['ip-prefix'].split('/')[0] # /128 loopback IP
              logging.info( f"TODO: Process {encoded_lldp} from {peer_id}" )
+             mac = ":".join( [ f'{(i>>8):02X}:{(i&0xff):02X}'
+                               for b in encoded_lldp.split(':')[3:]
+                               for i in [int(b,16)] ] )
+             if mac in self.state.local_lldp:
+                 logging.info( f"Match: {self.state.local_lldp[mac]}" )
 
 ############################################################
 ## Function to populate state of agent config
@@ -621,6 +626,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
           "admin-state": "enable",
           "vxlan-interface": "vxlan0.65535",
           "evi": 65535, # auto-RD == <router-ID>:65535
+          "default-admin-tag": 0xfdad
         }
        ]
       },
