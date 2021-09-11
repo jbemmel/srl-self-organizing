@@ -113,10 +113,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur = state.lag_state[ lldp_peer_name ]
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
-            _p = f"/{state.hostlinks_size}"
-            # hosts() lists .1 and .2 in case of /30
-            _ip = str( list(state.hostlinks[int(port) - 1].hosts())[0] ) + _p
-            Convert_to_lag( state, cur[state.router_id], _ip, True ) # EVPN MC-lag
+            Convert_lag_to_mc_lag( state, port, leaf_ip )
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
@@ -124,13 +121,23 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 # Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
 # A:B:C where A is the access port and B,C each include 3 bytes (hex)
 #
+# Spine AS is included in the Route Target, so matches are scoped to cluster
+#
+# TODO could signal lag parameters (LACP or not, etc.) for consistency check
+# Could also use different RT for each (implies same lag type for all per switch)
+#
 def Create_Ext_Community(state,chassis_mac,port):
     logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
     bytes = chassis_mac.split(':')
     c_b = ''.join( bytes[0:3] )
     c_c = ''.join( bytes[3:6] )
     # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
-    value = { "member": [ f"{port}:{int(c_b,16)}:{int(c_c,16)}" ] }
+
+    lldp_community = f"{int(c_b,16)}:{int(c_c,16)}"
+    value = { "member": [ f"{port}:" + lldp_community ] }
+
+    # Save locally too, excluding port
+    state.lldp_communities[ lldp_community ] = port
 
     updates = [('/routing-policy/community-set[name=LLDP]',value)]
     deletes = []
@@ -188,6 +195,7 @@ class EVPNRouteMonitoringThread(Thread):
                 logging.info( f"Update: {update['update']}")
 
                 # Assume routes changed, get attributes.
+                # XXX assumes port 1 is not an access port, VXLAN interface ID would overlap
                 p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[neighbor=*][ip-prefix-length=32][ip-prefix=*/32][route-distinguisher=*:1][ethernet-tag-id=0]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Attribute set IDs: {data}" )
@@ -197,17 +205,24 @@ class EVPNRouteMonitoringThread(Thread):
                         logging.info( f"Update {u2['path']}={u2['val']}" )
                         route = u2['val']['ip-prefix-routes'][0]
                         attr_id = route['attr-id']
-                        peer_id = route['ip-prefix'] # /32 loopback IP
+                        peer_id = route['ip-prefix'].split('/')[0] # /32 loopback IP
 
                         p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
                         comms = c.get(path=[p2], encoding='json_ietf')
                         logging.info( f"Communities: {comms}" )
-                        for n2 in data['notification']:
+                        for n2 in comms['notification']:
                            if 'update' in n2: # Update is empty when path is invalid
                              for u3 in n2['update']:
                                 logging.info( f"Update {u3['path']}={u3['val']}" )
                                 lldp_ports = u3['val']['attr-set'][0]['communities']['large-community']
-                                logging.info( f"LLDP Communities from {peer_id}: {lldp_ports}" )
+                                logging.info( f"LLDP Communities from {peer_id}: {sorted(lldp_ports)}" )
+                                for p in lldp_ports:
+                                    parts = p.split(':')
+                                    key = parts[1] + ':' + parts[2]
+                                    if key in self.state.lldp_communities:
+                                        lag_port = self.state.lldp_communities[ key ]
+                                        logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
+                                        Convert_lag_to_mc_lag( state, lag_port, peer_id )
 
     logging.info("Leaving gNMI subscribe loop")
 
@@ -303,8 +318,8 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # Converts an ethernet interface to a lag, creating a mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} evpn_mclag={evpn_mclag} vrf={vrf}")
+def Convert_to_lag(state,port,ip,vrf="overlay"):
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
              f'/interface[{eth}]/subinterface[index=*]',
@@ -355,29 +370,6 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
          "ip-prefix": state.anycast_gw,
          "anycast-gw": True
        } )
-
-   # EVPN MC-LAG
-   sys_bgp_evpn = {
-    "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
-    "evpn": {
-     "ethernet-segments": {
-      "bgp-instance": [
-        {
-          "id": 1,
-          "ethernet-segment": [
-            {
-              "name": f"lag{port}",
-              "admin-state": "enable",
-              "esi": f"00:12:12:12:12:12:12:00:00:{int(port):02x}",
-              "interface": f"lag{port}",
-              "multi-homing-mode": "all-active"
-            }
-          ]
-        }
-      ]
-     }
-    }
-   }
 
    # EVPN VXLAN interface
    vxlan_if = {
@@ -453,13 +445,55 @@ def Convert_to_lag(state,port,ip,evpn_mclag,vrf="overlay"):
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
          # ('/routing-policy', export_policy)
        ]
-   if evpn_mclag:
-       updates += [ ('/system/network-instance/protocols', sys_bgp_evpn ) ]
 
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', delete=deletes, update=updates )
+
+#
+# Called when an EVPN community match is discovered
+# Assumes lag is already created
+#
+def Convert_lag_to_mc_lag(state,port,peer_leaf):
+   logging.info(f"Convert_lag_to_mc_lag :: port={port} peer_leaf={peer_leaf}")
+
+   if port in state.mc_lags:
+      state.mc_lags[port].append( peer_leaf )
+   else:
+      state.mc_lags[port] = [ peer_leaf ]
+   peers = sorted( list( state.mc_lags.values() ) )
+
+   # EVPN MC-LAG
+   sys_bgp_evpn = {
+    "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
+    "evpn": {
+     "ethernet-segments": {
+      "bgp-instance": [
+        {
+          "id": 1,
+          "ethernet-segment": [
+            {
+              "name": f"mc-lag{port}",
+              "admin-state": "enable",
+              "esi": f"00:12:12:12:12:12:12:00:00:{int(port):02x}",
+              "_annotate_esi": f"EVPN MC-LAG with {peers}",
+              "interface": f"lag{port}",
+              "multi-homing-mode": "all-active"
+            }
+          ]
+        }
+      ]
+     }
+    }
+   }
+
+   updates = [ ('/system/network-instance/protocols', sys_bgp_evpn ) ]
+
+   logging.info(f"gNMI SET updates={updates}" )
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="admin",insecure=True) as c:
+      c.set( encoding='json_ietf', update=updates )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -686,8 +720,10 @@ def Handle_Notification(obj, state):
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
-          if state.get_role() == "leaf":
+          if state.get_role() == "leaf" and not "spine" in _peer_sys_name:
              Create_Ext_Community( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
+          else:
+             logging.info( f"Not creating LLDP Community for port {my_port_id} peer={_peer_sys_name}" )
 
           if router_id_changed:
              for intf in state.pending_peers:
@@ -818,7 +854,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      # For access ports, convert to L2 service if requested
      if peer_type=='host' and state.host_use_irb:
-        Convert_to_lag( state, lldp_my_port, _ip, False ) # No EVPN MC-LAG yet
+        Convert_to_lag( state, lldp_my_port, _ip ) # No EVPN MC-LAG yet
      else:
        logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
@@ -862,6 +898,8 @@ class State(object):
         self.lag_state = {}     # Used for auto-provisioning of LAGs
         self.host_use_irb = True
         self.use_bgp_unnumbered = False
+        self.lldp_communities = {}
+        self.mc_lags = {}
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
