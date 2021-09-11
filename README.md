@@ -24,6 +24,8 @@ YANG model provides parameters:
 * Loopback prefix: IP/mask for generating loopbacks
   ( For example: 1.1.0.0/23, spine1=1.1.0.1 and leaf1=1.1.1.1 )
 * Max number of spines/leaves in the topology
+* Whether to enable EVPN, and what model (symmetric/asymmetric IRB)
+* Whether to enable EVPN based auto provisioning of MC-LAGs (default: true)
 
 ## Deploy lab
 1. Checkout and build the base image from https://github.com/jbemmel/srl-baseimage
