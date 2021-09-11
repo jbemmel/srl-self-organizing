@@ -222,7 +222,7 @@ class EVPNRouteMonitoringThread(Thread):
                                     if key in self.state.lldp_communities:
                                         lag_port = self.state.lldp_communities[ key ]
                                         logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
-                                        Convert_lag_to_mc_lag( state, lag_port, peer_id )
+                                        Convert_lag_to_mc_lag( self.state, lag_port, peer_id )
 
     logging.info("Leaving gNMI subscribe loop")
 
@@ -720,10 +720,11 @@ def Handle_Notification(obj, state):
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
-          if state.get_role() == "leaf" and not "spine" in _peer_sys_name:
+          # Could also announce communities for spines
+          if state.get_role() == "leaf" and not "spine" in peer_sys_name:
              Create_Ext_Community( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
           else:
-             logging.info( f"Not creating LLDP Community for port {my_port_id} peer={_peer_sys_name}" )
+             logging.info( f"Not creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
           if router_id_changed:
              for intf in state.pending_peers:
