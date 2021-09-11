@@ -18,6 +18,8 @@ topology:
   nodes:
     leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json }
     leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf3:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf4:  { kind: srl, startup-config: auto-leaf.cfg.json }
     spine1: { kind: srl, startup-config: auto-spine.cfg.json }
 
     #h1: { kind: srl, config: auto-host-with-vip.cfg.json }
@@ -31,7 +33,15 @@ topology:
   links:
     - endpoints: ["leaf1:e1-1","spine1:e1-1"]
     - endpoints: ["leaf2:e1-1","spine1:e1-2"]
+    - endpoints: ["leaf3:e1-1","spine1:e1-3"]
+    - endpoints: ["leaf4:e1-1","spine1:e1-4"]
 
+    # 2-link lag
     - endpoints: ["h1:e1-1","leaf1:e1-3"]
-    - endpoints: ["h1:e1-2","leaf2:e1-3"] # lag
-    - endpoints: ["h2:e1-1","leaf2:e1-4"]
+    - endpoints: ["h1:e1-2","leaf2:e1-3"]
+
+    # 4-link mc-lag
+    - endpoints: ["h2:e1-1","leaf1:e1-4"]
+    - endpoints: ["h2:e1-2","leaf2:e1-4"]
+    - endpoints: ["h2:e1-3","leaf3:e1-4"]
+    - endpoints: ["h2:e1-4","leaf4:e1-4"]
