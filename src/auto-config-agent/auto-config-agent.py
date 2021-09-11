@@ -120,8 +120,10 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 #
 # Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
 # A:B:C where A is the access port and B,C each include 3 bytes (hex)
+# RFC8092 recommends the first value to be an ASN; an alternative encoding would
+# be: [4-byte ASN]:[2-byte port/flags + 2-byte MAC]:[4-byte MAC]
 #
-# Spine AS is included in the Route Target, so matches are scoped to cluster
+# Spine AS is also included in the Route Target, so matches are scoped to the cluster
 #
 # TODO could signal lag parameters (LACP or not, etc.) for consistency check
 # Could also use different RT for each (implies same lag type for all per switch)
@@ -575,10 +577,10 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
     ]
    }
 
-   # Routed VXLAN interface
+   # Routed VXLAN interface, not actually used for data traffic
    vxlan_if = {
       "type": "srl_nokia-interfaces:routed",
-      "ingress": { "vni": 1 },
+      "ingress": { "vni": 65535 },
       "egress": { "source-ip": "use-system-ipv4-address" }
    }
 
