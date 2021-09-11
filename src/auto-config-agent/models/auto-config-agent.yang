@@ -137,8 +137,16 @@ module auto_config_agent {
             }
             leaf evpn-auto-lags {
                 description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
-                type boolean;
-                default true;
+                type enumeration {
+                  enum encoded-ipv6; // LLDP data encoded as IPv6 loopback IPs
+                  enum large-communities; // LLDP data encoded as communities
+                  enum disabled;
+                }
+                default "encoded-ipv6";
+
+                must ". = 'disabled' or ../evpn != 'disabled'" {
+                  error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
+                }
             }
             leaf anycast-gw {
                 description "IPv4 anycast gateway to provision";

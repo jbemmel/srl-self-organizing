@@ -109,13 +109,15 @@ def Update_Peer_State(leaf_ip, port, lldp_peer_name):
 def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
     logging.info(f"Add_Discovered_Node :: {leaf_ip}:{port}={lldp_peer_name}")
     Update_Peer_State(leaf_ip, port, lldp_peer_name)
-    if lldp_peer_name in state.lag_state:
-        cur = state.lag_state[ lldp_peer_name ]
-        cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
-        if state.router_id in cur and len(cur) >= 2:
-            Convert_lag_to_mc_lag( state, port, leaf_ip, port ) # XXX port nok
-    else:
-        state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
+
+    # Broken, no longer used
+    # if lldp_peer_name in state.lag_state:
+    #     cur = state.lag_state[ lldp_peer_name ]
+    #     cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
+    #     if state.router_id in cur and len(cur) >= 2:
+    #         Convert_lag_to_mc_lag( state, port, leaf_ip, port ) # XXX port nok
+    # else:
+    #     state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
 #
 # Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
@@ -145,18 +147,28 @@ def Create_Ext_Community(state,chassis_mac,port):
 
     updates = [('/routing-policy/community-set[name=LLDP]',value)]
     deletes = []
-    if state.evpn_auto_lags:
-     # Toggle a special IP address on lo0.1 to trigger route count updates
-     ip99 = '99.99.99.99/32'
-     ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv4/address'
+    if state.evpn_auto_lags == "large_communities":
+       # Toggle a special IP address on lo0.1 to trigger route count updates
+       ip99 = '99.99.99.99/32'
+       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv4/address'
 
-     if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
-        state.toggle_route_update = True
-        updates.append( (ip_path, { 'ip-prefix': '99.99.99.99/32' } ) )
-     else:
-        state.toggle_route_update = False
-        deletes = [ ip_path + f"[ip-prefix={ip99}]" ]
-     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
+       if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
+          state.toggle_route_update = True
+          updates.append( (ip_path, { 'ip-prefix': '99.99.99.99/32' } ) )
+       else:
+          state.toggle_route_update = False
+          deletes = [ ip_path + f"[ip-prefix={ip99}]" ]
+       logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
+
+    elif state.evpn_auto_lags == "encoded_ipv6": # Use FC00::/7 range
+       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv6/address'
+       first_2 = ''.join( bytes[0:2] )
+       last_4 = ''.join( bytes[2:6] )
+       encoded_ipv6 = f'fc00::{port:02x}{first_2:02x}:{last_4:04x}/128'
+       updates.append( (ip_path, { 'ip-prefix': encoded_ipv6 } ) )
+    else:
+        logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
+        return False
 
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
@@ -199,40 +211,64 @@ class EVPNRouteMonitoringThread(Thread):
                 logging.info( f"Update: {update['update']}")
 
                 # Assume routes changed, get attributes.
-                # XXX assumes port 1 is not an access port, VXLAN interface ID would overlap
-                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:0]/attr-id"
-                data = c.get(path=[p], encoding='json_ietf')
-                logging.info( f"Attribute set IDs: {data}" )
-                for n in data['notification']:
-                   if 'update' in n: # Update is empty when path is invalid
-                     for u2 in n['update']:
-                        logging.info( f"Update {u2['path']}={u2['val']}" )
-                        for route in u2['val']['ip-prefix-routes']:
-                          attr_id = route['attr-id']
-                          peer_id = route['ip-prefix'].split('/')[0] # /32 loopback IP
-
-                          p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
-                          comms = c.get(path=[p2], encoding='json_ietf')
-                          logging.info( f"Communities: {comms}" )
-                          for n2 in comms['notification']:
-                           if 'update' in n2: # Update is empty when path is invalid
-                             for u3 in n2['update']:
-                                logging.info( f"Update {u3['path']}={u3['val']}" )
-                                lldp_ports = u3['val']['attr-set'][0]['communities']['large-community']
-                                logging.info( f"LLDP Communities from {peer_id}: {sorted(lldp_ports)}" )
-                                for p in lldp_ports:
-                                    parts = p.split(':')
-                                    key = parts[1] + ':' + parts[2]
-                                    if key in self.state.lldp_communities:
-                                        lag_port = self.state.lldp_communities[ key ]
-                                        logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
-                                        try:
-                                           # This repeatedly provisions the same thing...
-                                           Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0] )
-                                        except Exception as ex:
-                                           logging.error( f"BUG: {ex}" )
+                if self.state.evpn_auto_lags == "large_communities":
+                    self.checkCommunities(c)
+                elif self.state.evpn_auto_lags == "encoded_ipv6":
+                    self.checkIPv6Routes(c)
 
     logging.info("Leaving gNMI subscribe loop")
+
+   def checkCommunities(self,gnmiClient):
+     """
+     Check for updated Large Communities in the BGP RIB, and update MC-LAG configs
+     """
+     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:0]/attr-id"
+     data = gnmiClient.get(path=[p], encoding='json_ietf')
+     logging.info( f"Attribute set IDs: {data}" )
+     for n in data['notification']:
+       if 'update' in n: # Update is empty when path is invalid
+        for u2 in n['update']:
+           logging.info( f"Update {u2['path']}={u2['val']}" )
+           for route in u2['val']['ip-prefix-routes']:
+             attr_id = route['attr-id']
+             peer_id = route['ip-prefix'].split('/')[0] # /32 loopback IP
+
+             p2 = f"/network-instance[name=default]/bgp-rib/attr-sets/attr-set[index={attr_id}]/communities/large-community"
+             comms = gnmiClient.get(path=[p2], encoding='json_ietf')
+             logging.info( f"Communities: {comms}" )
+             for n2 in comms['notification']:
+              if 'update' in n2: # Update is empty when path is invalid
+                for u3 in n2['update']:
+                   logging.info( f"Update {u3['path']}={u3['val']}" )
+                   lldp_ports = u3['val']['attr-set'][0]['communities']['large-community']
+                   logging.info( f"LLDP Communities from {peer_id}: {sorted(lldp_ports)}" )
+                   for p in lldp_ports:
+                       parts = p.split(':')
+                       key = parts[1] + ':' + parts[2]
+                       if key in self.state.lldp_communities:
+                           lag_port = self.state.lldp_communities[ key ]
+                           logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
+                           try:
+                              # This repeatedly provisions the same thing...
+                              Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0], gnmiClient )
+                           except Exception as ex:
+                              logging.error( f"BUG: {ex}" )
+
+   def checkIPv6Routes(self,gnmiClient):
+     """
+     Check for updated IPv6 encoded LLDP in the BGP RIB, and update MC-LAG configs
+     """
+     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=128][route-distinguisher=*:0]/vni"
+     data = gnmiClient.get(path=[p], encoding='json_ietf')
+     logging.info( f"IPv6 routes: {data}" )
+     for n in data['notification']:
+       if 'update' in n: # Update is empty when path is invalid
+        for u2 in n['update']:
+           logging.info( f"Update {u2['path']}={u2['val']}" )
+           for route in u2['val']['ip-prefix-routes']:
+             peer_id = route['route-distinguisher']
+             encoded_lldp = route['ip-prefix'].split('/')[0] # /128 loopback IP
+             logging.info( f"TODO: Process {encoded_lldp} from {peer_id}" )
 
 ############################################################
 ## Function to populate state of agent config
@@ -395,23 +431,6 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    if state.evpn != 'disabled':
       rt = f"target:{state.base_as}:{port}"
 
-      # Not currently used
-      export_policy = {
-        "community-set": [ { "name": f"LAG{port}", "member": [ rt ], } ],
-        "policy": [
-        {
-         "name": f"add-rt-{state.base_as}-{port}",
-         "statement": [
-          {
-           "sequence-id": 10,
-           "action": {
-            "accept": { "bgp": { "communities": { "add": f"LAG{port}" } } }
-           }
-          }
-         ]
-        }]
-      }
-
       mac_vrf.update(
       {
         "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
@@ -463,7 +482,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
 #
-def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
+def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
    logging.info(f"Convert_lag_to_mc_lag :: port={port} peer_leaf={peer_leaf} peer_port={peer_port}")
 
    if port in state.mc_lags:
@@ -519,9 +538,7 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
    ]
 
    logging.info(f"gNMI SET updates={updates}" )
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                     username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', update=updates )
+   gnmiClient.set( encoding='json_ietf', update=updates )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -584,19 +601,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
       "egress": { "source-ip": "use-system-ipv4-address" }
    }
 
-   policy_name = "export-lldp-communities-for-mc-lag-discovery"
    lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS, EVI 0 doesnt exist
-   lldp_export_policy = {
-     "community-set": [ { "name": "LLDP", "member": [ lldp_rt ], } ],
-     "policy": [
-      {
-       "name": policy_name,
-       "default-action": {
-         "accept": { "bgp": { "communities": { "add": "LLDP" } } }
-       }
-      }
-     ]
-   }
 
    # For VXLAN interface, avoid any possible overlap with ports
    ip_vrf = {
@@ -615,15 +620,16 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
         }
        ]
       },
-      "srl_nokia-bgp-vpn:bgp-vpn": {
+      "bgp-vpn": {
         "bgp-instance": [
          { "id": 1,
-           "export-policy": policy_name,
+           # "export-policy": policy_name, # set conditionally below
            "route-target": {
-            "_annotate": "Special RT/RD for EVPN LAG coordination",
-            "import-rt": lldp_rt
+             "_annotate": "Special RT/RD for EVPN LAG coordination",
+             "import-rt": lldp_rt
            },
-           "route-distinguisher": { "rd": f"{state.base_as}:0" }
+           # Use router_id here (not AS) such that RD identifies leaf
+           "route-distinguisher": { "rd": f"{state.router_id}:0" }
         }
         ]
       }
@@ -632,9 +638,26 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
 
    updates=[ (f'/interface[name=lo0]', lo0_1_if),
              (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=65535]', vxlan_if ),
-             ('/routing-policy', lldp_export_policy),
              (f'/network-instance[name=evpn-lag-discovery]', ip_vrf),
            ]
+
+   if state.evpn_auto_lags == "large_communities":
+      policy_name = "export-lldp-communities-for-mc-lag-discovery"
+      lldp_export_policy = {
+        "community-set": [ { "name": "LLDP", "member": [ lldp_rt ], } ],
+        "policy": [
+         {
+          "name": policy_name,
+          "default-action": {
+            "accept": { "bgp": { "communities": { "add": "LLDP" } } }
+          }
+         }
+        ]
+      }
+      ip_vrf['protocols']['bgp-vpn']['bgp-instance'][0]['export-policy'] = policy_name
+      updates.append( ('/routing-policy', lldp_export_policy) )
+   elif state.evpn_auto_lags == "encoded_ipv6":
+      ip_vrf['protocols']['bgp-vpn']['bgp-instance'][0]['route-target']['export-rt'] = lldp_rt
 
    logging.info(f"gNMI SET updates={updates}" )
    gnmiClient.set( encoding='json_ietf', update=updates )
@@ -692,7 +715,7 @@ def Handle_Notification(obj, state):
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
-                    state.evpn_auto_lags = data['evpn_auto_lags']['value'] and state.evpn!="disabled"
+                    state.evpn_auto_lags = data['evpn_auto_lags']['value'][14:]
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
@@ -740,7 +763,7 @@ def Handle_Notification(obj, state):
             router_id_changed = True
             if state.role != "endpoint":
                Set_Default_Systemname( state )
-               if state.get_role()=="leaf" and state.evpn_auto_lags:
+               if state.get_role()=="leaf" and state.evpn_auto_lags != "disabled":
                   # XXX assumes router_id wont change after this point
                   EVPNRouteMonitoringThread(state).start()
 
