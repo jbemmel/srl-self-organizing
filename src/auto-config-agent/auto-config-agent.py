@@ -222,7 +222,10 @@ class EVPNRouteMonitoringThread(Thread):
                                     if key in self.state.lldp_communities:
                                         lag_port = self.state.lldp_communities[ key ]
                                         logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
-                                        Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0] )
+                                        try:
+                                           Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0] )
+                                        except Exception as ex:
+                                           logging.error( f"BUG: {ex}" )
 
     logging.info("Leaving gNMI subscribe loop")
 
@@ -462,7 +465,12 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
       state.mc_lags[port].update( { peer_leaf : peer_port } )
    else:
       state.mc_lags[port] = { peer_leaf : peer_port }
-   peers = sorted( list( state.mc_lags[port].entries() ) )
+
+   if len( state.mc_lags[port] ) > 3:
+       logging.error( "Platform does not support MC-LAG with more than 4 members" )
+       return False
+
+   peers = str( sorted( state.mc_lags[port].items() ) )
 
    # EVPN MC-LAG
    sys_bgp_evpn = {
