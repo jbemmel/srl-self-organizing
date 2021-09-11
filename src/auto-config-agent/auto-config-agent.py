@@ -126,6 +126,8 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 # TODO could signal lag parameters (LACP or not, etc.) for consistency check
 # Could also use different RT for each (implies same lag type for all per switch)
 #
+# Can also have LAGs to spines ( options: routed(default), static LAG, LACP )
+#
 def Create_Ext_Community(state,chassis_mac,port):
     logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
     bytes = chassis_mac.split(':')
@@ -196,7 +198,7 @@ class EVPNRouteMonitoringThread(Thread):
 
                 # Assume routes changed, get attributes.
                 # XXX assumes port 1 is not an access port, VXLAN interface ID would overlap
-                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:1]/attr-id"
+                p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:0]/attr-id"
                 data = c.get(path=[p], encoding='json_ietf')
                 logging.info( f"Attribute set IDs: {data}" )
                 for n in data['notification']:
@@ -581,7 +583,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
    }
 
    policy_name = "export-lldp-communities-for-mc-lag-discovery"
-   lldp_rt = f"target:{state.base_as}:1" # RT for the cluster AS
+   lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS, EVI 0 doesnt exist
    lldp_export_policy = {
      "community-set": [ { "name": "LLDP", "member": [ lldp_rt ], } ],
      "policy": [
@@ -594,19 +596,20 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
      ]
    }
 
+   # For VXLAN interface, avoid any possible overlap with ports
    ip_vrf = {
      "type": "srl_nokia-network-instance:ip-vrf",
      "admin-state": "enable",
      "interface": [ { "name": "lo0.1" } ],
-     "vxlan-interface": [ { "name": "vxlan0.1" } ],
+     "vxlan-interface": [ { "name": "vxlan0.65535" } ],
      "protocols": {
       "bgp-evpn": {
        "srl_nokia-bgp-evpn:bgp-instance": [
         {
           "id": 1,
           "admin-state": "enable",
-          "vxlan-interface": "vxlan0.1",
-          "evi": 1, # auto-RD == <router-ID>:1
+          "vxlan-interface": "vxlan0.65535",
+          "evi": 65535, # auto-RD == <router-ID>:65535
         }
        ]
       },
@@ -615,17 +618,18 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
          { "id": 1,
            "export-policy": policy_name,
            "route-target": {
-            "_annotate": "Special RT for EVPN LAG coordination",
+            "_annotate": "Special RT/RD for EVPN LAG coordination",
             "import-rt": lldp_rt
-           }
-            }
-           ]
-         }
+           },
+           "route-distinguisher": { "rd": f"{state.base_as}:0" }
+        }
+        ]
+      }
      }
    }
 
    updates=[ (f'/interface[name=lo0]', lo0_1_if),
-             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=1]', vxlan_if ),
+             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=65535]', vxlan_if ),
              ('/routing-policy', lldp_export_policy),
              (f'/network-instance[name=evpn-lag-discovery]', ip_vrf),
            ]
