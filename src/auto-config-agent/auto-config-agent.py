@@ -162,7 +162,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
 
     elif state.evpn_auto_lags == "encoded_ipv6": # Use FC00::/7 range
        ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv6'
-       pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,4) ]
+       pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,3) ]
        # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
        # Set 'local' bit -> 0xfd
        encoded_ipv6 = f'fd00::{int(port):02x}:{":".join(pairs)}/128'
