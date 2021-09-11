@@ -132,22 +132,23 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 #
 # Can also have LAGs to spines ( options: routed(default), static LAG, LACP )
 #
-def Create_Ext_Community(state,chassis_mac,port):
-    logging.info(f"Create_Ext_Community :: {port}={chassis_mac}")
+def Announce_LLDP_using_EVPN(state,chassis_mac,port):
+    logging.info(f"Announce_LLDP_using_EVPN({state.evpn_auto_lags}) :: {port}={chassis_mac}")
     bytes = chassis_mac.split(':')
-    c_b = ''.join( bytes[0:3] )
-    c_c = ''.join( bytes[3:6] )
-    # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
 
-    lldp_community = f"{int(c_b,16)}:{int(c_c,16)}"
-    value = { "member": [ f"{port}:" + lldp_community ] }
-
-    # Save locally too, excluding port
-    state.lldp_communities[ lldp_community ] = port
-
-    updates = [('/routing-policy/community-set[name=LLDP]',value)]
     deletes = []
     if state.evpn_auto_lags == "large_communities":
+       c_b = ''.join( bytes[0:3] )
+       c_c = ''.join( bytes[3:6] )
+       # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
+       lldp_community = f"{int(c_b,16)}:{int(c_c,16)}"
+       value = { "member": [ f"{port}:" + lldp_community ] }
+
+       # Save locally too, excluding port
+       state.local_lldp[ lldp_community ] = port
+
+       updates = [('/routing-policy/community-set[name=LLDP]',value)]
+
        # Toggle a special IP address on lo0.1 to trigger route count updates
        ip99 = '99.99.99.99/32'
        ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv4/address'
@@ -158,18 +159,21 @@ def Create_Ext_Community(state,chassis_mac,port):
        else:
           state.toggle_route_update = False
           deletes = [ ip_path + f"[ip-prefix={ip99}]" ]
-       logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
 
     elif state.evpn_auto_lags == "encoded_ipv6": # Use FC00::/7 range
-       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv6/address'
-       first_2 = ''.join( bytes[0:2] )
-       last_4 = ''.join( bytes[2:6] )
-       encoded_ipv6 = f'fc00::{port:02x}{first_2:02x}:{last_4:04x}/128'
-       updates.append( (ip_path, { 'ip-prefix': encoded_ipv6 } ) )
+       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv6'
+       pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,4) ]
+       # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
+       # Set 'local' bit -> 0xfd
+       encoded_ipv6 = f'fd00::{int(port):02x}:{":".join(pairs)}/128'
+       updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6 } ] } ) ]
+
+       state.local_lldp[ chassis_mac ] = port
     else:
         logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
         return False
 
+    logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                       username="admin",password="admin",insecure=True) as c:
        c.set( encoding='json_ietf', update=updates, delete=deletes )
@@ -215,6 +219,8 @@ class EVPNRouteMonitoringThread(Thread):
                     self.checkCommunities(c)
                 elif self.state.evpn_auto_lags == "encoded_ipv6":
                     self.checkIPv6Routes(c)
+                else:
+                    logging.error( f"Unexpected value: {self.state.evpn_auto_lags}" )
 
     logging.info("Leaving gNMI subscribe loop")
 
@@ -245,8 +251,8 @@ class EVPNRouteMonitoringThread(Thread):
                    for p in lldp_ports:
                        parts = p.split(':')
                        key = parts[1] + ':' + parts[2]
-                       if key in self.state.lldp_communities:
-                           lag_port = self.state.lldp_communities[ key ]
+                       if key in self.state.local_lldp:
+                           lag_port = self.state.local_lldp[ key ]
                            logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
                            try:
                               # This repeatedly provisions the same thing...
@@ -583,16 +589,13 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
      {
       "index": 1,
       "admin-state": "enable",
-      "ipv4": {
-        "address": [
-          {
-            "ip-prefix": state.router_id + '/32',
-          }
-        ]
-      }
      }
     ]
    }
+   if state.evpn_auto_lags == "large_communities":
+       lo0_1_if['subinterface'][0]['ipv4'] = { 'address' : [ {
+         "ip-prefix": state.router_id + '/32',
+       }] }
 
    # Routed VXLAN interface, not actually used for data traffic
    vxlan_if = {
@@ -715,7 +718,7 @@ def Handle_Notification(obj, state):
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
-                    state.evpn_auto_lags = data['evpn_auto_lags']['value'][14:]
+                    state.evpn_auto_lags = data['evpn_auto_lags'][15:]
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
@@ -775,7 +778,7 @@ def Handle_Notification(obj, state):
 
           # Could also announce communities for spines
           if state.get_role() == "leaf" and not "spine" in peer_sys_name:
-             Create_Ext_Community( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
+             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
           else:
              logging.info( f"Not creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
@@ -949,10 +952,10 @@ class State(object):
         self.pending_announcements = []
         self.announced = {}     # To filter duplicate LLDP events
 
-        self.lag_state = {}     # Used for auto-provisioning of LAGs
+        # self.lag_state = {}     # Used for auto-provisioning of LAGs
         self.host_use_irb = True
         self.use_bgp_unnumbered = False
-        self.lldp_communities = {}
+        self.local_lldp = {}
         self.mc_lags = {}
 
     def __str__(self):
