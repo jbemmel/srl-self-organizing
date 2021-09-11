@@ -503,7 +503,10 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
    arp = {
       "learn-unsolicited": True,
       "_annotate_learn-unsolicited": f"To support MC-LAG, see {url} p72",
-      "evpn": { "advertise": [ { "route-type": "dynamic" } ] }
+      "evpn": { "advertise": [ {
+        "route-type": "dynamic",
+        "_annotate": "for ARP synchronization across MH leaf nodes"
+      } ] }
    }
 
    updates = [
