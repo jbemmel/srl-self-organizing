@@ -271,16 +271,19 @@ class EVPNRouteMonitoringThread(Thread):
      for n in data['notification']:
        if 'update' in n: # Update is empty when path is invalid
         for u2 in n['update']:
-           logging.info( f"Update {u2['path']}={u2['val']}" )
+           # logging.info( f"Update {u2['path']}={u2['val']}" )
            for route in u2['val']['ip-prefix-routes']:
-             peer_id = route['route-distinguisher']
+             peer_id = route['route-distinguisher'].split(':')[0]
              encoded_lldp = route['ip-prefix'].split('/')[0] # /128 loopback IP
-             logging.info( f"TODO: Process {encoded_lldp} from {peer_id}" )
+             encoded_parts = encoded_lldp.split(':')
              mac = ":".join( [ f'{(i>>8):02X}:{(i&0xff):02X}'
-                               for b in encoded_lldp.split(':')[3:]
+                               for b in encoded_parts[3:]
                                for i in [int(b,16)] ] )
+             logging.info( f"Process {encoded_lldp} from {peer_id}: {mac}" )
              if mac in self.state.local_lldp:
-                 logging.info( f"Match: {self.state.local_lldp[mac]}" )
+                 lag_port = self.state.local_lldp[ mac ]
+                 peer_port = encoded_parts[2]
+                 Convert_lag_to_mc_lag( self.state, lag_port, peer_id, peer_port, gnmiClient )
 
 ############################################################
 ## Function to populate state of agent config
@@ -626,7 +629,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
           "admin-state": "enable",
           "vxlan-interface": "vxlan0.65535",
           "evi": 65535, # auto-RD == <router-ID>:65535
-          "default-admin-tag": 0xfdad
+          # "default-admin-tag": 0xfdad
         }
        ]
       },
