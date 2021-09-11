@@ -113,7 +113,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
         cur = state.lag_state[ lldp_peer_name ]
         cur[leaf_ip] = port # XXX only supports 1 lag link per leaf
         if state.router_id in cur and len(cur) >= 2:
-            Convert_lag_to_mc_lag( state, port, leaf_ip )
+            Convert_lag_to_mc_lag( state, port, leaf_ip, port ) # XXX port nok
     else:
         state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
@@ -222,7 +222,7 @@ class EVPNRouteMonitoringThread(Thread):
                                     if key in self.state.lldp_communities:
                                         lag_port = self.state.lldp_communities[ key ]
                                         logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
-                                        Convert_lag_to_mc_lag( self.state, lag_port, peer_id )
+                                        Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0] )
 
     logging.info("Leaving gNMI subscribe loop")
 
@@ -455,14 +455,14 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
 #
-def Convert_lag_to_mc_lag(state,port,peer_leaf):
-   logging.info(f"Convert_lag_to_mc_lag :: port={port} peer_leaf={peer_leaf}")
+def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
+   logging.info(f"Convert_lag_to_mc_lag :: port={port} peer_leaf={peer_leaf} peer_port={peer_port}")
 
    if port in state.mc_lags:
-      state.mc_lags[port].append( peer_leaf )
+      state.mc_lags[port].update( { peer_leaf : peer_port } )
    else:
-      state.mc_lags[port] = [ peer_leaf ]
-   peers = sorted( list( state.mc_lags.values() ) )
+      state.mc_lags[port] = { peer_leaf : peer_port }
+   peers = sorted( list( state.mc_lags[port].entries() ) )
 
    # EVPN MC-LAG
    sys_bgp_evpn = {
@@ -488,7 +488,18 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf):
     }
    }
 
-   updates = [ ('/system/network-instance/protocols', sys_bgp_evpn ) ]
+   # Update IRB interface to learn unsolicited ARPs
+   # Based on 8.1.1 p72 in https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf
+   url = "https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf"
+   arp = {
+      "learn-unsolicited": True,
+      "_annotate_learn-unsolicited": f"To support MC-LAG, see {url} p72",
+      "evpn": { "advertise": [ { "route-type": "dynamic" } ] }
+   }
+
+   updates = [ ('/system/network-instance/protocols', sys_bgp_evpn ),
+               (f'/interface[name=irb0]/subinterface[index={port}]/ipv4', arp)
+             ]
 
    logging.info(f"gNMI SET updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
