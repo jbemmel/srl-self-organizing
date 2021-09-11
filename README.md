@@ -46,7 +46,7 @@ This example uses:
 * Routing policy to only import/export loopback IPs
 * Global AS set to unique leaf AS, could also use single global AS such that EVPN auto route-targets would work
 * Host subnet size is configurable, default /31 (but Linux hosts may or may not support that)
-* [NEW] EVPN auto LAG discovery based on LLDP and Large Communities (RFC8092)
+* [NEW] EVPN auto LAG discovery based on LLDP and either Large Communities (RFC8092) or IPv6-encoding
 
 ## EVPN overlay
 The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
@@ -61,7 +61,7 @@ to explore differences in resource usage and scaling.
 ## EVPN based signalling for MultiHoming LAGs
 The agent listens for LLDP events from the SR Linux NDK, and populates a BGP Community set with encoded port and MAC information for each neighbor.
 It then configures a special control-plane-only IP VRF with a loopback ( == router ID ) to announce an RT5 IP Prefix route with the LLDP information.
-By listening for route count changes, each agent detects changes in LLDP communities, and updates its local MH configuration (Ethernet Segments with ESI).
+By listening for route count changes, each agent detects changes in LLDP communities (or IPv6 host routes with encoded LLDP data), and updates its local MH configuration (Ethernet Segments with ESI).
 
 Optionally, the agent could stop listening once all links are discovered, and/or one could disable BGP for the IP VRF. For this demo, the agent simply keeps listening indefinitely.
 
