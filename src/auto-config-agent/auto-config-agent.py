@@ -497,9 +497,10 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port):
       "evpn": { "advertise": [ { "route-type": "dynamic" } ] }
    }
 
-   updates = [ ('/system/network-instance/protocols', sys_bgp_evpn ),
-               (f'/interface[name=irb0]/subinterface[index={port}]/ipv4', arp)
-             ]
+   updates = [
+     ('/system/network-instance/protocols', sys_bgp_evpn ),
+     (f'/interface[name=irb0]/subinterface[index={port}]/ipv4/arp', arp)
+   ]
 
    logging.info(f"gNMI SET updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),

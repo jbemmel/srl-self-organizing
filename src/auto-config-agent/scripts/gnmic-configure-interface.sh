@@ -439,16 +439,17 @@ EOF
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
-# Configure lo0.0 with special loopback IP to advertise communities
+# Configure lo0.0 on Leaf with router IP for ping testing in overlay
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
   "subinterface": [
     {
       "index": 0,
+      "description": "Overlay loopback",
       "admin-state": "enable",
-      "ipv4": { "address": [ { "ip-prefix": "192.0.2.0/32" } ] },
-      "ipv6": { "address": [ { "ip-prefix": "2001:db8::192:0:2:0/128" } ] }
+      "ipv4": { "address": [ { "ip-prefix": "$ROUTER_ID/32" } ] },
+      "ipv6": { "address": [ { "ip-prefix": "2001::${ROUTER_ID//\./:}/128" } ] }
     }
   ]
 }
