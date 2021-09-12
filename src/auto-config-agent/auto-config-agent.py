@@ -283,6 +283,7 @@ class EVPNRouteMonitoringThread(Thread):
              if mac in self.state.local_lldp:
                  lag_port = self.state.local_lldp[ mac ]
                  peer_port = encoded_parts[2]
+                 # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                  Convert_lag_to_mc_lag( self.state, lag_port, peer_id, peer_port, gnmiClient )
 
 ############################################################
@@ -629,6 +630,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
           "admin-state": "enable",
           "vxlan-interface": "vxlan0.65535",
           "evi": 65535, # auto-RD == <router-ID>:65535
+          "ecmp": 8, # So we can see the other LAG members
           # "default-admin-tag": 0xfdad
         }
        ]
