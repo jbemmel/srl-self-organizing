@@ -165,7 +165,9 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
        pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,3) ]
        # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
        # Set 'local' bit -> 0xfd
-       encoded_ipv6 = f'fdad::{int(port):02x}:{":".join(pairs)}/128'
+       _r = [ f'{int(i,16):02x}' for i in state.router_id.split('.') ]
+       router_id = f'{_r[0]}{_r[1]}:{_r[2]}{_r[3]}'
+       encoded_ipv6 = f'fdad::{router_id}:{int(port):02x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
                    "_annotate": f"for EVPN auto-lag discovery on port {port}" } ] } ) ]
 
@@ -187,10 +189,18 @@ class EVPNRouteMonitoringThread(Thread):
        self.state = state
 
    def run(self):
+
+    if self.state.evpn_auto_lags == "large_communities":
+        path = '/network-instance[name=default]/protocols/bgp/evpn'
+    elif self.state.evpn_auto_lags == "encoded_ipv6":
+        # Subscribe specifically to ipv6 route table changes in discovery VRF
+        # Only EVPN mgr events, not locally created routes
+        path = '/network-instance[name=evpn-lag-discovery]/route-table/ipv6-unicast/route[route-owner=bgp_evpn_mgr]/next-hop-group'
+
     subscribe = {
       'subscription': [
           {
-              'path': '/network-instance[name=default]/protocols/bgp/evpn',
+              'path': path,
               'mode': 'on_change'
           }
       ],
@@ -219,6 +229,7 @@ class EVPNRouteMonitoringThread(Thread):
                 if self.state.evpn_auto_lags == "large_communities":
                     self.checkCommunities(c)
                 elif self.state.evpn_auto_lags == "encoded_ipv6":
+                    # TODO process ipv6 route prefix update directly
                     self.checkIPv6Routes(c)
                 else:
                     logging.error( f"Unexpected value: {self.state.evpn_auto_lags}" )
@@ -277,12 +288,13 @@ class EVPNRouteMonitoringThread(Thread):
              encoded_lldp = route['ip-prefix'].split('/')[0] # /128 loopback IP
              encoded_parts = encoded_lldp.split(':')
              mac = ":".join( [ f'{(i>>8):02X}:{(i&0xff):02X}'
-                               for b in encoded_parts[3:]
+                               for b in encoded_parts[5:]
                                for i in [int(b,16)] ] )
              logging.info( f"Process {encoded_lldp} from {peer_id}: {mac}" )
              if mac in self.state.local_lldp:
                  lag_port = self.state.local_lldp[ mac ]
-                 peer_port = encoded_parts[2]
+                 peer_router_id = encoded_parts[2:4] # 2 x 16 bits
+                 peer_port = encoded_parts[4]
                  # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                  Convert_lag_to_mc_lag( self.state, lag_port, peer_id, peer_port, gnmiClient )
 
