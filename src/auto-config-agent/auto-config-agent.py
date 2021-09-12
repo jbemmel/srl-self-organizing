@@ -165,7 +165,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
        pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,3) ]
        # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
        # Set 'local' bit -> 0xfd
-       encoded_ipv6 = f'fdad::{int(port):02x}:{":".join(pairs)}/128'
+       encoded_ipv6 = f'fdad::{int(port):04x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
                    "_annotate": f"for EVPN auto-lag discovery on port {port}" } ] } ) ]
 
