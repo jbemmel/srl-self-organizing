@@ -191,7 +191,8 @@ class EVPNRouteMonitoringThread(Thread):
    def run(self):
 
     if self.state.evpn_auto_lags == "large_communities":
-        path = '/network-instance[name=default]/protocols/bgp/evpn'
+        # path = '/network-instance[name=default]/protocols/bgp/evpn'
+        path = '/network-instance[name=evpn-lag-discovery]/route-table/ipv4-unicast/route[route-owner=bgp_evpn_mgr]/next-hop-group'
     elif self.state.evpn_auto_lags == "encoded_ipv6":
         # Subscribe specifically to ipv6 route table changes in discovery VRF
         # Only EVPN mgr events, not locally created routes
