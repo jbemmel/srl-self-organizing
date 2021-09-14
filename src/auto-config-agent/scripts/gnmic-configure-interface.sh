@@ -94,6 +94,12 @@ cat > $temp_file << EOF
         { "ip-prefix": "0.0.0.0/0","mask-length-range": "32..32" },
         { "ip-prefix": "::/0", "mask-length-range": "128..128" }
       ]
+    },
+    {
+      "name": "links",
+      "prefix": [
+        { "ip-prefix": "$LINK_PREFIX","mask-length-range": "28..31" }
+      ]
     }
   ],
   "policy": [
@@ -111,13 +117,13 @@ cat > $temp_file << EOF
       ]
     },
     {
-      "name": "reject-local-routes",
+      "name": "reject-link-routes",
       "default-action": { "accept": { } },
       "statement": [
         {
           "sequence-id": 10,
           "match": {
-            "protocol": "srl_nokia-common:local"
+            "prefix-set": "links"
           },
           "action": { "reject": { } }
         }
@@ -251,7 +257,7 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
   "group-name": "evpn-rr",
   "admin-state": "enable",
   "import-policy": "accept-all",
-  "export-policy": "accept-all",
+  "export-policy": "reject-link-routes",
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],
   "evpn": { "admin-state": "enable" },
