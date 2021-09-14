@@ -429,7 +429,10 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
             "ip-prefix": ip, # /31 link IP (or .1 out of /24-30)
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
-        ]
+        ],
+        "arp": {
+          "duplicate-address-detection": False # reusing same IPs across EVPN fabric, MAC routes
+        }
       },
       "anycast-gw": {}
     }
