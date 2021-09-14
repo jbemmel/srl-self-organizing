@@ -430,9 +430,9 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ],
-        "arp": {
-          "duplicate-address-detection": False # reusing same IPs across EVPN fabric, MAC routes
-        }
+        #"arp": {
+        #  "duplicate-address-detection": False # reusing same IPs across EVPN fabric, MAC routes
+        #}
       },
       "anycast-gw": {}
     }
@@ -475,7 +475,14 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
              "admin-state": "enable",
              "vxlan-interface": f"vxlan0.{port}",
              "evi": int(port),
-             "ecmp": 8
+             "ecmp": 8,
+             "routes": {
+              "bridge-table": {
+                "mac-ip": {
+                  "advertise": False # Avoid duplicate IPs on links
+                }
+              }
+            }
            }
           ]
          },
