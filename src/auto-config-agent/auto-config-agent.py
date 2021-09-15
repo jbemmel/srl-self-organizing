@@ -430,9 +430,10 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ],
-        #"arp": {
-        #  "duplicate-address-detection": False # reusing same IPs across EVPN fabric, MAC routes
-        #}
+        "arp": {
+          # reusing same IPs across EVPN fabric, MAC routes or OSPF causes dup
+          "duplicate-address-detection": False
+        }
       },
       "anycast-gw": {}
     }
