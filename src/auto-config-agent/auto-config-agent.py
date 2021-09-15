@@ -906,9 +906,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     min_peer_as = max_peer_as = state.base_as
     peer_type = 'leaf'
 
-    # For IP addressing, reuse same link space as underlay, purely by leaf port
+    # For IP addressing, reuse same link space as underlay, by leaf port and leaf id
     # TODO lag addressing is different
-    link_index = (lldp_peer_port - 1)
+    link_index = (lldp_peer_port - 1) + (state.node_id-1) * state.max_leaves
 
   if link_index >= len(state.peerlinks):
       logging.error(f'Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}')
