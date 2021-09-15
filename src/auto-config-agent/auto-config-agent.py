@@ -430,10 +430,10 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
             "primary": '[null]'  # type 'empty', used as source for bcast
           }
         ],
-        "arp": {
+        #"arp": {
           # reusing same IPs across EVPN fabric, MAC routes or OSPF causes dup
-          "duplicate-address-detection": False
-        }
+        #  "duplicate-address-detection": False
+        #}
       },
       "anycast-gw": {}
     }
@@ -892,7 +892,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else:
-      link_index = (lldp_my_port - 1) # Reuse underlay address space
+      # Reuse underlay address space, but allocate unique IPs per leaf
+      link_index = (lldp_my_port - 1) + (state.node_id-1) * state.max_leaves
       peer_type = 'host'
 
       # For access ports, announce LLDP events if auto_lags is enabled
@@ -909,7 +910,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     # For IP addressing, reuse same link space as underlay, by leaf port and leaf id
     # TODO lag addressing is different
     link_index = (lldp_peer_port - 1) + (state.node_id-1) * state.max_leaves
-    logging.info( f"Assigning link_index {link_index} based on lldp port {lldp_peer_port} node_id={state.node_id}")
 
   if link_index >= len(state.peerlinks):
       logging.error(f'Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}')
