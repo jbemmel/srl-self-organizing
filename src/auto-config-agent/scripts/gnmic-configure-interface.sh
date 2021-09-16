@@ -81,7 +81,6 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
 exitcode+=$?
-fi
 
 elif [[ "$IGP" == "isis" ]]; then
 
