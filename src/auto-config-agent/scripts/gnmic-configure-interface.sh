@@ -347,6 +347,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   "keep-all-routes": true,
   "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
 },
+"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
 "preference": {
  "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },
 $DEFAULT_DYNAMIC_HOST_PEERING
