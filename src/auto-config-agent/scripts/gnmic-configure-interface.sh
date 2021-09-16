@@ -621,10 +621,8 @@ elif [[ "$IGP" == "isis" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
- "ipv6-unicast": {
-  "admin-state": "enable",
-  "enable-bfd": true
- }
+ "ipv4-unicast": { "admin-state": "disable" },
+ "ipv6-unicast": { "admin-state": "enable", "enable-bfd": true }
 }
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
