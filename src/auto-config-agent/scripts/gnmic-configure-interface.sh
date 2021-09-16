@@ -52,6 +52,18 @@ EOF
 $GNMIC set --replace-path /interface[name=${LOOPBACK_IF}0] --replace-file $temp_file
 exitcode+=$?
 
+# Enable BFD for loopback
+cat > $temp_file << EOF
+{
+ "admin-state" : "enable",
+ "desired-minimum-transmit-interval" : 250000,
+ "required-minimum-receive" : 250000,
+ "detection-multiplier" : 3
+}
+EOF
+$GNMIC set --replace-path /bfd/subinterface[id=${LOOPBACK_IF}0.0] --replace-file $temp_file
+exitcode+=$?
+
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
 
