@@ -16,7 +16,7 @@ PEER_AS_MAX="$9"     # Host AS in case of leaf-host
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
-OSPF_ADMIN_STATE="${13}" # 'enable' or 'disable'
+IGP="${13}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 
 echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
@@ -57,7 +57,7 @@ exitcode+=$?
 
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 # Still requires static (link local) IPv4 addresses on each interface
-if [[ "$OSPF_ADMIN_STATE" == "enable" ]]; then
+if [[ "$IGP" == "ospf" ]]; then
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
@@ -79,8 +79,39 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-cp $temp_file /tmp/debug_ospf_config.json
 $GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
+exitcode+=$?
+fi
+
+elif [[ "$IGP" == "isis" ]]; then
+
+IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+NET_ID=$( printf "49.0001.9999.%02x%02x.%02x%02x.00" $ip1 $ip2 $ip3 $ip4 )
+
+cat > $temp_file << EOF
+{
+      "admin-state": "enable",
+      "level-capability": "L1",
+      "max-ecmp-paths": 8,
+      "net": [
+        "$NET_ID"
+      ],
+      "ipv4-unicast": {
+        "admin-state": "enable"
+      },
+      "ipv6-unicast": {
+        "admin-state": "enable"
+      },
+      "interface": [
+       {
+        "interface-name": "${LOOPBACK_IF}0.0",
+        "admin-state": "enable",
+        "passive": true
+       }
+      ]
+}
+EOF
+$GNMIC set --update-path /network-instance[name=default]/protocols/isis/instance[name=main] --update-file $temp_file
 exitcode+=$?
 fi
 
@@ -143,7 +174,7 @@ exitcode+=$?
 
 if [[ "$ROLE" == "spine" ]]; then
 
-if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
@@ -173,7 +204,7 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 EOF
 fi
 
-if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
 ,
 {
@@ -288,7 +319,7 @@ IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
 },
 EOF
 
-if [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' SPINES_GROUP << EOF
 {
   "group-name": "spines",
@@ -574,7 +605,7 @@ exitcode+=$?
 # Note: To view: info from state /bfd
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
 
-if [[ "$OSPF_ADMIN_STATE" == "enable" ]]; then
+if [[ "$IGP" == "ospf" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -585,6 +616,19 @@ cat > $temp_file << EOF
 }
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
+exitcode+=$?
+
+elif [[ "$IGP" == "isis" ]]; then
+cat > $temp_file << EOF
+{
+ "admin-state": "enable",
+ "ipv6-unicast": {
+  "admin-state": "enable",
+  "enable-bfd": true
+ }
+}
+EOF
+$GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 fi
 
@@ -602,7 +646,7 @@ exitcode+=$?
 fi
 
 if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && \
-   [[ "$OSPF_ADMIN_STATE" == "disable" ]]; then
+   [[ "$IGP" == "bgp" ]]; then
 _IP="$PEER_IP"
 # if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
 # PEER_GROUP="hosts"

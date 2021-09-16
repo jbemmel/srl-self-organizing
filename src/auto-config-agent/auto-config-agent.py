@@ -750,8 +750,8 @@ def Handle_Notification(obj, state):
                     state.max_lag_links = int( data['max_lag_links']['value'] )
                 if 'evpn' in data:
                     state.evpn = data['evpn'][5:] # strip "EVPN_"
-                if 'use_ospfv3' in data:
-                    state.ospfv3 = 'enable' if data['use_ospfv3']['value'] else 'disable'
+                if 'igp' in data:
+                    state.igp = data['igp'][4:] # strip IGP_
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
@@ -972,7 +972,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
-                                       state.ospfv3,
+                                       state.igp,
                                        state.evpn],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
