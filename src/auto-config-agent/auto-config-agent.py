@@ -730,6 +730,7 @@ def Handle_Notification(obj, state):
                     state.peerlinks = list(ipaddress.ip_network(state.peerlinks_prefix).subnets(new_prefix=31))
                     state.hostlinks_size = int( peerlinks['host_subnet_size']['value'] )
                     state.host_enable_ipv6 = bool( peerlinks['host_enable_ipv6']['value'] )
+                    state.reuse_overlay_ips = bool( peerlinks['reuse_overlay_ips']['value'] )
                     state.hostlinks = list(ipaddress.ip_network(state.peerlinks_prefix).subnets(new_prefix=state.hostlinks_size))
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
@@ -892,8 +893,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else:
-      # Reuse underlay address space, but allocate unique IPs per leaf
-      link_index = (lldp_my_port - 1) + (state.node_id-1) * state.max_leaves
+      # Reuse underlay address space, optionally allocate unique IPs per leaf
+      link_index = (lldp_my_port - 1)
+      if not state.reuse_overlay_ips:
+         link_index += (state.node_id-1) * state.max_leaves
       peer_type = 'host'
 
       # For access ports, announce LLDP events if auto_lags is enabled

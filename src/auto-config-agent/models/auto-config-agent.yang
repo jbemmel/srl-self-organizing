@@ -80,6 +80,11 @@ module auto_config_agent {
                  type boolean;
                  default true;
                }
+               leaf reuse-overlay-ips {
+                 description "Whether to use the same IP at every host peerlink";
+                 type boolean;
+                 default false;
+               }
             }
             leaf loopbacks-prefix {
                 description "IPv4 prefix range to use for auto-assigned loopback IPs /32";
