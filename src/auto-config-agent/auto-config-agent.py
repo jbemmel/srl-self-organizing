@@ -477,13 +477,13 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
              "vxlan-interface": f"vxlan0.{port}",
              "evi": int(port),
              "ecmp": 8,
-             "routes": {
-              "bridge-table": {
-                "mac-ip": {
-                  "advertise": False # Avoid duplicate IPs on links
-                }
-              }
-            }
+             #"routes": {
+             # "bridge-table": {
+             #    "mac-ip": {
+             #      "advertise": False # Avoid duplicate IPs on links
+             #    }
+             #  }
+             # }
            }
           ]
          },
@@ -501,6 +501,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
          }
         }
       })
+   else:
+     irb_if['subinterface'][0]['ipv4']['arp'] = {
+       'timeout': 300,
+       '_annotate_timeout': "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
+     }
 
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),
