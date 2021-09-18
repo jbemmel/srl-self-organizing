@@ -506,6 +506,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
        'timeout': 300,
        '_annotate_timeout': "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
      }
+     if 'ipv6' in irb_if['subinterface'][0]:
+        irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
+          'stale-time': 300,
+          '_annotate_stale-time': "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
+        }
 
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),
