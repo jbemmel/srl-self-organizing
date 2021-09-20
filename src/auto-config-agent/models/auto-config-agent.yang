@@ -34,8 +34,8 @@ module auto_config_agent {
                 type enumeration {
                  enum auto;      // Auto-determined: Start as spine, become leaf
                  enum leaf;
-                 enum spine;
-                 enum superspine;
+                 enum spine; // Includes super-spines
+                 // enum superspine; // auto-detected when all neighbors are spines
                  enum endpoint;  // Use SRL to emulate a Linux host
                  // enum leaf-with-evpn; // Leaf with BGP EVPN/VXLAN overlay enabled?
                 }
@@ -120,6 +120,14 @@ module auto_config_agent {
                   enum disabled;
                 }
                 default "disabled";
+            }
+            leaf evpn-rr {
+                description "Enable the use of an EVPN Route Reflector on (super)spines"
+                type enumeration {
+                  enum enabled;
+                  enum disabled;
+                }
+                default "enabled";
             }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";

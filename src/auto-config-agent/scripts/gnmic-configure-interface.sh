@@ -18,6 +18,12 @@ PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
 IGP="${13}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
+EVPN_RR="${15}" # on_spines, on_superspines, disabled
+
+if [[ "$ROLE" == "spine" && "$EVPN_RR" == "on_spines" ]] || \
+   [[ "$ROLE" == "superspine" && "$EVPN_RR" == "on_superspines" ]]; then
+IS_EVPN_RR="1"
+fi
 
 echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 
@@ -183,9 +189,9 @@ EOF
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
-if [[ "$ROLE" == "spine" ]]; then
+if [[ "$ROLE" == "spine" ]] || [[ "$ROLE" == "superspine" ]]; then
 
-if [[ "$IGP" == "bgp" ]]; then
+if [[ "$ROLE" == "spine" && "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
@@ -193,11 +199,22 @@ IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
   "allowed-peer-as": [
     "$PEER_AS_MIN..$PEER_AS_MAX"
   ]
-},
+}
+EOF
+EBGP_NEIGHBORS_COMMA=","
+
+IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
+,
+{
+  "group-name": "leaves",
+  "admin-state": "enable",
+  "import-policy": "select-loopbacks",
+  "export-policy": "select-loopbacks"
+}
 EOF
 fi
 
-if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
 IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 ,
 {
@@ -213,41 +230,37 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
   }
 }
 EOF
-fi
-
-if [[ "$IGP" == "bgp" ]]; then
-IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
-,
-{
-  "group-name": "leaves",
-  "admin-state": "enable",
-  "import-policy": "select-loopbacks",
-  "export-policy": "select-loopbacks"
-}
-EOF
-fi
 
 IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
-IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
-"dynamic-neighbors": {
-    "accept": {
-      "match": [
-        $EBGP_NEIGHBORS
-        {
-          "prefix": "$ip1.$ip2.$ip3.0/22",
-          "peer-group": "evpn",
-          "allowed-peer-as": [ "$AS" ]
-        }
-      ]
-    }
-},
-"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
+$EBGP_NEIGHBORS_COMMA {
+  "prefix": "$ip1.$ip2.$ip3.0/22",
+  "peer-group": "evpn",
+  "allowed-peer-as": [ "$AS" ]
+}
+EOF
+
+IFS='' read -r -d '' EVPN_SECTION << EOF
 "evpn": {
  "rapid-update": true ,
  "keep-all-routes": true,
  "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
 },
+EOF
+fi
+
+IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
+"dynamic-neighbors": {
+    "accept": {
+      "match": [
+        ${EBGP_NEIGHBORS}
+        ${EVPN_IBGP_NEIGHBORS}
+      ]
+    }
+},
+"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+${EVPN_SECTION}
 "group": [
     {
       "group-name": "fellow-spines",

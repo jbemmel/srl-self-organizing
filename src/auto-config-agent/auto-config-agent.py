@@ -767,6 +767,8 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
                     state.evpn_auto_lags = data['evpn_auto_lags'][15:]
+                if 'evpn_rr' in data:
+                    state.evpn_rr = data['evpn_rr'][7:]
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
@@ -791,6 +793,13 @@ def Handle_Notification(obj, state):
           # Allow SRL-based emulated hosts called h1, h2...
           if m and not re.match("^h[0-9]+", peer_sys_name):
             to_port_id = m.groups()[1]
+
+            # rely on 'leaf' in name to auto-detect superspines
+            if re.match("^leaf.*$", peer_sys_name):
+                state.leaf_lldp_seen = True
+            elif re.match("^spine.*$", peer_sys_name):
+                state.spine_lldp_seen = True
+
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
             if not state.host_lldp_seen and state.role == 'auto':
@@ -986,7 +995,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
-                                       state.evpn],
+                                       state.evpn, state.evpn_rr],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -997,6 +1006,8 @@ class State(object):
     def __init__(self):
         self.role = None        # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
+        self.leaf_lldp_seen = False # To auto-detect superspines: >= leaf connected
+        self.spine_lldp_seen = False # To auto-detect superspines: >= spine connected
         self.pending_peers = {} # LLDP data received before we can determine ID
 
         self.announcing = ""    # Becomes Boolean for spines
