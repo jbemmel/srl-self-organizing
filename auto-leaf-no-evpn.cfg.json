@@ -1,7 +1,7 @@
 {
   "auto_config_agent:auto-config-agent": {
     "role": "leaf",
-    "use-ospfv3": true,
+    "igp": "ospf",
     "evpn": "disabled"
   },
   "srl_nokia-acl:acl": {
