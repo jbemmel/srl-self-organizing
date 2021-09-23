@@ -21,5 +21,4 @@ build-frr:
 	         -f Docker/Dockerfile.frr -t frr-with-lldp .
 	sudo docker tag frr-with-lldp frr-with-lldp:latest
 
-login:
-	docker log -u ${DOCKER_USER} -p ${DOCKER_PASS}
+all: build build-frr
