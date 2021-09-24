@@ -19,15 +19,15 @@ FROM srl/custombase:$SR_LINUX_RELEASE
 # COPY --from=paris-traceroute /usr/local/bin/paris-* /usr/local/bin/
 # COPY --from=paris-traceroute /usr/local/lib/* /usr/local/lib/
 
-RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/
+RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/
 COPY --chown=srlinux:srlinux ./auto-config-agent.yml /etc/opt/srlinux/appmgr
-COPY ./src /opt/srlinux/agents/
+COPY ./src /opt/demo-agents/
 
 # Add FIB agent
 # COPY ./srl-demo-agent/demo_* /home/appmgr/
 
 # run pylint to catch any obvious errors
-RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/srlinux/agents/auto-config-agent
+RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/auto-config-agent
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"

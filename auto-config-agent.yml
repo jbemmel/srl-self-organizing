@@ -1,8 +1,8 @@
 # See example_config.yml for an explanation of all the accepted fields
 auto_config_agent:
-   path: /opt/srlinux/agents/auto-config-agent/
+   path: /opt/demo-agents/auto-config-agent/
    launch-command: scripts/auto-config-agent.sh
-   search-command: python3 /opt/srlinux/agents/auto-config-agent/auto-config-agent.py
+   search-command: python3 /opt/demo-agents/auto-config-agent/auto-config-agent.py
    wait-for-config: Yes
    failure-threshold: 100
    failure-action: wait=forever
@@ -12,5 +12,5 @@ auto_config_agent:
        names:
            - "auto-config-agent"
        source-directories:
-           - "/opt/srlinux/agents/auto-config-agent/models/"
+           - "/opt/demo-agents/auto-config-agent/models/"
            - "/opt/srlinux/models/srl_nokia/models/common/"
