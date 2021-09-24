@@ -33,7 +33,7 @@ YANG model provides parameters:
 ```
 # Checkout the project from git:
 git clone --recurse-submodules https://github.com/jbemmel/srl-self-organizing.git
-
+cd srl-self-organizing
 make -C ./Docker all # -> this creates a local Docker image called 'srl/auto-config'
 
 sudo containerlab deploy -t ./srl-leafspine.lab # -> this creates a lab with 4 leaves and various MC-LAG variations
