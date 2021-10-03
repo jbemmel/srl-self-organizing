@@ -903,10 +903,14 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     min_peer_as = _as = state.base_as
     max_peer_as = min_peer_as + state.max_leaves
   elif (state.role != 'endpoint'):
-    logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
+    logging.info(f"Configure LEAF or SPINE-SUPERSPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*(?:spine)[-]?(\d+).*", lldp_peer_name)
-    _masterSpine = state.is_spine() and spineId and int(spineId.groups()[0]) > lldp_my_port
-    _r = 0 if _masterSpine or (not spineId and state.get_role()=='leaf') else 1
+    leafId = re.match(".*(?:leaf)[-]?(\d+).*", lldp_peer_name)
+
+    # _masterSpine = state.is_spine() and spineId and int(spineId.groups()[0]) > lldp_my_port
+    _r = 0 if (state.get_role() == "superspine" or
+               (leafId and state.get_role()=='spine') or
+               (not spineId and state.get_role()=='leaf') ) else 1
     _i = 1
     _as = state.leaf_as if state.leaf_as!=0 else (
            state.base_as + (0 if state.is_spine() # Use i- for iBGP
