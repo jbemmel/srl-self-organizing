@@ -4,7 +4,7 @@
 # TODO next version: Use Jinja2 templates plus native Python logic instead
 #
 #
-ROLE="$1"  # "spine" or "leaf" or "endpoint"
+ROLE="$1"  # "spine" or "leaf" or "endpoint" or "superspine"
 INTF="$2"
 IP_PREFIX="$3"
 PEER="$4"         # 'host' for Linux nodes and endpoints
@@ -15,18 +15,18 @@ PEER_AS_MIN="$8"     # Overlay AS in case of leaf-host
 PEER_AS_MAX="$9"     # Host AS in case of leaf-host
 LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${11}"
-PEER_ROUTER_ID="${12}"
+PEER_ROUTER_ID="${12}" # Not currently used
 IGP="${13}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
-EVPN_RR="${15}" # on_spines, on_superspines, disabled
+RR_ROUTER_ID="${15}"
 
-if [[ "$ROLE" == "spine" && "$EVPN_RR" == "on_spines" ]] || \
-   [[ "$ROLE" == "superspine" && "$EVPN_RR" == "on_superspines" ]]; then
+if [[ "$ROUTER_ID" == "$RR_ROUTER_ID" ]]; then
 IS_EVPN_RR="1"
 fi
 
-echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+# echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 
+# Can add --debug
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
@@ -55,7 +55,8 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=${LOOPBACK_IF}0] --replace-file $temp_file
+# Cannot do 'replace' here, other subinterfaces used
+$GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
 
 # Enable BFD for loopback
@@ -235,7 +236,7 @@ IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
 IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
 $EBGP_NEIGHBORS_COMMA {
-  "prefix": "$ip1.$ip2.$ip3.0/22",
+  "prefix": "$ip1.$ip2.0.0/24",
   "peer-group": "evpn",
   "allowed-peer-as": [ "$AS" ]
 }
@@ -263,7 +264,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 ${EVPN_SECTION}
 "group": [
     {
-      "group-name": "fellow-spines",
+      "group-name": "fellow-${ROLE}s",
       "admin-state": "enable",
       "peer-as": $AS
     }
@@ -516,7 +517,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
+$GNMIC set --update-path /interface[name=lo0] --update-file $temp_file
 exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
@@ -674,8 +675,8 @@ _IP="$PEER_IP"
 # if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
 # PEER_GROUP="hosts"
 # _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-if [[ "$ROLE" == "spine" ]]; then
-PEER_GROUP="fellow-spines"
+if [[ "$ROLE" =~ "(super)?spine" ]]; then
+PEER_GROUP="fellow-${ROLE}s"
 elif [[ "$ROLE" == "leaf" ]]; then
 PEER_GROUP="spines"
 else
@@ -690,18 +691,21 @@ cat > $temp_file << EOF
   "description": "$PEER"
 }
 EOF
+echo "Adding BGP peer ${_IP} in VRF ${VRF}..."
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
 # Peer router ID only set for spines when this node is a leaf
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$RR_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
 EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
+echo "Adding BGP peer ${RR_ROUTER_ID} as EVPN route reflector..."
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$RR_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi
 
+echo "Done, cleaning up ${temp_file}..."
 rm -f $temp_file
 exit $exitcode

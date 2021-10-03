@@ -29,18 +29,6 @@ module auto_config_agent {
             description "Top level enclosing container for auto config agent sample app
                          config and operational state data";
 
-            leaf role {
-                description "Role of this node in the fabric (layer in the network)";
-                type enumeration {
-                 enum auto;      // Auto-determined: Start as spine, become leaf
-                 enum leaf;
-                 enum spine; // Includes super-spines
-                 // enum superspine; // auto-detected when all neighbors are spines
-                 enum endpoint;  // Use SRL to emulate a Linux host
-                 // enum leaf-with-evpn; // Leaf with BGP EVPN/VXLAN overlay enabled?
-                }
-                default "auto";
-            }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";
                 // type srl_nokia-comm:as-number;
@@ -122,12 +110,8 @@ module auto_config_agent {
                 default "disabled";
             }
             leaf evpn-rr {
-                description "Enable the use of an EVPN Route Reflector on (super)spines"
-                type enumeration {
-                  enum enabled;
-                  enum disabled;
-                }
-                default "enabled";
+                description "Prefix to match EVPN Route Reflector IDs on (super)spines, defaults to all spines";
+                type srl_nokia-comm:ipv4-prefix;
             }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";

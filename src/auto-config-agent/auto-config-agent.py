@@ -395,9 +395,10 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 def Convert_to_lag(state,port,ip,vrf="overlay"):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
-   deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
-             f'/interface[{eth}]/subinterface[index=*]',
+   deletes=[ f'/interface[{eth}]/subinterface[index=*]',
              f'/interface[{eth}]/vlan-tagging' ]
+   if state.evpn != 'disabled' or vrf!='overlay':
+       deletes.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
    lag = {
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": True,
@@ -527,7 +528,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', delete=deletes, update=updates )
+      try:
+         c.set( encoding='json_ietf', delete=deletes, update=updates )
+      except Exception as ex:
+         # Dont quit agent. Usually means 'overlay' didn't get created
+         logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
 
 #
 # Called when an EVPN community match is discovered
@@ -768,7 +773,11 @@ def Handle_Notification(obj, state):
                 if 'evpn_auto_lags' in data:
                     state.evpn_auto_lags = data['evpn_auto_lags'][15:]
                 if 'evpn_rr' in data:
-                    state.evpn_rr = data['evpn_rr'][7:]
+                    state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
+                else:
+                    # Default to all nodes in spine layer
+                    state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
+                logging.info( f"EVPN RR prefix: {state.evpn_rr}" )
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'anycast_gw' in data:
@@ -808,7 +817,7 @@ def Handle_Notification(obj, state):
                delattr(state,"router_id")  # Re-determine IDs
                delattr(state,"node_id")
 
-          # First figure out this node's relative id in its group. Don't depend on hostname
+          # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
              node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
              if node_id == 0:
@@ -852,9 +861,13 @@ def Handle_Notification(obj, state):
 
 #####
 ## Determine this node's local ID within its group ( e.g. leaf1 = 1, spine1 = 1 )
-## Depends on LLDP system naming for now (but not local system name)
+## Based on local system name if available, else LLDP derived
 #####
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
+
+   if state.id_from_hostname != 0:
+       return state.id_from_hostname
+
    if state.is_spine():
        # TODO spine-spine link case
        return lldp_peer_port
@@ -872,18 +885,11 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
 
 ###
 # Calculates an IPv4 address to be used as router ID for the given node/role
-# Note: More generically 'node level', spine=0 leaf=1 host=2 for standard CLOS
+# Note: More generically 'node level', leaf=0 spine=1 superspine=2.. for standard CLOS
 ###
 def determine_router_id( state, role, node_id ):
-    _l = node_level(role)
+    _l = state.node_level(other_role=role)
     return str( state.loopbacks_prefix[ 256 * _l + node_id ] )
-
-def node_level( role ):
-    if role=="spine":
-        return 0
-    elif role=="leaf":
-        return 1
-    return 2
 
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
@@ -989,13 +995,18 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
+    evpn_rr = ""
+    if peer_rid != "":
+       evpn_rr = (peer_rid if ipaddress.IPv4Address(peer_rid) in state.evpn_rr
+                  # else list(state.evpn_rr.hosts())[0] ) # TODO support multiple RR on super-spines
+                  else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
     try:
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
-                                       state.evpn, state.evpn_rr],
+                                       state.evpn, evpn_rr],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -1004,7 +1015,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
 
 class State(object):
     def __init__(self):
-        self.role = None        # May not be set in config, default 'auto'
+        self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
         self.leaf_lldp_seen = False # To auto-detect superspines: >= leaf connected
         self.spine_lldp_seen = False # To auto-detect superspines: >= spine connected
@@ -1020,8 +1031,33 @@ class State(object):
         self.local_lldp = {}
         self.mc_lags = {}
 
+    def _determine_role(self):
+       """
+       Determine this node's role and relative ID based on the hostname
+       """
+       hostname = socket.gethostname()
+       role_id = re.match( "^(\w+)[-]?(\d+)$", hostname )
+       if role_id:
+           self.role = role_id.groups()[0]
+           self.id_from_hostname = int( role_id.groups()[1] )
+           logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
+
+           # TODO super<n>spine
+       else:
+           logging.error( f"Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
+           self.role = "auto"
+           self.id_from_hostname = 0
+
+    def node_level(self,other_role=None):
+       _role = other_role or self.get_role()
+       if _role=="leaf":
+         return 0 # Start from 0 at leaves, since we don't know how many levels
+       elif _role=="spine":
+         return 1
+       return 2 # superspine or higher, TODO super2spine, etc.
+
     def __str__(self):
-        return str(self.__class__) + ": " + str(self.__dict__)
+       return str(self.__class__) + ": " + str(self.__dict__)
 
     def get_role(self):
         # TODO could return "spine" when all active ports have LLDP
@@ -1078,17 +1114,7 @@ def Run():
                     # logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
-        logging.info(f'GOING TO EXIT NOW, DOING FINAL git pull: {err}')
-        # try:
-           # Need to execute this in the mgmt network namespace, hardcoded name for now
-           # XXX needs username/password unless checked out using 'git:'
-           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'],
-           #                            cwd='/etc/opt/srlinux/appmgr',
-           #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-           # stdoutput, stderroutput = git_pull.communicate()
-           # logging.info(f'git pull result: {stdoutput} err={stderroutput}')
-        # except Exception as e:
-        #   logging.error(f'Exception caught in git pull :: {e}')
+        logging.error(f'grpc._channel._Rendezvous: {err}')
 
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -1096,28 +1122,24 @@ def Run():
         # traceback.print_exc()
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
-        try:
-            response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-            logging.error(f'Run try: Unregister response:: {response}')
-        except grpc._channel._Rendezvous as err:
-            logging.info(f'GOING TO EXIT NOW: {err}')
-            sys.exit()
-        return True
-    sys.exit()
-    return True
+    finally:
+        Exit_Gracefully(0,0)
+
 ############################################################
 ## Gracefully handle SIGTERM signal
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister auto_config_agent".format(signum))
+    logging.info(f"Caught signal :: {signum}\n will unregister auto_config_agent" )
+    exitcode = signum
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-        logging.error('try: Unregister response:: {}'.format(response))
-        sys.exit()
+        logging.error( f'try: Unregister response::{response}' )
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW: {}'.format(err))
-        sys.exit()
+        logging.error( f'GOING TO EXIT NOW: {err}' )
+        exitcode = -1
+    finally:
+        sys.exit(exitcode)
 
 ##################################################################################################
 ## Main from where the Agent starts
