@@ -1,0 +1,52 @@
+name: auto-superspine-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # Uses custom container image containing auto-config agent
+      # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
+      image: srl/auto-config-v2:latest
+      extras:
+        srl-agents: [ auto-config-agent.yml ]
+    #binds:
+    #  - ./appmgr:/etc/opt/srlinux/appmgr:ro
+    linux:
+      image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
+
+  nodes:
+    leaf1:  { kind: srl, startup-config: auto-node-v2.cfg.json }
+    leaf2:  { kind: srl, startup-config: auto-node-v2.cfg.json }
+    leaf3:  { kind: srl, startup-config: auto-node-v2.cfg.json }
+    leaf4:  { kind: srl, startup-config: auto-node-v2.cfg.json }
+    spine1: { kind: srl, startup-config: auto-node-v2.cfg.json }
+    spine2: { kind: srl, startup-config: auto-node-v2.cfg.json }
+    superspine1: { kind: srl, startup-config: auto-node-v2.cfg.json }
+
+    #h1: { kind: srl, config: auto-host-with-vip.cfg.json }
+    #h2: { kind: srl, config: auto-host-with-vip.cfg.json }
+    h1:
+      kind: linux
+
+    h2:
+      kind: linux
+
+  links:
+    - endpoints: ["spine1:e1-1","superspine1:e1-1"]
+    - endpoints: ["spine2:e1-1","superspine1:e1-2"]
+
+    - endpoints: ["leaf1:e1-1","spine1:e1-2"]
+    - endpoints: ["leaf2:e1-1","spine1:e1-3"]
+    - endpoints: ["leaf3:e1-1","spine2:e1-2"]
+    - endpoints: ["leaf4:e1-1","spine2:e1-3"]
+
+    # 2-link lag
+    - endpoints: ["h1:e1-1","leaf1:e1-3"]
+    - endpoints: ["h1:e1-2","leaf2:e1-3"]
+
+    # 4-link mc-lag
+    - endpoints: ["h2:e1-1","leaf1:e1-4"]
+    - endpoints: ["h2:e1-2","leaf2:e1-4"]
+    - endpoints: ["h2:e1-3","leaf3:e1-4"]
+    - endpoints: ["h2:e1-4","leaf4:e1-4"]
