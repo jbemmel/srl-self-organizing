@@ -219,9 +219,10 @@ if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
 IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
 ,
 {
-  "group-name": "evpn",
+  "group-name": "evpn-leaves",
   "admin-state": "enable",
-  "peer-as": $AS,
+  "peer-as": $PEER_AS_MIN,
+  "_annotate_peer-as": "iBGP with leaves",
   "evpn": { "admin-state": "enable" },
   "ipv4-unicast": { "admin-state": "disable" },
   "ipv6-unicast": { "admin-state": "disable" },
@@ -237,8 +238,8 @@ IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
 $EBGP_NEIGHBORS_COMMA {
   "prefix": "$ip1.$ip2.0.0/24",
-  "peer-group": "evpn",
-  "allowed-peer-as": [ "$AS" ]
+  "peer-group": "evpn-leaves",
+  "allowed-peer-as": [ "$PEER_AS_MIN" ]
 }
 EOF
 

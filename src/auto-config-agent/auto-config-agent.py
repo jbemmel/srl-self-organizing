@@ -905,11 +905,11 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   elif (state.role != 'endpoint'):
     logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
     spineId = re.match(".*(?:spine)[-]?(\d+).*", lldp_peer_name)
-    _masterSpine = state.get_role() == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
+    _masterSpine = state.is_spine() and spineId and int(spineId.groups()[0]) > lldp_my_port
     _r = 0 if _masterSpine or (not spineId and state.get_role()=='leaf') else 1
     _i = 1
     _as = state.leaf_as if state.leaf_as!=0 else (
-           state.base_as + (0 if state.get_role() == 'spine' # Use i- for iBGP
+           state.base_as + (0 if state.is_spine() # Use i- for iBGP
                              or 'i-' in lldp_peer_name else state.node_id))
     min_peer_as = state.base_as # Overlay AS
     max_peer_as = state.host_as if state.host_as!=0 else state.base_as
@@ -1067,7 +1067,7 @@ class State(object):
            return self.role
 
     def is_spine(self):
-        return self.get_role() == "spine"
+        return self.get_role() == "spine" or self.get_role() == "superspine"
 
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
