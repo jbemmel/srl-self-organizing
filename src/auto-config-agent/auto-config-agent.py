@@ -756,8 +756,8 @@ def Handle_Notification(obj, state):
                     state.leaf_as = int( data['leaf_as']['value'] )
                 if 'host_as' in data:
                     state.host_as = int( data['host_as']['value'] )
-                if 'max_spines' in data:
-                    state.max_spines = int( data['max_spines']['value'] )
+                if 'max_spine_ports' in data:
+                    state.max_spine_ports = int( data['max_spine_ports']['value'] )
                 if 'max_leaves' in data:
                     state.max_leaves = int( data['max_leaves']['value'] )
                 if 'max_hosts_per_leaf' in data:
@@ -895,30 +895,36 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
   # For spine-spine connections, build iBGP
   peer_router_id = ""
-  if state.is_spine() and ('spine' not in lldp_peer_name):
+
+  # Number links based on spine ID
+  spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
+  node_id = int(spineId.groups()[0]) if spineId else state.node_id
+  if state.is_spine(): # (super)spines
     _r = 0
     _i = 0
-    link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
-    peer_type = 'leaf'
+
+    # Could dynamically determine # of active spine ports, and use less addresses
+    # state.max_spine_ports default = 4
+    link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
+    if 'superspine' in lldp_peer_name:
+       _r = 1
+       peer_type = 'superspine'
+    else:
+       _r = 0
+       peer_type = 'spine' if 'spine' in lldp_peer_name else 'leaf'
+
+    # Could calculate link_index purely based on node IDs, not LLDP
+    logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port}")
     min_peer_as = _as = state.base_as
     max_peer_as = min_peer_as + state.max_leaves
-  elif (state.role != 'endpoint'):
-    logging.info(f"Configure LEAF or SPINE-SUPERSPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    spineId = re.match(".*(?:spine)[-]?(\d+).*", lldp_peer_name)
-    leafId = re.match(".*(?:leaf)[-]?(\d+).*", lldp_peer_name)
-
-    # _masterSpine = state.is_spine() and spineId and int(spineId.groups()[0]) > lldp_my_port
-    _r = 0 if (state.get_role() == "superspine" or
-               (leafId and state.get_role()=='spine') or
-               (not spineId and state.get_role()=='leaf') ) else 1
+  elif (state.role != 'endpoint'): # Leaves
+    _r = 0 if (not spineId and state.get_role()=='leaf') else 1
     _i = 1
-    _as = state.leaf_as if state.leaf_as!=0 else (
-           state.base_as + (0 if state.is_spine() # Use i- for iBGP
-                             or 'i-' in lldp_peer_name else state.node_id))
+    _as = state.leaf_as if state.leaf_as!=0 else (state.base_as + state.node_id)
     min_peer_as = state.base_as # Overlay AS
     max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
-      link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
+      link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else:
@@ -932,7 +938,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       # if state.auto_lags:
       #     Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
-  else:
+    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port}")
+  else: # Emulated Hosts
     _r = 1
     _i = 2
     _as = state.host_as if state.host_as!=0 else state.base_as # iBGP to leaves uses same AS as spines

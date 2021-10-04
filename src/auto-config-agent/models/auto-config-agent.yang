@@ -80,8 +80,8 @@ module auto_config_agent {
 
                 default "1.1.0.0/22"; // spines get 1.1.0.x, leaves 1.1.1.x
             }
-            leaf max-spines {
-                description "Maximum number of spines, controls IP link addressing; must match across fabric";
+            leaf max-spine-ports {
+                description "Maximum number of active ports on spines, controls IP link addressing; must match across fabric";
                 type uint8;
                 default 4; // Higher values require a larger peerlinks-prefix space
             }
