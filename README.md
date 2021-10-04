@@ -18,7 +18,7 @@ What is demonstrated:
 * For now and to keep things simple: role is an agent parameter
 
 YANG model provides parameters:
-* role: leaf|spine|superspine
+* role: leaf|spine
 * AS base: Spine AS number, each Leaf gets <base + rank>
 * Link prefix: IP/mask to use for generating peer-2-peer /31 link addresses 
   ( For example: 192.168.0.0/24, spine1=192.168.0.0/31 and leaf1=192.168.0.1/31 )
@@ -30,10 +30,14 @@ YANG model provides parameters:
 * Whether to use OSPFv3 or BGP Unnumbered (based on FRR agent)
 
 ## Deploy lab
-1. Checkout and build the base image from https://github.com/jbemmel/srl-baseimage
-2. Checkout the project from git
-3. `make -C ./Docker` -> this creates a local Docker image called 'srl/auto-config'
-4. `sudo clab deploy -t ./srl-leafspine.lab` -> this creates a lab with 4 leaves and various MC-LAG variations
+```
+# Checkout the project from git:
+git clone --recurse-submodules https://github.com/jbemmel/srl-self-organizing.git
+cd srl-self-organizing
+make -C ./Docker all # -> this creates a local Docker image called 'srl/auto-config'
+
+sudo containerlab deploy -t ./srl-leafspine.lab # -> this creates a lab with 4 leaves and various MC-LAG variations
+```
 
 ## Networking design details
 This example uses:
