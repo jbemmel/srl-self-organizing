@@ -924,7 +924,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     min_peer_as = state.base_as # Overlay AS
     max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
-      link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
+      link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
     else:
@@ -938,7 +938,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       # if state.auto_lags:
       #     Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
-    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port}")
+    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} peer_router_id={peer_router_id}")
   else: # Emulated Hosts
     _r = 1
     _i = 2
@@ -1006,11 +1006,10 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
-    evpn_rr = ""
-    if peer_rid != "":
-       evpn_rr = (peer_rid if ipaddress.IPv4Address(peer_rid) in state.evpn_rr
-                  # else list(state.evpn_rr.hosts())[0] ) # TODO support multiple RR on super-spines
-                  else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
+    evpn_rr = (router_id if ipaddress.IPv4Address(router_id) in state.evpn_rr
+               else peer_rid if ipaddress.IPv4Address(peer_rid) in state.evpn_rr
+               else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
+    logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
