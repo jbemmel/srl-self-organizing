@@ -18,6 +18,7 @@ PEER_TYPE="${11}"
 PEER_ROUTER_ID="${12}"
 IGP="${13}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
+OVERLAY_BGP_ADMIN_STATE="${15}" # 'disable' or 'enable'
 
 echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 
@@ -263,7 +264,7 @@ elif [[ "$ROLE" == "leaf" ]]; then
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
   "group-name": "hosts",
-  "admin-state": "enable",
+  "admin-state": "$OVERLAY_BGP_ADMIN_STATE",
   "ipv6-unicast" : { "admin-state" : "enable" },
   "peer-as": $PEER_AS_MAX,
   "local-as": [ { "as-number": $PEER_AS_MIN } ],

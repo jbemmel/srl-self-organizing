@@ -769,6 +769,9 @@ def Handle_Notification(obj, state):
                     state.evpn_auto_lags = data['evpn_auto_lags'][15:]
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
+                if 'overlay_bgp_admin_state' in data:
+                    _b = data['overlay_bgp_admin_state'][24:]
+                    state.overlay_bgp_admin_state = _b
                 if 'anycast_gw' in data:
                     state.anycast_gw = data['anycast_gw']['value']
 
@@ -986,7 +989,8 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
-                                       state.evpn],
+                                       state.evpn,
+                                       state.overlay_bgp_admin_state ],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')

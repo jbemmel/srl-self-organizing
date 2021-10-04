@@ -144,6 +144,14 @@ module auto_config_agent {
                 type boolean;
                 default true;
             }
+            leaf overlay-bgp-admin-state {
+                description "admin-state for overlay BGP group, default 'enable'";
+                type enumeration {
+                  enum disable;
+                  enum enable;
+                }
+                default enable;
+            }
             leaf evpn-auto-lags {
                 description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
                 type enumeration {
