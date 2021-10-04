@@ -1006,8 +1006,8 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
-    evpn_rr = (router_id if ipaddress.IPv4Address(router_id) in state.evpn_rr
-               else peer_rid if ipaddress.IPv4Address(peer_rid) in state.evpn_rr
+    evpn_rr = (router_id if (router_id and ipaddress.IPv4Address(router_id) in state.evpn_rr)
+               else peer_rid if (peer_rid and ipaddress.IPv4Address(peer_rid) in state.evpn_rr)
                else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
