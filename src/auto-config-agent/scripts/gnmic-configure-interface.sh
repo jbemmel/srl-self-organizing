@@ -602,7 +602,7 @@ fi
 # Removed $_VLAN_TAGGING and $_VLAN
 cat > $temp_file << EOF
 {
-  "description": "To $PEER",
+  "description": "auto-config to $PEER",
   "admin-state": "enable",
   "subinterface": [
     {
