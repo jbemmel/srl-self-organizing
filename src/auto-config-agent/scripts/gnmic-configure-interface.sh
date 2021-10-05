@@ -77,6 +77,15 @@ exitcode+=$?
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 # Still requires static (link local) IPv4 addresses on each interface
 if [[ "$IGP" == "ospf" ]]; then
+
+if [[ "$ROLE" == "spine" ]]; then
+IFS='' read -r -d '' ENABLE_ASBR_ON_SPINE << EOF
+"asbr": {
+  "_annotate": "Redistribute indirect routes including static routes"
+},
+EOF
+fi
+
 cat > $temp_file << EOF
 {
   "router-id": "$ROUTER_ID",
@@ -84,9 +93,7 @@ cat > $temp_file << EOF
   "version": "ospf-v3",
   "address-family": "ipv4-unicast",
   "max-ecmp-paths": 8,
-  "asbr": {
-    "_annotate": "Redistribute indirect routes including static routes"
-  },
+  ${ENABLE_ASBR_ON_SPINE}
   "area": [
     {
       "area-id": "0.0.0.0",
