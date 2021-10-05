@@ -416,7 +416,8 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "autonomous-system": $AS,
+  "autonomous-system": $PEER_AS_MIN,
+  "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   $BGP_IP_UNDERLAY
