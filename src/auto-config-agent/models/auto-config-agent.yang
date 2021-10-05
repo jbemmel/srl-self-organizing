@@ -83,7 +83,7 @@ module auto_config_agent {
             leaf max-spine-ports {
                 description "Maximum number of active ports on spines, controls IP link addressing; must match across fabric";
                 type uint8;
-                default 4; // Higher values require a larger peerlinks-prefix space
+                default 6; // Higher values require a larger peerlinks-prefix space
             }
             leaf max-leaves {
                 description "Maximum number of leafs, controls AS allocation; must match across fabric";
