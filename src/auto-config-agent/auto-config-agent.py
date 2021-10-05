@@ -905,6 +905,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
     # Could dynamically determine # of active spine ports, and use less addresses
     # state.max_spine_ports default = 4
+    if lldp_my_port > state.max_spine_ports:
+        logging.error( f"max-spine-ports configured too low({state.max_spine_ports}), will result in duplicate link IPs" )
+        return
+
     link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
     if 'superspine' in lldp_peer_name:
        _r = 1
@@ -914,7 +918,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
        peer_type = 'spine' if 'spine' in lldp_peer_name else 'leaf'
 
     # Could calculate link_index purely based on node IDs, not LLDP
-    logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port}")
+    logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index}[{_r}] local_port={lldp_my_port} peer_port={lldp_peer_port}")
     min_peer_as = _as = state.base_as
     max_peer_as = min_peer_as + state.max_leaves
   elif (state.role != 'endpoint'): # Leaves
