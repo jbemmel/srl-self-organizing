@@ -83,6 +83,7 @@ IFS='' read -r -d '' ENABLE_ASBR_ON_SPINE << EOF
 "asbr": {
   "_annotate": "Redistribute indirect routes including static routes"
 },
+"export-policy": "accept-all",
 EOF
 fi
 
