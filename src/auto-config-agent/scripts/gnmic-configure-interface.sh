@@ -84,6 +84,9 @@ cat > $temp_file << EOF
   "version": "ospf-v3",
   "address-family": "ipv4-unicast",
   "max-ecmp-paths": 8,
+  "asbr": {
+    "_annotate": "Redistribute indirect routes including static routes"
+  },
   "area": [
     {
       "area-id": "0.0.0.0",
