@@ -1021,7 +1021,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
-       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in ("str","int") } # **kwargs
+       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
