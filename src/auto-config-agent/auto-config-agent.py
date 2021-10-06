@@ -826,7 +826,7 @@ def Handle_Notification(obj, state):
                 state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
                   peer_sys_name, obj.lldp_neighbor.data.system_description )
                 return False; # Unable to continue configuration
-             state.node_id = node_id
+             state._determine_local_as(node_id) # XXX todo reorganize
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
@@ -1021,7 +1021,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
-       my_env = { a: str(v) for a,v in state.__dict__.items() } # **kwargs
+       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in ("str","int") } # **kwargs
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
@@ -1038,6 +1038,10 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
 
 class State(object):
     def __init__(self):
+        # YAML attributes
+        self.base_as = None
+        self.max_leaves = None
+
         self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
         self.leaf_lldp_seen = False # To auto-detect superspines: >= leaf connected
@@ -1067,9 +1071,21 @@ class State(object):
 
            # TODO super<n>spine
        else:
-           logging.error( f"Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
+           logging.warning( f"Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
            self.role = "auto"
            self.id_from_hostname = 0
+
+    def _determine_local_as(self,node_id):
+       self.node_id = node_id # Store it
+       _role = self.get_role()
+       if _role == "superspine":
+           self.local_as = self.base_as
+       elif _role == "spine":
+           self.local_as = self.base_as + 1
+       elif _role == "leaf":
+           self.local_as = self.base_as + 1 + self.node_id
+       else: # host
+           self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 
     def node_level(self,other_role=None):
        _role = other_role or self.get_role()

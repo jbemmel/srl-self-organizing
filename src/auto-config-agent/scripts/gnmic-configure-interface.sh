@@ -25,7 +25,7 @@ IS_EVPN_RR="1"
 fi
 
 # echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
-echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
+# echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
 
 # Can add --debug
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
@@ -233,7 +233,7 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
 {
   "group-name": "evpn-leaves",
   "admin-state": "enable",
-  "peer-as": $PEER_AS_MIN,
+  "peer-as": ${evpn_overlay_as},
   "_annotate_peer-as": "iBGP with leaves",
   "evpn": { "admin-state": "enable" },
   "ipv4-unicast": { "admin-state": "disable" },
@@ -288,7 +288,7 @@ IFS='' read -r -d '' HOSTS_GROUP << EOF
   "admin-state": "enable",
   "ipv6-unicast" : { "admin-state" : "enable" },
   "peer-as": $PEER_AS_MAX,
-  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "send-default-route": {
     "ipv4-unicast": true,
     "ipv6-unicast": true
@@ -322,8 +322,8 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "accept-all",
   "export-policy": "reject-link-routes",
-  "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "peer-as": ${evpn_overlay_as},
+  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
   "transport" : { "local-address" : "${ROUTER_ID}" }
 }
@@ -361,7 +361,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
   "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": $AS } ]
+  "local-as": [ { "as-number": ${local_as} } ]
 }
 EOF
 else
@@ -412,7 +412,7 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "autonomous-system": $PEER_AS_MIN,
+  "autonomous-system": ${evpn_overlay_as},
   "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
@@ -471,17 +471,8 @@ IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
       "ecmp": 8
     }
   ]
-},
-"bgp-vpn": {
-  "bgp-instance": [
-    {
-      "id": 1,
-      "route-target": {
-        "export-rt": "target:$PEER_AS_MIN:10000",
-        "import-rt": "target:$PEER_AS_MIN:10000"
-      }
-    }
-  ]
+},"bgp-vpn": {
+
 }
 EOF
 else
@@ -542,7 +533,7 @@ cat > $temp_file << EOF
     "protocols": {
       "bgp": {
         "admin-state": "enable",
-        "autonomous-system": $PEER_AS_MIN,
+        "autonomous-system": ${evpn_overlay_as},
         "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
         "ipv4-unicast": {
           "admin-state": "enable",
