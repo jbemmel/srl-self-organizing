@@ -25,12 +25,17 @@ module auto_config_agent {
         description "Top level grouping for auto config agent sample app";
 
         container auto-config-agent {
-            presence "presence container";
+            presence "Auto-config agent parameters";
             description "Top level enclosing container for auto config agent sample app
                          config and operational state data";
 
+            leaf evpn-overlay-as {
+                description "iBGP overlay AS number to use for the EVPN overlay";
+                type uint32;
+                default 65000;
+            }
             leaf base-as {
-                description "Baseline 2-byte or 4-byte Autonomous System to auto-assign";
+                description "Baseline 2-byte or 4-byte Autonomous System to auto-assign for EBGP";
                 // type srl_nokia-comm:as-number;
                 type uint32;
                 // default 65000; // Use 2-byte AS for easier RT interop

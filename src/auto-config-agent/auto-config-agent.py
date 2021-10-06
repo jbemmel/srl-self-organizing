@@ -750,6 +750,8 @@ def Handle_Notification(obj, state):
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                     state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
+                if 'evpn_overlay_as' in data:
+                    state.evpn_overlay_as = int( data['evpn_overlay_as']['value'] )
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
                 if 'leaf_as' in data:
@@ -1019,12 +1021,15 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
                else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
+       my_env = { a: str(v) for a,v in state.__dict__.items() } # **kwargs
+       logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
                                        state.evpn, evpn_rr],
+                                       env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')

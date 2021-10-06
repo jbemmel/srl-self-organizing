@@ -25,6 +25,7 @@ IS_EVPN_RR="1"
 fi
 
 # echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
 
 # Can add --debug
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
