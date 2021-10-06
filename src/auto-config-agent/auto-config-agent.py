@@ -977,13 +977,13 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      else:
        _ip = ""
        _peer = "*"
-     logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
+     logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip} peer={_peer}")
      script_update_interface(
          state,
          intf_name,
          _ip,
          lldp_peer_desc,
-         _peer if state.get_role() != 'spine' else '*',
+         _peer if _r==1 else '*', # Only when connecting "upwards"
          _as,
          state.router_id if set_router_id else "",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
