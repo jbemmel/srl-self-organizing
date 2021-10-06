@@ -205,16 +205,10 @@ if [[ $ROLE =~ ^(super)?spine ]]; then
 
 if [[ "$IGP" == "bgp" ]]; then
 
-if [[ "$ROLE" == "spine" ]]; then
-EBGP_PEER_GROUP="leaves"
-else
-EBGP_PEER_GROUP="spines"
-fi
-
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "$EBGP_PEER_GROUP",
+  "peer-group": "ebgp-peers",
   "allowed-peer-as": [
     "$PEER_AS_MIN..$PEER_AS_MAX"
   ]
@@ -222,10 +216,9 @@ IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 EOF
 EBGP_NEIGHBORS_COMMA=","
 
-IFS='' read -r -d '' EBGP_CHILDREN_GROUP << EOF
-,
+IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
-  "group-name": "$EBGP_PEER_GROUP",
+  "group-name": "ebgp-peers",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks"
@@ -234,7 +227,7 @@ EOF
 fi
 
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
-IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
+IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
 ,
 {
   "group-name": "evpn-leaves",
@@ -282,18 +275,11 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
 ${EVPN_SECTION}
 "group": [
-    {
-      "group-name": "fellow-${ROLE}s",
-      "admin-state": "enable",
-      "peer-as": $AS
-    }
-    ${EBGP_CHILDREN_GROUP}
-    ${EVPN_SPINE_GROUP}
-  ],
+    ${EBGP_PEER_GROUP}
+    ${EVPN_LEAVES_GROUP}
+],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
-
-EBGP_PEER_GROUP="spines"
 
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
@@ -698,7 +684,7 @@ _IP="$PEER_IP"
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "$EBGP_PEER_GROUP",
+  "peer-group": "ebgp-peers",
   "description": "$PEER"
 }
 EOF
