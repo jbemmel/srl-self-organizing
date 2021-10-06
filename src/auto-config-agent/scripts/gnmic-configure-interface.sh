@@ -201,13 +201,20 @@ EOF
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
-if [[ "$ROLE" == "spine" ]] || [[ "$ROLE" == "superspine" ]]; then
+if [[ $ROLE =~ ^(super)?spine ]]; then
 
-if [[ "$ROLE" == "spine" && "$IGP" == "bgp" ]]; then
+if [[ "$IGP" == "bgp" ]]; then
+
+if [[ "$ROLE" == "spine" ]]; then
+EBGP_PEER_GROUP="leaves"
+else
+EBGP_PEER_GROUP="spines"
+fi
+
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "leaves",
+  "peer-group": "$EBGP_PEER_GROUP",
   "allowed-peer-as": [
     "$PEER_AS_MIN..$PEER_AS_MAX"
   ]
@@ -215,10 +222,10 @@ IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 EOF
 EBGP_NEIGHBORS_COMMA=","
 
-IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
+IFS='' read -r -d '' EBGP_CHILDREN_GROUP << EOF
 ,
 {
-  "group-name": "leaves",
+  "group-name": "$EBGP_PEER_GROUP",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks"
@@ -280,11 +287,13 @@ ${EVPN_SECTION}
       "admin-state": "enable",
       "peer-as": $AS
     }
-    ${BGP_LEAVES_GROUP}
+    ${EBGP_CHILDREN_GROUP}
     ${EVPN_SPINE_GROUP}
   ],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
+
+EBGP_PEER_GROUP="spines"
 
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
@@ -685,22 +694,11 @@ fi
 if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && \
    [[ "$IGP" == "bgp" ]]; then
 _IP="$PEER_IP"
-# if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
-# PEER_GROUP="hosts"
-# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-if [[ "$ROLE" =~ "(super)?spine" ]]; then
-PEER_GROUP="fellow-${ROLE}s"
-elif [[ "$ROLE" == "leaf" ]]; then
-PEER_GROUP="spines"
-else
-PEER_GROUP="leaf-ibgp"
-# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-fi
 
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "$PEER_GROUP",
+  "peer-group": "$EBGP_PEER_GROUP",
   "description": "$PEER"
 }
 EOF
