@@ -932,18 +932,18 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   elif (state.role != 'endpoint'): # Leaves
     _r = 0 if (not spineId and state.get_role()=='leaf') else 1
     _i = 1
-    min_peer_as = state.base_as # Overlay AS
-    max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
+      min_peer_as = max_peer_as = state.base_as + 1 # EBGP spine AS
     else:
       # Reuse underlay address space, optionally allocate unique IPs per leaf
       link_index = (lldp_my_port - 1)
       if not state.reuse_overlay_ips:
          link_index += (state.node_id-1) * state.max_leaves
       peer_type = 'host'
+      min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
       # if state.auto_lags:
@@ -953,7 +953,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   else: # Emulated Hosts
     _r = 1
     _i = 2
-    min_peer_as = max_peer_as = state.base_as
+    min_peer_as = max_peer_as = state.evpn_overlay_as
     peer_type = 'leaf'
 
     # For IP addressing, reuse same link space as underlay, by leaf port and leaf id

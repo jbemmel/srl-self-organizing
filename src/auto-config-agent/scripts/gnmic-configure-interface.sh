@@ -704,7 +704,7 @@ fi
 # Peer router ID only set for spines when this node is a leaf
 if [[ "$ROLE" == "leaf" ]] && [[ "$RR_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
+{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "EVPN Route Reflector for overlay" }
 EOF
 echo "Adding BGP peer ${RR_ROUTER_ID} as EVPN route reflector..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$RR_ROUTER_ID] --update-file $temp_file
