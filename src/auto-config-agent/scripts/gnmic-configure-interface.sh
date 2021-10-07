@@ -76,6 +76,63 @@ exitcode+=$?
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
 
+# Need a generic BGP policy to advertise loopbacks; apply specifically
+cat > $temp_file << EOF
+{
+  "prefix-set": [
+    {
+      "name": "loopbacks",
+      "prefix": [
+        { "ip-prefix": "0.0.0.0/0","mask-length-range": "32..32" },
+        { "ip-prefix": "::/0", "mask-length-range": "128..128" }
+      ]
+    },
+    {
+      "name": "links",
+      "prefix": [
+        { "ip-prefix": "$LINK_PREFIX","mask-length-range": "28..31" }
+      ]
+    }
+  ],
+  "policy": [
+    {
+      "name": "select-loopbacks",
+      "default-action": { "reject": { } },
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": {
+            "prefix-set": "loopbacks"
+          },
+          "action": { "accept": { } }
+        }
+      ]
+    },
+    {
+      "name": "reject-link-routes",
+      "default-action": { "accept": { } },
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": {
+            "prefix-set": "links"
+          },
+          "action": { "reject": { } }
+        }
+      ]
+    },
+    {
+      "name": "accept-all",
+      "default-action": { "accept": { } }
+    }
+  ]
+}
+EOF
+
+# Or replace to reset all to a known state?
+$GNMIC set --update-path /routing-policy --update-file $temp_file
+exitcode+=$?
+
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 # Still requires static (link local) IPv4 addresses on each interface
 if [[ "$IGP" == "ospf" ]]; then
@@ -145,63 +202,6 @@ EOF
 $GNMIC set --update-path /network-instance[name=default]/protocols/isis/instance[name=main] --update-file $temp_file
 exitcode+=$?
 fi
-
-# Need a generic BGP policy to advertise loopbacks; apply specifically
-cat > $temp_file << EOF
-{
-  "prefix-set": [
-    {
-      "name": "loopbacks",
-      "prefix": [
-        { "ip-prefix": "0.0.0.0/0","mask-length-range": "32..32" },
-        { "ip-prefix": "::/0", "mask-length-range": "128..128" }
-      ]
-    },
-    {
-      "name": "links",
-      "prefix": [
-        { "ip-prefix": "$LINK_PREFIX","mask-length-range": "28..31" }
-      ]
-    }
-  ],
-  "policy": [
-    {
-      "name": "select-loopbacks",
-      "default-action": { "reject": { } },
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": {
-            "prefix-set": "loopbacks"
-          },
-          "action": { "accept": { } }
-        }
-      ]
-    },
-    {
-      "name": "reject-link-routes",
-      "default-action": { "accept": { } },
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": {
-            "prefix-set": "links"
-          },
-          "action": { "reject": { } }
-        }
-      ]
-    },
-    {
-      "name": "accept-all",
-      "default-action": { "accept": { } }
-    }
-  ]
-}
-EOF
-
-# Or replace to reset all to a known state?
-$GNMIC set --update-path /routing-policy --update-file $temp_file
-exitcode+=$?
 
 if [[ $ROLE =~ ^(super)?spine ]]; then
 
