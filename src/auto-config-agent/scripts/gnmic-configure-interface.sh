@@ -458,6 +458,8 @@ cat > $temp_file << EOF
 
 EOF
 
+# DEBUG
+cp $temp_file /tmp/debug_protocols_bgp.json
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
 
