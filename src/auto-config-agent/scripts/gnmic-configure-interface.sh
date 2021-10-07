@@ -228,6 +228,12 @@ EOF
 DYNAMIC_EBPG_GROUP="ebgp-leaves"
 else
 DYNAMIC_EBPG_GROUP="ebgp-spines"
+IFS='' read -r -d '' AS_PATH_OPTIONS << EOF
+"as-path-options": {
+    "replace-peer-as": true,
+    "_annotate_replace-peer-as": "To allow routes across spines"
+},
+EOF
 fi
 
 IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
@@ -245,6 +251,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  ${AS_PATH_OPTIONS}
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
 ${EBGP_PEER_GROUP_SUPERSPINES}

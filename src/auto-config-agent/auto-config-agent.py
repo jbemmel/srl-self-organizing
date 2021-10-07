@@ -1021,6 +1021,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
+       my_env['PATH'] = '/usr/bin/'
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,router_id,
