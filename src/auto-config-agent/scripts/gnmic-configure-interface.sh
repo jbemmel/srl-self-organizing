@@ -254,14 +254,13 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   ${AS_PATH_OPTIONS}
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
-${EBGP_PEER_GROUP_SUPERSPINES}
+${EBGP_PEER_GROUP_SUPERSPINES},
 EOF
 
 fi
 
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
 IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
-,
 {
   "group-name": "evpn-leaves",
   "admin-state": "enable",
