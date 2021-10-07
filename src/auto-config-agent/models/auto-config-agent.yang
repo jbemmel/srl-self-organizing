@@ -30,9 +30,9 @@ module auto_config_agent {
                          config and operational state data";
 
             leaf evpn-overlay-as {
-                description "iBGP overlay AS number to use for the EVPN overlay";
+                description "iBGP overlay AS number to use for the EVPN overlay, should not overlap with underlay";
                 type uint32;
-                default 65000;
+                default 65535;
             }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign for EBGP";
