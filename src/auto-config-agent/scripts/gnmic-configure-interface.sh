@@ -206,10 +206,26 @@ if [[ $ROLE =~ ^(super)?spine ]]; then
 
 if [[ "$IGP" == "bgp" ]]; then
 
+if [[ "$ROLE" == "spine" ]]; then
+# May or may not be used
+IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
+  ,{
+    "group-name": "ebgp-superspines",
+    "admin-state": "enable",
+    "import-policy": "select-loopbacks",
+    "export-policy": "select-loopbacks",
+    "local-as": [ { "as-number": ${local_as} } ]
+  }
+EOF
+OTHER_EBPG_GROUP="ebgp-leaves"
+else
+OTHER_EBPG_GROUP="ebgp-spines"
+fi
+
 IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "ebgp-peers",
+  "peer-group": "${OTHER_EBPG_GROUP}",
   "allowed-peer-as": [
     "$PEER_AS_MIN..$PEER_AS_MAX"
   ]
@@ -219,12 +235,15 @@ EBGP_NEIGHBORS_COMMA=","
 
 IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
-  "group-name": "ebgp-peers",
+  "group-name": "ebgp-${PEER_TYPE}s",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
-  "export-policy": "select-loopbacks"
+  "export-policy": "select-loopbacks",
+  "local-as": [ { "as-number": ${local_as} } ]
 }
+${EBGP_PEER_GROUP_SUPERSPINES}
 EOF
+
 fi
 
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
@@ -669,19 +688,16 @@ $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_f
 exitcode+=$?
 fi
 
-if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && \
-   [[ "$IGP" == "bgp" ]]; then
-_IP="$PEER_IP"
-
+if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && [[ "$IGP" == "bgp" ]]; then
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "ebgp-peers",
+  "peer-group": "ebgp-${PEER_TYPE}s",
   "description": "$PEER"
 }
 EOF
-echo "Adding BGP peer ${_IP} in VRF ${VRF}..."
-$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
+echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
