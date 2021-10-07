@@ -216,6 +216,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
     "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+    "timers": { "connect-retry": 10 },
     "local-as": [ { "as-number": ${local_as} } ],
     "peer-as": ${PEER_AS_MIN}
   }
@@ -345,7 +346,8 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
   "peer-as": ${evpn_overlay_as},
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
-  "transport" : { "local-address" : "${ROUTER_ID}" }
+  "transport" : { "local-address" : "${ROUTER_ID}" },
+  "timers": { "connect-retry": 10 }
 }
 EOF
 
@@ -380,6 +382,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  "timers": { "connect-retry": 10 },
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": ${local_as} } ]
 }

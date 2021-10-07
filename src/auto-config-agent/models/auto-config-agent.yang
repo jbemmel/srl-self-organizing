@@ -30,7 +30,7 @@ module auto_config_agent {
                          config and operational state data";
 
             leaf evpn-overlay-as {
-                description "iBGP overlay AS number to use for the EVPN overlay, should not overlap with underlay";
+                description "iBGP AS number to use for the EVPN overlay, should not overlap with underlay";
                 type uint32;
                 default 65535;
             }
@@ -40,7 +40,7 @@ module auto_config_agent {
                 type uint32;
                 // default 65000; // Use 2-byte AS for easier RT interop
                 // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
-                default 4200000000; // Spines get this, each leaf gets base+rank
+                default 4200000000; // Superspines get this, each leaf gets base+1+rank
             }
             leaf leaf-as {
                 description "AS to use for leaves, 0=auto (eBGP)";
