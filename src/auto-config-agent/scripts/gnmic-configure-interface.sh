@@ -209,6 +209,10 @@ if [[ "$IGP" == "bgp" ]]; then
 
 if [[ "$ROLE" == "spine" ]]; then
 # May or may not be used
+#
+# Could also use "as-path-options": { "allow-own-as": 1(or 2 on leaves) },
+# instead of "prepend-global-as": false
+#
 IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
   ,{
     "group-name": "ebgp-superspines",
