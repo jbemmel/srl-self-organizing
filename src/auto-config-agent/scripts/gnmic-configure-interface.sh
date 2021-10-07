@@ -32,11 +32,13 @@ GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
 
-# Set loopback IP, if provided
+#
+# 1) One-time configuration at startup, when ROUTER_ID is provided
+#
 if [[ "$ROUTER_ID" != "" ]]; then
 
 if [[ "$ROLE" == "leaf" ]]; then
-# XXX cannot ping system0 interface, may want to create lo0.0 with ipv6 addr
+# XXX cannot ping system0 interface? may want to create lo0.0 with ipv6 addr
 LOOPBACK_IF="system"
 else
 LOOPBACK_IF="lo"
@@ -226,10 +228,7 @@ fi
 IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "${DYNAMIC_EBPG_GROUP}",
-  "allowed-peer-as": [
-    "$PEER_AS_MIN..$PEER_AS_MAX"
-  ]
+  "peer-group": "${DYNAMIC_EBPG_GROUP}"
 }
 EOF
 EBGP_NEIGHBORS_COMMA=","
@@ -588,8 +587,11 @@ $GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_fil
 exitcode+=$?
 
 fi # leaf with EVPN enabled
+fi # if ROUTER_ID provided, first time only
 
-fi # if router_id provided, first time only
+#
+# 2) Per-link provisioning
+#
 
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
@@ -675,6 +677,34 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
+
+elif [[ "$IGP" == "bgp" ]]; then
+
+if [[ "$PEER_IP" != "*" ]]; then
+cat > $temp_file << EOF
+{
+  "admin-state": "enable",
+  "peer-group": "ebgp-${PEER_TYPE}s",
+  "description": "$PEER"
+}
+EOF
+echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
+exitcode+=$?
+elif [[ "$ROLE" != "leaf" ]]; then
+
+# Update EBGP dynamic peering group on (super)spines with correct AS range
+cat > $temp_file << EOF
+{
+  "allowed-peer-as": [
+    "$PEER_AS_MIN..$PEER_AS_MAX"
+  ]
+}
+EOF
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
+exitcode+=$?
+
+fi # "$PEER_IP" != "*"
 fi
 
 # Enable BFD, except for host facing interfaces
@@ -687,19 +717,6 @@ cat > $temp_file << EOF
 }
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
-exitcode+=$?
-fi
-
-if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && [[ "$IGP" == "bgp" ]]; then
-cat > $temp_file << EOF
-{
-  "admin-state": "enable",
-  "peer-group": "ebgp-${PEER_TYPE}s",
-  "description": "$PEER"
-}
-EOF
-echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
-$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
 exitcode+=$?
 fi
 
