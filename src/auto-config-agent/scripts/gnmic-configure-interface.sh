@@ -217,7 +217,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "export-policy": "select-loopbacks",
     "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
     "timers": { "connect-retry": 10 },
-    "local-as": [ { "as-number": ${local_as} } ],
+    "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
     "peer-as": ${PEER_AS_MIN}
   }
 EOF
@@ -241,7 +241,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
-  "local-as": [ { "as-number": ${local_as} } ]
+  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
 ${EBGP_PEER_GROUP_SUPERSPINES}
 EOF
@@ -384,7 +384,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
   "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": ${local_as} } ]
+  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
 EOF
 else
