@@ -213,6 +213,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "admin-state": "enable",
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
+    "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
     "local-as": [ { "as-number": ${local_as} } ],
     "peer-as": ${PEER_AS_MIN}
   }
@@ -239,6 +240,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
+  "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
   "local-as": [ { "as-number": ${local_as} } ]
 }
 ${EBGP_PEER_GROUP_SUPERSPINES}
@@ -374,7 +376,7 @@ EOF
 if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' SPINES_GROUP << EOF
 {
-  "group-name": "spines",
+  "group-name": "ebgp-spines",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
