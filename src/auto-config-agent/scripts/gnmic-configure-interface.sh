@@ -270,7 +270,7 @@ IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
 $EBGP_NEIGHBORS_COMMA {
   "prefix": "$ip1.$ip2.0.0/24",
   "peer-group": "evpn-leaves",
-  "allowed-peer-as": [ "$PEER_AS_MIN" ]
+  "allowed-peer-as": [ "${evpn_overlay_as}" ]
 }
 EOF
 
