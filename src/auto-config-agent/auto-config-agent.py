@@ -1017,7 +1017,8 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     evpn_rr = (router_id if (router_id and ipaddress.IPv4Address(router_id) in state.evpn_rr)
                else peer_rid if (peer_rid and ipaddress.IPv4Address(peer_rid) in state.evpn_rr)
-               else str(state.evpn_rr.network_address) ) # Workaround Python 3.6 bug, fixed in 3.8
+               else str(state.evpn_rr.network_address) if state.evpn_rr.prefixlen!=24 # Workaround Python 3.6 bug, fixed in 3.8
+               else "" )
     logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
