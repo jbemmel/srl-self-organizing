@@ -235,7 +235,7 @@ EBGP_NEIGHBORS_COMMA=","
 
 IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
-  "group-name": "${OTHER_EBPG_GROUP}",
+  "group-name": "${DYNAMIC_EBPG_GROUP}",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
