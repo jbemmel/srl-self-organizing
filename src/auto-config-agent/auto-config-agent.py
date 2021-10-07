@@ -914,23 +914,24 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
        link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
        _r = 0
        peer_type = 'spine'
+       min_peer_as = max_peer_as = state.base_as + 1 # Fixed EBGP AS
     else:
        link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
        if 'superspine' in lldp_peer_name:
           _r = 1
           peer_type = 'superspine'
+          min_peer_as = max_peer_as = state.base_as # Fixed EBGP AS
        else:
           _r = 0
           peer_type = 'leaf'
+          min_peer_as = state.base_as + 2 # Fixed EBGP AS
+          max_peer_as = min_peer_as + state.max_leaves
 
     # Could calculate link_index purely based on node IDs, not LLDP
     logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index}[{_r}] local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    min_peer_as = _as = state.base_as
-    max_peer_as = min_peer_as + state.max_leaves
   elif (state.role != 'endpoint'): # Leaves
     _r = 0 if (not spineId and state.get_role()=='leaf') else 1
     _i = 1
-    _as = state.leaf_as if state.leaf_as!=0 else (state.base_as + state.node_id)
     min_peer_as = state.base_as # Overlay AS
     max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
@@ -952,7 +953,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   else: # Emulated Hosts
     _r = 1
     _i = 2
-    _as = state.host_as if state.host_as!=0 else state.base_as # iBGP to leaves uses same AS as spines
     min_peer_as = max_peer_as = state.base_as
     peer_type = 'leaf'
 
@@ -986,7 +986,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _ip,
          lldp_peer_desc,
          _peer if _r==1 else '*', # Only when connecting "upwards"
-         _as,
          state.router_id if set_router_id else "",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
@@ -1004,7 +1003,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      if state.use_bgp_unnumbered:
          if (peer_type!='host' and state.get_role() != 'endpoint'):
-             Configure_BGP_unnumbered( state.router_id, _as, lldp_my_port )
+             Configure_BGP_unnumbered( state.router_id, state.local_as, lldp_my_port )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
@@ -1012,8 +1011,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
-    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
+def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
+    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     evpn_rr = (router_id if (router_id and ipaddress.IPv4Address(router_id) in state.evpn_rr)
@@ -1024,7 +1023,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
-                                       state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
+                                       state.get_role(),name,ip,peer,peer_ip,router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,

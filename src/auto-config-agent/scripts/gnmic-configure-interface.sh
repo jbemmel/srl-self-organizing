@@ -9,16 +9,15 @@ INTF="$2"
 IP_PREFIX="$3"
 PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
-AS="$6"
-ROUTER_ID="$7"
-PEER_AS_MIN="$8"     # Overlay AS in case of leaf-host
-PEER_AS_MAX="$9"     # Host AS in case of leaf-host
-LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
-PEER_TYPE="${11}"
-PEER_ROUTER_ID="${12}" # Not currently used
-IGP="${13}" # 'bgp' or 'isis' or 'ospf'
-USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
-RR_ROUTER_ID="${15}"
+ROUTER_ID="$6"
+PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
+PEER_AS_MAX="$8"     # Host AS in case of leaf-host
+LINK_PREFIX="${9}"  # IP subnet used for allocation of IPs to BGP peers
+PEER_TYPE="${10}"
+PEER_ROUTER_ID="${11}" # Not currently used
+IGP="${12}" # 'bgp' or 'isis' or 'ospf'
+USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
+RR_ROUTER_ID="${14}"
 
 if [[ "$ROUTER_ID" == "$RR_ROUTER_ID" ]]; then
 IS_EVPN_RR="1"
@@ -214,18 +213,19 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "admin-state": "enable",
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
-    "local-as": [ { "as-number": ${local_as} } ]
+    "local-as": [ { "as-number": ${local_as} } ],
+    "peer-as": ${PEER_AS_MIN}
   }
 EOF
-OTHER_EBPG_GROUP="ebgp-leaves"
+DYNAMIC_EBPG_GROUP="ebgp-leaves"
 else
-OTHER_EBPG_GROUP="ebgp-spines"
+DYNAMIC_EBPG_GROUP="ebgp-spines"
 fi
 
-IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
+IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "${OTHER_EBPG_GROUP}",
+  "peer-group": "${DYNAMIC_EBPG_GROUP}",
   "allowed-peer-as": [
     "$PEER_AS_MIN..$PEER_AS_MAX"
   ]
@@ -235,7 +235,7 @@ EBGP_NEIGHBORS_COMMA=","
 
 IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
-  "group-name": "ebgp-${PEER_TYPE}s",
+  "group-name": "${OTHER_EBPG_GROUP}",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
@@ -287,7 +287,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "dynamic-neighbors": {
     "accept": {
       "match": [
-        ${EBGP_NEIGHBORS}
+        ${DYNAMIC_EBGP_NEIGHBORS}
         ${EVPN_IBGP_NEIGHBORS}
       ]
     }
