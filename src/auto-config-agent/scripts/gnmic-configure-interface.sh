@@ -523,7 +523,12 @@ IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
     }
   ]
 },"bgp-vpn": {
-
+  "bgp-instance": [
+    {
+      "id": 1,
+      "_annotate": "Required to make bgp-evpn oper-state=up"
+    }
+  ]
 }
 EOF
 else
