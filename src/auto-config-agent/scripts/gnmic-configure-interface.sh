@@ -4,34 +4,42 @@
 # TODO next version: Use Jinja2 templates plus native Python logic instead
 #
 #
-ROLE="$1"  # "spine" or "leaf" or "endpoint"
+ROLE="$1"  # "spine" or "leaf" or "endpoint" or "superspine"
 INTF="$2"
 IP_PREFIX="$3"
 PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
-AS="$6"
-ROUTER_ID="$7"
-PEER_AS_MIN="$8"     # Overlay AS in case of leaf-host
-PEER_AS_MAX="$9"     # Host AS in case of leaf-host
-LINK_PREFIX="${10}"  # IP subnet used for allocation of IPs to BGP peers
-PEER_TYPE="${11}"
-PEER_ROUTER_ID="${12}"
-IGP="${13}" # 'bgp' or 'isis' or 'ospf'
-USE_EVPN_OVERLAY="${14}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
+ROUTER_ID="$6"
+PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
+PEER_AS_MAX="$8"     # Host AS in case of leaf-host
+LINK_PREFIX="${9}"  # IP subnet used for allocation of IPs to BGP peers
+PEER_TYPE="${10}"
+PEER_ROUTER_ID="${11}" # Not currently used
+IGP="${12}" # 'bgp' or 'isis' or 'ospf'
+USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
+RR_ROUTER_ID="${14}"
 OVERLAY_BGP_ADMIN_STATE="${15}" # 'disable' or 'enable'
 
-echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+if [[ "$ROUTER_ID" == "$RR_ROUTER_ID" ]]; then
+IS_EVPN_RR="1"
+fi
 
+# echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+# echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
+
+# Can add --debug
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
 
-# Set loopback IP, if provided
+#
+# 1) One-time configuration at startup, when ROUTER_ID is provided
+#
 if [[ "$ROUTER_ID" != "" ]]; then
 
 if [[ "$ROLE" == "leaf" ]]; then
-# XXX cannot ping system0 interface, may want to create lo0.0 with ipv6 addr
+# XXX cannot ping system0 interface? may want to create lo0.0 with ipv6 addr
 LOOPBACK_IF="system"
 else
 LOOPBACK_IF="lo"
@@ -50,7 +58,8 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=${LOOPBACK_IF}0] --replace-file $temp_file
+# Cannot do 'replace' here, other subinterfaces used
+$GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
 
 # Enable BFD for loopback
@@ -67,65 +76,6 @@ exitcode+=$?
 
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
-
-# Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
-# Still requires static (link local) IPv4 addresses on each interface
-if [[ "$IGP" == "ospf" ]]; then
-cat > $temp_file << EOF
-{
-  "router-id": "$ROUTER_ID",
-  "admin-state": "enable",
-  "version": "ospf-v3",
-  "address-family": "ipv4-unicast",
-  "max-ecmp-paths": 8,
-  "area": [
-    {
-      "area-id": "0.0.0.0",
-      "interface": [
-        {
-          "admin-state": "enable",
-          "interface-name": "${LOOPBACK_IF}0.0",
-          "passive": true
-        }
-      ]
-    }
-  ]
-}
-EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
-exitcode+=$?
-
-elif [[ "$IGP" == "isis" ]]; then
-
-IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
-NET_ID=$( printf "49.0001.9999.%02x%02x.%02x%02x.00" $ip1 $ip2 $ip3 $ip4 )
-
-cat > $temp_file << EOF
-{
-      "admin-state": "enable",
-      "level-capability": "L1",
-      "max-ecmp-paths": 8,
-      "net": [
-        "$NET_ID"
-      ],
-      "ipv4-unicast": {
-        "admin-state": "enable"
-      },
-      "ipv6-unicast": {
-        "admin-state": "enable"
-      },
-      "interface": [
-       {
-        "interface-name": "${LOOPBACK_IF}0.0",
-        "admin-state": "enable",
-        "passive": true
-       }
-      ]
-}
-EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/isis/instance[name=main] --update-file $temp_file
-exitcode+=$?
-fi
 
 # Need a generic BGP policy to advertise loopbacks; apply specifically
 cat > $temp_file << EOF
@@ -184,27 +134,139 @@ EOF
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
 
+# Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
+# Still requires static (link local) IPv4 addresses on each interface
+if [[ "$IGP" == "ospf" ]]; then
+
 if [[ "$ROLE" == "spine" ]]; then
+IFS='' read -r -d '' ENABLE_ASBR_ON_SPINE << EOF
+"asbr": {
+  "_annotate": "Redistribute indirect routes including static routes"
+},
+"export-policy": "accept-all",
+EOF
+fi
+
+cat > $temp_file << EOF
+{
+  "router-id": "$ROUTER_ID",
+  "admin-state": "enable",
+  "version": "ospf-v3",
+  "address-family": "ipv4-unicast",
+  "max-ecmp-paths": 8,
+  ${ENABLE_ASBR_ON_SPINE}
+  "area": [
+    {
+      "area-id": "0.0.0.0",
+      "interface": [
+        {
+          "admin-state": "enable",
+          "interface-name": "${LOOPBACK_IF}0.0",
+          "passive": true
+        }
+      ]
+    }
+  ]
+}
+EOF
+$GNMIC set --update-path /network-instance[name=default]/protocols/ospf/instance[name=main] --update-file $temp_file
+exitcode+=$?
+
+elif [[ "$IGP" == "isis" ]]; then
+
+IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+NET_ID=$( printf "49.0001.9999.%02x%02x.%02x%02x.00" $ip1 $ip2 $ip3 $ip4 )
+
+cat > $temp_file << EOF
+{
+      "admin-state": "enable",
+      "level-capability": "L1",
+      "max-ecmp-paths": 8,
+      "net": [
+        "$NET_ID"
+      ],
+      "ipv4-unicast": {
+        "admin-state": "enable"
+      },
+      "ipv6-unicast": {
+        "admin-state": "enable"
+      },
+      "interface": [
+       {
+        "interface-name": "${LOOPBACK_IF}0.0",
+        "admin-state": "enable",
+        "passive": true
+       }
+      ]
+}
+EOF
+$GNMIC set --update-path /network-instance[name=default]/protocols/isis/instance[name=main] --update-file $temp_file
+exitcode+=$?
+fi
+
+if [[ $ROLE =~ ^(super)?spine ]]; then
 
 if [[ "$IGP" == "bgp" ]]; then
-IFS='' read -r -d '' EBGP_NEIGHBORS << EOF
-{
-  "prefix": "$LINK_PREFIX",
-  "peer-group": "leaves",
-  "allowed-peer-as": [
-    "$PEER_AS_MIN..$PEER_AS_MAX"
-  ]
+
+if [[ "$ROLE" == "spine" ]]; then
+# May or may not be used
+#
+# Could also use "as-path-options": { "allow-own-as": 1(or 2 on leaves) },
+# instead of "prepend-global-as": false
+#
+IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
+  ,{
+    "group-name": "ebgp-superspines",
+    "admin-state": "enable",
+    "import-policy": "select-loopbacks",
+    "export-policy": "select-loopbacks",
+    "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+    "timers": { "connect-retry": 10 },
+    "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
+    "peer-as": ${PEER_AS_MIN}
+  }
+EOF
+DYNAMIC_EBPG_GROUP="ebgp-leaves"
+else
+DYNAMIC_EBPG_GROUP="ebgp-spines"
+IFS='' read -r -d '' AS_PATH_OPTIONS << EOF
+"as-path-options": {
+    "replace-peer-as": true,
+    "_annotate_replace-peer-as": "To allow routes across spines"
 },
 EOF
 fi
 
-if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
-IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
-,
+IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
-  "group-name": "evpn",
+  "prefix": "$LINK_PREFIX",
+  "peer-group": "${DYNAMIC_EBPG_GROUP}"
+}
+EOF
+EBGP_NEIGHBORS_COMMA=","
+
+IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
+{
+  "group-name": "${DYNAMIC_EBPG_GROUP}",
   "admin-state": "enable",
-  "peer-as": $AS,
+  "import-policy": "select-loopbacks",
+  "export-policy": "select-loopbacks",
+  "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  ${AS_PATH_OPTIONS}
+  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
+}
+${EBGP_PEER_GROUP_SUPERSPINES},
+EOF
+
+fi
+
+if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
+IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
+{
+  "group-name": "evpn-leaves",
+  "admin-state": "enable",
+  "peer-as": ${evpn_overlay_as},
+  "_annotate_peer-as": "iBGP with leaves",
   "evpn": { "admin-state": "enable" },
   "ipv4-unicast": { "admin-state": "disable" },
   "ipv6-unicast": { "admin-state": "disable" },
@@ -214,60 +276,72 @@ IFS='' read -r -d '' EVPN_SPINE_GROUP << EOF
   }
 }
 EOF
-fi
-
-if [[ "$IGP" == "bgp" ]]; then
-IFS='' read -r -d '' BGP_LEAVES_GROUP << EOF
-,
-{
-  "group-name": "leaves",
-  "admin-state": "enable",
-  "import-policy": "select-loopbacks",
-  "export-policy": "select-loopbacks"
-}
-EOF
-fi
 
 IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
 
-IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
-"dynamic-neighbors": {
-    "accept": {
-      "match": [
-        $EBGP_NEIGHBORS
-        {
-          "prefix": "$ip1.$ip2.$ip3.0/22",
-          "peer-group": "evpn",
-          "allowed-peer-as": [ "$AS" ]
-        }
-      ]
-    }
-},
-"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
+$EBGP_NEIGHBORS_COMMA {
+  "prefix": "$ip1.$ip2.0.0/24",
+  "peer-group": "evpn-leaves",
+  "allowed-peer-as": [ "${evpn_overlay_as}" ]
+}
+EOF
+
+IFS='' read -r -d '' EVPN_SECTION << EOF
 "evpn": {
  "rapid-update": true ,
  "keep-all-routes": true,
  "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
 },
-"group": [
-    {
-      "group-name": "fellow-spines",
-      "admin-state": "enable",
-      "peer-as": $AS
+EOF
+fi
+
+IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
+"dynamic-neighbors": {
+    "accept": {
+      "match": [
+        ${DYNAMIC_EBGP_NEIGHBORS}
+        ${EVPN_IBGP_NEIGHBORS}
+      ]
     }
-    ${BGP_LEAVES_GROUP}
-    ${EVPN_SPINE_GROUP}
-  ],
+},
+"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+${EVPN_SECTION}
+"group": [
+    ${EBGP_PEER_GROUP}
+    ${EVPN_LEAVES_GROUP}
+],
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
+
+# Create a sample BGP policy to convert customer AS to ext community (origin)
+cat > $temp_file << EOF
+{
+  "as-path-set": [ { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" } ],
+  "community-set": [ { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] } ],
+  "policy": [
+    {
+      "name": "overlay-export-as-to-community",
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
+          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
+        }
+      ]
+    }
+  ]
+}
+EOF
+$GNMIC set --update-path /routing-policy --update-file $temp_file
+exitcode+=$?
 
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
   "group-name": "hosts",
   "admin-state": "$OVERLAY_BGP_ADMIN_STATE",
   "ipv6-unicast" : { "admin-state" : "enable" },
-  "peer-as": $PEER_AS_MAX,
-  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "send-default-route": {
     "ipv4-unicast": true,
     "ipv6-unicast": true
@@ -282,10 +356,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
       "match": [
         {
           "prefix": "$LINK_PREFIX",
-          "peer-group": "hosts",
-          "allowed-peer-as": [
-            "$PEER_AS_MAX"
-          ]
+          "peer-group": "hosts"
         }
       ]
     }
@@ -301,10 +372,11 @@ IFS='' read -r -d '' EVPN_RR_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "accept-all",
   "export-policy": "reject-link-routes",
-  "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": $PEER_AS_MIN } ],
+  "peer-as": ${evpn_overlay_as},
+  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
-  "transport" : { "local-address" : "${ROUTER_ID}" }
+  "transport" : { "local-address" : "${ROUTER_ID}" },
+  "timers": { "connect-retry": 10 }
 }
 EOF
 
@@ -334,13 +406,14 @@ EOF
 if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' SPINES_GROUP << EOF
 {
-  "group-name": "spines",
+  "group-name": "ebgp-spines",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  "timers": { "connect-retry": 10 },
   "peer-as": $PEER_AS_MIN,
-  "local-as": [ { "as-number": $AS } ]
+  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
 EOF
 else
@@ -391,7 +464,8 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "autonomous-system": $AS,
+  "autonomous-system": ${evpn_overlay_as},
+  "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   $BGP_IP_UNDERLAY
@@ -449,15 +523,11 @@ IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
       "ecmp": 8
     }
   ]
-},
-"bgp-vpn": {
+},"bgp-vpn": {
   "bgp-instance": [
     {
       "id": 1,
-      "route-target": {
-        "export-rt": "target:$PEER_AS_MIN:10000",
-        "import-rt": "target:$PEER_AS_MIN:10000"
-      }
+      "_annotate": "Required to make bgp-evpn oper-state=up"
     }
   ]
 }
@@ -465,29 +535,6 @@ EOF
 else
 L3_VXLAN_INTERFACE='"_annotate": "This is asymmetric IRB, no BGP-EVPN or vxlan interface in this ip-vrf",'
 fi
-
-# Create a sample BGP policy to convert customer AS to ext community (origin)
-cat > $temp_file << EOF
-{
-  "as-path-set": [ { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" } ],
-  "community-set": [ { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] } ],
-  "policy": [
-    {
-      "name": "overlay-export-as-to-community",
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
-          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
-        }
-      ]
-    }
-  ]
-}
-EOF
-
-$GNMIC set --update-path /routing-policy --update-file $temp_file
-exitcode+=$?
 
 # Configure lo0.0 on Leaf with router IP for ping testing in overlay
 cat > $temp_file << EOF
@@ -504,7 +551,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --replace-path /interface[name=lo0] --replace-file $temp_file
+$GNMIC set --update-path /interface[name=lo0] --update-file $temp_file
 exitcode+=$?
 
 # Set autonomous system & router-id for BGP to hosts
@@ -520,7 +567,7 @@ cat > $temp_file << EOF
     "protocols": {
       "bgp": {
         "admin-state": "enable",
-        "autonomous-system": $PEER_AS_MIN,
+        "autonomous-system": ${evpn_overlay_as},
         "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
         "ipv4-unicast": {
           "admin-state": "enable",
@@ -554,8 +601,11 @@ $GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_fil
 exitcode+=$?
 
 fi # leaf with EVPN enabled
+fi # if ROUTER_ID provided, first time only
 
-fi # if router_id provided, first time only
+#
+# 2) Per-link provisioning
+#
 
 if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
@@ -588,7 +638,7 @@ fi
 # Removed $_VLAN_TAGGING and $_VLAN
 cat > $temp_file << EOF
 {
-  "description": "To $PEER",
+  "description": "auto-config to $PEER",
   "admin-state": "enable",
   "subinterface": [
     {
@@ -616,9 +666,9 @@ exitcode+=$?
 
 # Add it to OSPF (if enabled)
 # Note: To view: info from state /bfd
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+if [[ "$ROLE" != "endpoint" ]]; then
 
-if [[ "$IGP" == "ospf" ]]; then
+if [[ "$IGP" == "ospf" && "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -631,7 +681,7 @@ EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 
-elif [[ "$IGP" == "isis" ]]; then
+elif [[ "$IGP" == "isis" && "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -641,9 +691,38 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
-fi
+
+elif [[ "$IGP" == "bgp" || "$PEER_TYPE" == "host" ]]; then
+
+if [[ "$PEER_IP" != "*" ]]; then
+cat > $temp_file << EOF
+{
+  "admin-state": "enable",
+  "peer-group": "ebgp-${PEER_TYPE}s",
+  "description": "$PEER"
+}
+EOF
+echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
+exitcode+=$?
+else
+
+# Update EBGP dynamic peering group on (super)spines and leaves with correct AS range
+cat > $temp_file << EOF
+{
+  "allowed-peer-as": [
+    "$PEER_AS_MIN..$PEER_AS_MAX"
+  ]
+}
+EOF
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
+exitcode+=$?
+
+fi # "$PEER_IP" != "*"
+fi # IGP logic
 
 # Enable BFD, except for host facing interfaces
+if [[ "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
@@ -654,42 +733,20 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
-fi
+fi # "$PEER_TYPE" != "host"
 
-if [[ "$PEER_IP" != "*" ]] && [[ "$PEER_TYPE" != "host" ]] && \
-   [[ "$IGP" == "bgp" ]]; then
-_IP="$PEER_IP"
-# if [[ "$PEER" == "host" ]] || [[ "$PEER_TYPE" == "host" ]]; then
-# PEER_GROUP="hosts"
-# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-if [[ "$ROLE" == "spine" ]]; then
-PEER_GROUP="fellow-spines"
-elif [[ "$ROLE" == "leaf" ]]; then
-PEER_GROUP="spines"
-else
-PEER_GROUP="leaf-ibgp"
-# _IP="2001::${PEER_IP//\./:}" # Use ipv6 for hosts
-fi
-
-cat > $temp_file << EOF
-{
-  "admin-state": "enable",
-  "peer-group": "$PEER_GROUP",
-  "description": "$PEER"
-}
-EOF
-$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$_IP] --update-file $temp_file
-exitcode+=$?
-fi
+fi # $ROLE != "endpoint"
 
 # Peer router ID only set for spines when this node is a leaf
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+if [[ "$ROLE" == "leaf" ]] && [[ "$RR_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "$PEER" }
+{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "EVPN Route Reflector for overlay" }
 EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
+echo "Adding BGP peer ${RR_ROUTER_ID} as EVPN route reflector..."
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$RR_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi
 
+echo "Done, cleaning up ${temp_file}..."
 rm -f $temp_file
 exit $exitcode

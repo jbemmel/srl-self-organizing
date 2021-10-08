@@ -395,9 +395,10 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 def Convert_to_lag(state,port,ip,vrf="overlay"):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
-   deletes=[ f'/network-instance[name={vrf}]/interface[{eth}.0]',
-             f'/interface[{eth}]/subinterface[index=*]',
+   deletes=[ f'/interface[{eth}]/subinterface[index=*]',
              f'/interface[{eth}]/vlan-tagging' ]
+   if state.evpn != 'disabled' or vrf!='overlay':
+       deletes.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
    lag = {
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": True,
@@ -491,11 +492,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
            "bgp-instance": [
             { "id": 1,
               # "export-policy": f"add-rt-{state.base_as}-{port}",
-              "route-target": {
-               "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
-               "export-rt": rt,
-               "import-rt": rt
-              }
+              #"route-target": {
+              # "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
+              # "export-rt": rt,
+              # "import-rt": rt
+              #}
             }
            ]
          }
@@ -527,7 +528,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', delete=deletes, update=updates )
+      try:
+         c.set( encoding='json_ietf', delete=deletes, update=updates )
+      except Exception as ex:
+         # Dont quit agent. Usually means 'overlay' didn't get created
+         logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
 
 #
 # Called when an EVPN community match is discovered
@@ -745,14 +750,16 @@ def Handle_Notification(obj, state):
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                     state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
+                if 'evpn_overlay_as' in data:
+                    state.evpn_overlay_as = int( data['evpn_overlay_as']['value'] )
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
                 if 'leaf_as' in data:
                     state.leaf_as = int( data['leaf_as']['value'] )
                 if 'host_as' in data:
                     state.host_as = int( data['host_as']['value'] )
-                if 'max_spines' in data:
-                    state.max_spines = int( data['max_spines']['value'] )
+                if 'max_spine_ports' in data:
+                    state.max_spine_ports = int( data['max_spine_ports']['value'] )
                 if 'max_leaves' in data:
                     state.max_leaves = int( data['max_leaves']['value'] )
                 if 'max_hosts_per_leaf' in data:
@@ -767,6 +774,12 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
                     state.evpn_auto_lags = data['evpn_auto_lags'][15:]
+                if 'evpn_rr' in data:
+                    state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
+                else:
+                    # Default to all nodes in spine layer
+                    state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
+                logging.info( f"EVPN RR prefix: {state.evpn_rr}" )
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'overlay_bgp_admin_state' in data:
@@ -794,6 +807,13 @@ def Handle_Notification(obj, state):
           # Allow SRL-based emulated hosts called h1, h2...
           if m and not re.match("^h[0-9]+", peer_sys_name):
             to_port_id = m.groups()[1]
+
+            # rely on 'leaf' in name to auto-detect superspines
+            if re.match("^leaf.*$", peer_sys_name):
+                state.leaf_lldp_seen = True
+            elif re.match("^spine.*$", peer_sys_name):
+                state.spine_lldp_seen = True
+
           else:
             to_port_id = my_port_id  # FRR Linux host or other element not sending port name
             if not state.host_lldp_seen and state.role == 'auto':
@@ -802,14 +822,14 @@ def Handle_Notification(obj, state):
                delattr(state,"router_id")  # Re-determine IDs
                delattr(state,"node_id")
 
-          # First figure out this node's relative id in its group. Don't depend on hostname
+          # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
              node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
              if node_id == 0:
                 state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
                   peer_sys_name, obj.lldp_neighbor.data.system_description )
                 return False; # Unable to continue configuration
-             state.node_id = node_id
+             state._determine_local_as(node_id) # XXX todo reorganize
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
@@ -846,9 +866,13 @@ def Handle_Notification(obj, state):
 
 #####
 ## Determine this node's local ID within its group ( e.g. leaf1 = 1, spine1 = 1 )
-## Depends on LLDP system naming for now (but not local system name)
+## Based on local system name if available, else LLDP derived
 #####
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
+
+   if state.id_from_hostname != 0:
+       return state.id_from_hostname
+
    if state.is_spine():
        # TODO spine-spine link case
        return lldp_peer_port
@@ -866,61 +890,73 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
 
 ###
 # Calculates an IPv4 address to be used as router ID for the given node/role
-# Note: More generically 'node level', spine=0 leaf=1 host=2 for standard CLOS
+# Note: More generically 'node level', leaf=0 spine=1 superspine=2.. for standard CLOS
 ###
 def determine_router_id( state, role, node_id ):
-    _l = node_level(role)
+    _l = state.node_level(other_role=role)
     return str( state.loopbacks_prefix[ 256 * _l + node_id ] )
-
-def node_level( role ):
-    if role=="spine":
-        return 0
-    elif role=="leaf":
-        return 1
-    return 2
 
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
   # For spine-spine connections, build iBGP
   peer_router_id = ""
-  if state.is_spine() and ('spine' not in lldp_peer_name):
-    _r = 0
+
+  # Number links based on spine ID
+  spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
+  node_id = int(spineId.groups()[0]) if spineId else state.node_id
+  if state.is_spine(): # (super)spines
     _i = 0
-    link_index = state.max_spines * (lldp_peer_port - 1) + lldp_my_port - 1
-    peer_type = 'leaf'
-    min_peer_as = _as = state.base_as
-    max_peer_as = min_peer_as + state.max_leaves
-  elif (state.role != 'endpoint'):
-    logging.info(f"Configure LEAF or SPINE-SPINE local_port={lldp_my_port} peer_port={lldp_peer_port}")
-    spineId = re.match(".*(?:spine)[-]?(\d+).*", lldp_peer_name)
-    _masterSpine = state.get_role() == 'spine' and spineId and int(spineId.groups()[0]) > lldp_my_port
-    _r = 0 if _masterSpine or (not spineId and state.get_role()=='leaf') else 1
+
+    # Could dynamically determine # of active spine ports, and use less addresses
+    # state.max_spine_ports default = 6
+    if lldp_my_port > state.max_spine_ports:
+        logging.error( f"max-spine-ports configured too low({state.max_spine_ports}), will result in duplicate link IPs" )
+        return
+
+    if spineId: # This node is a superspine
+       link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
+       _r = 0
+       peer_type = 'spine'
+       min_peer_as = max_peer_as = state.base_as + 1 # Fixed EBGP AS
+    else:
+       link_index = state.max_spine_ports * (node_id - 1) + lldp_my_port - 1
+       if 'superspine' in lldp_peer_name:
+          _r = 1
+          peer_type = 'superspine'
+          min_peer_as = max_peer_as = state.base_as # Fixed EBGP AS
+       else:
+          _r = 0
+          peer_type = 'leaf'
+          min_peer_as = state.base_as + 2 # Fixed EBGP AS
+          max_peer_as = min_peer_as + state.max_leaves
+
+    # Could calculate link_index purely based on node IDs, not LLDP
+    logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index}[{_r}] local_port={lldp_my_port} peer_port={lldp_peer_port}")
+  elif (state.role != 'endpoint'): # Leaves
+    _r = 0 if (not spineId and state.get_role()=='leaf') else 1
     _i = 1
-    _as = state.leaf_as if state.leaf_as!=0 else (
-           state.base_as + (0 if state.get_role() == 'spine' # Use i- for iBGP
-                             or 'i-' in lldp_peer_name else state.node_id))
-    min_peer_as = state.base_as # Overlay AS
-    max_peer_as = state.host_as if state.host_as!=0 else state.base_as
     if spineId: # For spine facing links, pick based on peer_port
-      link_index = state.max_spines * (lldp_my_port - 1) + lldp_peer_port - 1
+      link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
       peer_type = 'spine'
       peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
+      min_peer_as = max_peer_as = state.base_as + 1 # EBGP spine AS
     else:
       # Reuse underlay address space, optionally allocate unique IPs per leaf
       link_index = (lldp_my_port - 1)
       if not state.reuse_overlay_ips:
          link_index += (state.node_id-1) * state.max_leaves
       peer_type = 'host'
+      min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
       # if state.auto_lags:
       #     Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
-  else:
+    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} peer_router_id={peer_router_id}")
+  else: # Emulated Hosts
     _r = 1
     _i = 2
-    _as = state.host_as if state.host_as!=0 else state.base_as # iBGP to leaves uses same AS as spines
-    min_peer_as = max_peer_as = state.base_as
+    min_peer_as = max_peer_as = state.evpn_overlay_as
     peer_type = 'leaf'
 
     # For IP addressing, reuse same link space as underlay, by leaf port and leaf id
@@ -946,14 +982,13 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      else:
        _ip = ""
        _peer = "*"
-     logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip}")
+     logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip} peer={_peer}")
      script_update_interface(
          state,
          intf_name,
          _ip,
          lldp_peer_desc,
-         _peer if state.get_role() != 'spine' else '*',
-         _as,
+         _peer if _r==1 else '*', # Only when connecting "upwards"
          state.router_id if set_router_id else "",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
@@ -971,7 +1006,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      if state.use_bgp_unnumbered:
          if (peer_type!='host' and state.get_role() != 'endpoint'):
-             Configure_BGP_unnumbered( state.router_id, _as, lldp_my_port )
+             Configure_BGP_unnumbered( state.router_id, state.local_as, lldp_my_port )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
@@ -979,18 +1014,26 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
-    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} as={_as} ' +
+def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
+    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
+    evpn_rr = (router_id if (router_id and ipaddress.IPv4Address(router_id) in state.evpn_rr)
+               else peer_rid if (peer_rid and ipaddress.IPv4Address(peer_rid) in state.evpn_rr)
+               else str(state.evpn_rr.network_address) if state.evpn_rr.prefixlen!=24 # Workaround Python 3.6 bug, fixed in 3.8
+               else "" )
+    logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
+       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
+       my_env['PATH'] = '/usr/bin/'
+       logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
-                                       state.get_role(),name,ip,peer,peer_ip,str(_as),router_id,
+                                       state.get_role(),name,ip,peer,peer_ip,router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
-                                       state.evpn,
-                                       state.overlay_bgp_admin_state ],
+                                       state.evpn, evpn_rr, state.overlay_bgp_admin_state],
+                                       env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
        logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
@@ -999,8 +1042,14 @@ def script_update_interface(state,name,ip,peer,peer_ip,_as,router_id,peer_as_min
 
 class State(object):
     def __init__(self):
-        self.role = None        # May not be set in config, default 'auto'
+        # YAML attributes
+        self.base_as = None
+        self.max_leaves = None
+
+        self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
+        self.leaf_lldp_seen = False # To auto-detect superspines: >= leaf connected
+        self.spine_lldp_seen = False # To auto-detect superspines: >= spine connected
         self.pending_peers = {} # LLDP data received before we can determine ID
 
         self.announcing = ""    # Becomes Boolean for spines
@@ -1013,8 +1062,45 @@ class State(object):
         self.local_lldp = {}
         self.mc_lags = {}
 
+    def _determine_role(self):
+       """
+       Determine this node's role and relative ID based on the hostname
+       """
+       hostname = socket.gethostname()
+       role_id = re.match( "^(\w+)[-]?(\d+)$", hostname )
+       if role_id:
+           self.role = role_id.groups()[0]
+           self.id_from_hostname = int( role_id.groups()[1] )
+           logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
+
+           # TODO super<n>spine
+       else:
+           logging.warning( f"Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
+           self.role = "auto"
+           self.id_from_hostname = 0
+
+    def _determine_local_as(self,node_id):
+       self.node_id = node_id # Store it
+       _role = self.get_role()
+       if _role == "superspine":
+           self.local_as = self.base_as
+       elif _role == "spine":
+           self.local_as = self.base_as + 1
+       elif _role == "leaf":
+           self.local_as = self.base_as + 1 + self.node_id
+       else: # host
+           self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
+
+    def node_level(self,other_role=None):
+       _role = other_role or self.get_role()
+       if _role=="leaf":
+         return 0 # Start from 0 at leaves, since we don't know how many levels
+       elif _role=="spine":
+         return 1
+       return 2 # superspine or higher, TODO super2spine, etc.
+
     def __str__(self):
-        return str(self.__class__) + ": " + str(self.__dict__)
+       return str(self.__class__) + ": " + str(self.__dict__)
 
     def get_role(self):
         # TODO could return "spine" when all active ports have LLDP
@@ -1024,7 +1110,7 @@ class State(object):
            return self.role
 
     def is_spine(self):
-        return self.get_role() == "spine"
+        return self.get_role() == "spine" or self.get_role() == "superspine"
 
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
@@ -1071,17 +1157,7 @@ def Run():
                     # logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
-        logging.info(f'GOING TO EXIT NOW, DOING FINAL git pull: {err}')
-        # try:
-           # Need to execute this in the mgmt network namespace, hardcoded name for now
-           # XXX needs username/password unless checked out using 'git:'
-           # git_pull = subprocess.Popen(['/usr/sbin/ip','netns','exec','srbase-mgmt','/usr/bin/git','pull'],
-           #                            cwd='/etc/opt/srlinux/appmgr',
-           #                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-           # stdoutput, stderroutput = git_pull.communicate()
-           # logging.info(f'git pull result: {stdoutput} err={stderroutput}')
-        # except Exception as e:
-        #   logging.error(f'Exception caught in git pull :: {e}')
+        logging.error(f'grpc._channel._Rendezvous: {err}')
 
     except Exception as e:
         traceback_str = ''.join(traceback.format_tb(e.__traceback__))
@@ -1089,28 +1165,24 @@ def Run():
         # traceback.print_exc()
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
-        try:
-            response = stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-            logging.error(f'Run try: Unregister response:: {response}')
-        except grpc._channel._Rendezvous as err:
-            logging.info(f'GOING TO EXIT NOW: {err}')
-            sys.exit()
-        return True
-    sys.exit()
-    return True
+    finally:
+        Exit_Gracefully(0,0)
+
 ############################################################
 ## Gracefully handle SIGTERM signal
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister auto_config_agent".format(signum))
+    logging.info(f"Caught signal :: {signum}\n will unregister auto_config_agent" )
+    exitcode = signum
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-        logging.error('try: Unregister response:: {}'.format(response))
-        sys.exit()
+        logging.error( f'try: Unregister response::{response}' )
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW: {}'.format(err))
-        sys.exit()
+        logging.error( f'GOING TO EXIT NOW: {err}' )
+        exitcode = -1
+    finally:
+        sys.exit(exitcode)
 
 ##################################################################################################
 ## Main from where the Agent starts
