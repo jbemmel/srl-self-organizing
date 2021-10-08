@@ -713,9 +713,10 @@ $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neig
 exitcode+=$?
 
 fi # "$PEER_IP" != "*"
-fi # $ROLE != "endpoint"
+fi # IGP logic
 
 # Enable BFD, except for host facing interfaces
+if [[ "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
@@ -726,7 +727,9 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
-fi
+fi # "$PEER_TYPE" != "host"
+
+fi # $ROLE != "endpoint"
 
 # Peer router ID only set for spines when this node is a leaf
 if [[ "$ROLE" == "leaf" ]] && [[ "$RR_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
