@@ -1067,7 +1067,7 @@ class State(object):
        Determine this node's role and relative ID based on the hostname
        """
        hostname = socket.gethostname()
-       role_id = re.match( "^(\w+)[-]?(\d+)$", hostname )
+       role_id = re.match( "^(\w+)[-]?(\d+).*$", hostname ) # Ignore trailing router ID, if set
        if role_id:
            self.role = role_id.groups()[0]
            self.id_from_hostname = int( role_id.groups()[1] )
@@ -1075,7 +1075,7 @@ class State(object):
 
            # TODO super<n>spine
        else:
-           logging.warning( f"Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
+           logging.warning( f"_determine_role: Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
            self.role = "auto"
            self.id_from_hostname = 0
 
