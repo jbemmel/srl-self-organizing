@@ -13,9 +13,9 @@ What is demonstrated:
 * How to [build a custom Docker container](https://github.com/jbemmel/srl-self-organizing/tree/main/Docker) containing the sources
 
 3 roles currently supported, as inferred from the hostname: (super)spine or leaf
-* All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
+* Role and rank derived from hostname if possible ( "leaf1" -> role=leaf rank=1 )
+* If not: All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
 * Could auto-determine role: Some links connected but no LLDP or MAC address instead of SRL port name -> assume this is a leaf node, otherwise spine
-* For now and to keep things simple: role and node ID are derived from the hostname
 
 YANG model provides parameters:
 * AS base: Superspine EBGP AS number, each Leaf gets <base + 1 + rank>
@@ -43,12 +43,13 @@ This example uses:
 * Either OSPFv3, ISIS, BGPv4 or BGP unnumbered to exchange loopback routes within the fabric, 
 * (optional) eBGP v4/v6 towards Linux hosts
 * iBGP EVPN between leaves and (super)spine route-reflector(s), with VXLAN overlay
-* Spines share a private base AS for EBGP, each leaf gets a unique leaf AS
+* (super)spines share a private base AS for EBGP, each leaf gets a unique leaf AS
 * Interfaces use /31 IPv4 link addresses (required for VXLAN v4), OSPFv3 uses IPv6 link-local addresses
 * (Super)spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
 * Global AS set to overlay AS, such that EVPN auto route-targets work; not added to EBGP routes
-* Host subnet size is configurable, default /31 (but Linux hosts may or may not support that)
+* Superspines remove AS path received from spines, such that other spines don't reject these routes
+* Host subnet size is configurable, default /31 (but some hosts may not support that)
 * [NEW] EVPN auto LAG discovery based on LLDP and either Large Communities (RFC8092) or IPv6-encoding
 
 ## EVPN overlay
