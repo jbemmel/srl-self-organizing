@@ -3,7 +3,7 @@
 What if network nodes would auto-configure themselves?
 
 This basic example offers a starting point for a Python-based SR Linux agent that configures the local node.
-Each node has a generic config, and is configured with peering links and IGP related parameters based on LLDP
+All nodes can share a single generic global config file, and each agent configures peering links, IGP related parameters and EVPN overlay/LAG based on LLDP events.
 
 What is demonstrated:
 * How to [create a custom agent for SR Linux](https://github.com/jbemmel/srl-self-organizing/tree/main/src/auto-config-agent)
@@ -12,14 +12,13 @@ What is demonstrated:
 * How to [use Python (pygnmic) to change configuration](https://github.com/jbemmel/srl-self-organizing/blob/main/src/auto-config-agent/auto-config-agent.py#L458)
 * How to [build a custom Docker container](https://github.com/jbemmel/srl-self-organizing/tree/main/Docker) containing the sources
 
-2 roles currently supported: Spine or Leaf
+3 roles currently supported, as inferred from the hostname: (super)spine or leaf
 * All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
 * Could auto-determine role: Some links connected but no LLDP or MAC address instead of SRL port name -> assume this is a leaf node, otherwise spine
-* For now and to keep things simple: role is an agent parameter
+* For now and to keep things simple: role and node ID are derived from the hostname
 
 YANG model provides parameters:
-* role: leaf|spine
-* AS base: Spine AS number, each Leaf gets <base + rank>
+* AS base: Superspine EBGP AS number, each Leaf gets <base + 1 + rank>
 * Link prefix: IP/mask to use for generating peer-2-peer /31 link addresses 
   ( For example: 192.168.0.0/24, spine1=192.168.0.0/31 and leaf1=192.168.0.1/31 )
 * Loopback prefix: IP/mask for generating loopbacks
@@ -27,7 +26,7 @@ YANG model provides parameters:
 * Max number of spines/leaves/hosts-per-leaf in the topology
 * Whether to enable EVPN, and what model (symmetric/asymmetric IRB)
 * Whether to enable EVPN based auto provisioning of MC-LAGs (default: true)
-* Whether to use OSPFv3 or BGP Unnumbered (based on FRR agent)
+* Whether to use OSPFv3, ISIS, regular BGPv4 or BGP Unnumbered (based on FRR agent)
 
 ## Deploy lab
 ```
@@ -41,14 +40,14 @@ sudo containerlab deploy -t ./srl-leafspine.lab # -> this creates a lab with 4 l
 
 ## Networking design details
 This example uses:
-* Either OSPFv3 or BGP unnumbered to exchange loopback routes within the fabric, 
+* Either OSPFv3, ISIS, BGPv4 or BGP unnumbered to exchange loopback routes within the fabric, 
 * (optional) eBGP v4/v6 towards Linux hosts
-* iBGP EVPN between leaves and spine route-reflectors, with VXLAN overlay
-* Spines share a private base AS, each leaf gets a unique leaf AS
+* iBGP EVPN between leaves and (super)spine route-reflector(s), with VXLAN overlay
+* Spines share a private base AS for EBGP, each leaf gets a unique leaf AS
 * Interfaces use /31 IPv4 link addresses (required for VXLAN v4), OSPFv3 uses IPv6 link-local addresses
-* Spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
+* (Super)spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
-* Global AS set to unique leaf AS, could also use single global AS such that EVPN auto route-targets would work
+* Global AS set to overlay AS, such that EVPN auto route-targets work; not added to EBGP routes
 * Host subnet size is configurable, default /31 (but Linux hosts may or may not support that)
 * [NEW] EVPN auto LAG discovery based on LLDP and either Large Communities (RFC8092) or IPv6-encoding
 
@@ -126,6 +125,13 @@ A:leaf-1-1.1.1.1# info
         }
     }
 ```
+
+## Superspine support
+Adding superspine support required some changes to the auto-configuration logic. Router IDs are now numbered starting with 0 at the leaves ( e.g. Leaf1=1.1.0.1 )
+because the local agent does not know whether a superspine will be included in the topology or not.
+
+The node role and rank are now derived from the hostname; in a 3-tier topology leaf nodes cannot easily determine their rank based on the spine port(s) they're connected to.
+Deriving things from the hostname also allows a single config file to be used across the entire fabric.
 
 ## Using LLDP for signalling topology changes (deprecated)
 To auto-configure LAGs, upon receiving an LLDP event the agent temporarily modifies the system name:
