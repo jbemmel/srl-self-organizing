@@ -313,12 +313,33 @@ ${EVPN_SECTION}
 EOF
 elif [[ "$ROLE" == "leaf" ]]; then
 
+# Create a sample BGP policy to convert customer AS to ext community (origin)
+cat > $temp_file << EOF
+{
+  "as-path-set": [ { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" } ],
+  "community-set": [ { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] } ],
+  "policy": [
+    {
+      "name": "overlay-export-as-to-community",
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
+          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
+        }
+      ]
+    }
+  ]
+}
+EOF
+$GNMIC set --update-path /routing-policy --update-file $temp_file
+exitcode+=$?
+
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
   "group-name": "hosts",
   "admin-state": "enable",
   "ipv6-unicast" : { "admin-state" : "enable" },
-  "peer-as": $PEER_AS_MAX,
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "send-default-route": {
     "ipv4-unicast": true,
@@ -334,10 +355,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
       "match": [
         {
           "prefix": "$LINK_PREFIX",
-          "peer-group": "hosts",
-          "allowed-peer-as": [
-            "$PEER_AS_MAX"
-          ]
+          "peer-group": "hosts"
         }
       ]
     }
@@ -457,8 +475,6 @@ cat > $temp_file << EOF
 
 EOF
 
-# DEBUG
-cp $temp_file /tmp/debug_protocols_bgp.json
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
 
@@ -513,29 +529,6 @@ EOF
 else
 L3_VXLAN_INTERFACE='"_annotate": "This is asymmetric IRB, no BGP-EVPN or vxlan interface in this ip-vrf",'
 fi
-
-# Create a sample BGP policy to convert customer AS to ext community (origin)
-cat > $temp_file << EOF
-{
-  "as-path-set": [ { "name": "CUSTOMER1", "expression": "${PEER_AS_MAX}" } ],
-  "community-set": [ { "name": "CUSTOMER1", "member": [ "origin:${PEER_AS_MAX}:0" ] } ],
-  "policy": [
-    {
-      "name": "overlay-export-as-to-community",
-      "statement": [
-        {
-          "sequence-id": 10,
-          "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
-          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
-        }
-      ]
-    }
-  ]
-}
-EOF
-
-$GNMIC set --update-path /routing-policy --update-file $temp_file
-exitcode+=$?
 
 # Configure lo0.0 on Leaf with router IP for ping testing in overlay
 cat > $temp_file << EOF
@@ -706,9 +699,9 @@ EOF
 echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
 exitcode+=$?
-elif [[ "$ROLE" != "leaf" ]]; then
+else
 
-# Update EBGP dynamic peering group on (super)spines with correct AS range
+# Update EBGP dynamic peering group on (super)spines and leaves with correct AS range
 cat > $temp_file << EOF
 {
   "allowed-peer-as": [
@@ -716,7 +709,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
 exitcode+=$?
 
 fi # "$PEER_IP" != "*"
