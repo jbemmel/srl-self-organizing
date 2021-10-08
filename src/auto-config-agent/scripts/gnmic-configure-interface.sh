@@ -660,9 +660,9 @@ exitcode+=$?
 
 # Add it to OSPF (if enabled)
 # Note: To view: info from state /bfd
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+if [[ "$ROLE" != "endpoint" ]]; then
 
-if [[ "$IGP" == "ospf" ]]; then
+if [[ "$IGP" == "ospf" && "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -675,7 +675,7 @@ EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 
-elif [[ "$IGP" == "isis" ]]; then
+elif [[ "$IGP" == "isis" && "$PEER_TYPE" != "host" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state": "enable",
@@ -686,7 +686,7 @@ EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 
-elif [[ "$IGP" == "bgp" ]]; then
+elif [[ "$IGP" == "bgp" || "$PEER_TYPE" == "host" ]]; then
 
 if [[ "$PEER_IP" != "*" ]]; then
 cat > $temp_file << EOF
@@ -713,7 +713,7 @@ $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neig
 exitcode+=$?
 
 fi # "$PEER_IP" != "*"
-fi
+fi # $ROLE != "endpoint"
 
 # Enable BFD, except for host facing interfaces
 cat > $temp_file << EOF
