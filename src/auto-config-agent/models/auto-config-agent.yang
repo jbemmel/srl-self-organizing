@@ -32,14 +32,19 @@ module auto_config_agent {
             leaf evpn-overlay-as {
                 description "iBGP AS number to use for the EVPN overlay, should not overlap with underlay";
                 type uint32;
-                default 65535;
+                default 65534;    // 65535 SHOULD NOT be used because of overlap with special communities
+                // default 65000; // Use 2-byte AS for easier RT interop
+                // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
+
+                must ". != 65535" {
+                  error-message "Private AS 65535 overlaps with certain reserved communities and SHOULD NOT be used";
+                }
             }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign for EBGP";
                 // type srl_nokia-comm:as-number;
                 type uint32;
-                // default 65000; // Use 2-byte AS for easier RT interop
-                // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
+
                 default 4200000000; // Superspines get this, each leaf gets base+1+rank
             }
             leaf leaf-as {
