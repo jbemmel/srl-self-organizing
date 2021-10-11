@@ -3,6 +3,7 @@
 
 import grpc
 import datetime
+import time # for sleep
 import sys
 import logging
 import socket
@@ -309,10 +310,13 @@ def Set_LLDP_Systemname(name):
    value = { "host-name" : name }
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', update=[('/system/name',value)] )
+      c.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] )
 
 def Set_Default_Systemname(state):
-    Set_LLDP_Systemname( f"{state.get_role()}-{state.node_id}-{state.router_id}" )
+    _name = f"{state.get_role()}-{state.node_id}-{state.router_id}"
+    if state.evpn_rr == "auto_top_nodes":
+        _name += f"L{state.max_level}N{state.top_count}"
+    Set_LLDP_Systemname( _name )
 
 # Only used on LEAVES when auto_lags==True
 def Announce_LLDP_peer(state,name,port):
@@ -534,6 +538,37 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
          # Dont quit agent. Usually means 'overlay' didn't get created
          logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
 
+def Update_EVPN_RR_Neighbors(state,first_time=False):
+
+   if state.evpn_rr[0].isdigit():
+     if not first_time:
+         return # Skip
+     rr_ids = state.evpn_rr.split(',')
+   elif state.evpn_rr in ["superspine","auto_top_nodes"]:
+     rr_ids = [ state._router_id_by_level( state.max_level, n )
+                for n in range(1,state.top_count+1) ]
+   else:
+     return # 'spine' handled in gnmic-configure-interface.sh
+
+   prefix = ".".join( str(state.loopbacks_prefix.network_address).split('.')[0:2] )
+   deletes=[f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}.*]']
+   updates = []
+   for id in rr_ids:
+      _p = f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={id}]'
+      _v = {
+        "admin-state": "enable",
+        "peer-group": "evpn-rr"
+      }
+      updates.append( (_p, _v) )
+
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                   username="admin",password="admin",insecure=True) as c:
+     try:
+        c.set( encoding='json_ietf', delete=deletes, update=updates )
+     except Exception as ex:
+        # Dont quit agent. Usually means 'overlay' didn't get created
+        logging.error( f"Exception in Update_EVPN_RR_Neighbors gNMI set: {ex} state={state}" )
+
 #
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
@@ -736,9 +771,6 @@ def Handle_Notification(obj, state):
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
-                if 'role' in data:
-                    state.role = data['role'][5:] # strip "ROLE_"
-                    logging.info(f"Got role :: {state.role}")
                 if 'peerlinks' in data:
                     peerlinks = data['peerlinks']
                     state.peerlinks_prefix = peerlinks['prefix']['value']
@@ -774,12 +806,14 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:
                     state.evpn_auto_lags = data['evpn_auto_lags'][15:]
-                if 'evpn_rr' in data:
-                    state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
-                else:
+                if 'evpn_rr_enum' in data:
+                    # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
+                    state.set_EVPN_RR( data['evpn_rr_enum'][13:] )
+                    logging.info( f"EVPN RR strategy: {state.evpn_rr}" )
+                # else
                     # Default to all nodes in spine layer
-                    state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
-                logging.info( f"EVPN RR prefix: {state.evpn_rr}" )
+                    # state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
+
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
                 if 'overlay_bgp_admin_state' in data:
@@ -789,7 +823,7 @@ def Handle_Notification(obj, state):
                     state.anycast_gw = data['anycast_gw']['value']
 
                 return state.role is not None
-    elif obj.HasField('lldp_neighbor') and not state.role is None:
+    elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
         logging.info(f"process LLDP notification : {obj} op='{obj.lldp_neighbor.op}'")
 
@@ -822,6 +856,9 @@ def Handle_Notification(obj, state):
                delattr(state,"router_id")  # Re-determine IDs
                delattr(state,"node_id")
 
+          # Update max level in topology, for EVPN RR ID calculation
+          level_updated = state.update_max_level( peer_sys_name )
+
           # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
              node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
@@ -833,13 +870,14 @@ def Handle_Notification(obj, state):
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
-            state.router_id = determine_router_id( state, state.get_role(), state.node_id )
+            state.router_id = state.determine_router_id( state.get_role(), state.node_id )
             router_id_changed = True
             if state.role != "endpoint":
                Set_Default_Systemname( state )
-               if state.get_role()=="leaf" and state.evpn_auto_lags != "disabled":
-                  # XXX assumes router_id wont change after this point
-                  EVPNRouteMonitoringThread(state).start()
+          elif level_updated:
+               Set_Default_Systemname( state ) # Update system name to reflect
+               if state.get_role()=="leaf":
+                  Update_EVPN_RR_Neighbors( state )
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
@@ -857,6 +895,12 @@ def Handle_Notification(obj, state):
              for intf in state.pending_peers:
                  _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc = state.pending_peers[intf]
                  configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+
+             if state.get_role()=="leaf":
+                Update_EVPN_RR_Neighbors( state, first_time=True )
+                if state.evpn_auto_lags != "disabled":
+                   # XXX assumes router_id wont change after this point
+                   EVPNRouteMonitoringThread(state).start()
 
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -887,14 +931,6 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
             # Disambiguate assuming N ports per leaf
             return (int(leafId.groups()[0]) - 1) * state.max_hosts_per_leaf + lldp_peer_port
         return lldp_peer_port
-
-###
-# Calculates an IPv4 address to be used as router ID for the given node/role
-# Note: More generically 'node level', leaf=0 spine=1 superspine=2.. for standard CLOS
-###
-def determine_router_id( state, role, node_id ):
-    _l = state.node_level(other_role=role)
-    return str( state.loopbacks_prefix[ 256 * _l + node_id ] )
 
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
@@ -938,7 +974,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
       peer_type = 'spine'
-      peer_router_id = determine_router_id( state, peer_type, int(spineId.groups()[0]) )
+      peer_router_id = state.determine_router_id( peer_type, int(spineId.groups()[0]) )
       min_peer_as = max_peer_as = state.base_as + 1 # EBGP spine AS
     else:
       # Reuse underlay address space, optionally allocate unique IPs per leaf
@@ -1018,11 +1054,6 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
-    evpn_rr = (router_id if (router_id and ipaddress.IPv4Address(router_id) in state.evpn_rr)
-               else peer_rid if (peer_rid and ipaddress.IPv4Address(peer_rid) in state.evpn_rr)
-               else str(state.evpn_rr.network_address) if state.evpn_rr.prefixlen!=24 # Workaround Python 3.6 bug, fixed in 3.8
-               else "" )
-    logging.info( f"Target EVPN RR: {evpn_rr}" )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
@@ -1032,7 +1063,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type,peer_rid,
                                        state.igp,
-                                       state.evpn, evpn_rr, state.overlay_bgp_admin_state],
+                                       state.evpn, state.overlay_bgp_admin_state],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
@@ -1045,6 +1076,8 @@ class State(object):
         # YAML attributes
         self.base_as = None
         self.max_leaves = None
+        self.max_level = 0 # Maximum topology level, learnt through LLDP
+        self.top_count = 1 # Number of nodes at top, learnt through LLDP
 
         self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
@@ -1061,6 +1094,13 @@ class State(object):
         self.use_bgp_unnumbered = False
         self.local_lldp = {}
         self.mc_lags = {}
+        self.loopbacks_prefix = []
+        self.evpn_rr = None
+
+    def set_EVPN_RR(self,evpn_rr):
+        self.evpn_rr = evpn_rr
+        if evpn_rr == "superspine":
+            self.max_level = 2 # Dont enable RR on spines then
 
     def _determine_role(self):
        """
@@ -1071,6 +1111,7 @@ class State(object):
        if role_id:
            self.role = role_id.groups()[0]
            self.id_from_hostname = int( role_id.groups()[1] )
+           self.max_level = self.node_level()
            logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
 
            # TODO super<n>spine
@@ -1091,6 +1132,17 @@ class State(object):
        else: # host
            self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 
+    ###
+    # Calculates an IPv4 address to be used as router ID for the given node/role
+    # Note: More generically 'node level', leaf=0 spine=1 superspine=2.. for standard CLOS
+    ###
+    def determine_router_id( self, role, node_id ):
+        _l = self.node_level(other_role=role)
+        return self._router_id_by_level( _l, node_id )
+
+    def _router_id_by_level( self, level, node_id ):
+       return str( self.loopbacks_prefix[ 256 * level + node_id ] )
+
     def node_level(self,other_role=None):
        _role = other_role or self.get_role()
        if _role=="leaf":
@@ -1098,6 +1150,39 @@ class State(object):
        elif _role=="spine":
          return 1
        return 2 # superspine or higher, TODO super2spine, etc.
+
+    def update_max_level(self,peer_lldp_sysname):
+        change = False
+        m = re.match( "^.*-\d+[.]\d+[.](\d+)[.](\d+)L(\d+)N(\d+)$", peer_lldp_sysname )
+        if m:
+           peer_level, peer_id, peer_max_level, peer_top_count = map( int, m.groups() )
+
+           if peer_level > self.node_level():
+             if peer_max_level > self.max_level:
+                 self.max_level = peer_max_level
+                 self.top_count = max(peer_top_count,peer_id) # Reset to peer's count
+                 logging.info( f"self.max_level updated to {peer_max_level}, top_count reset to {self.top_count} based on LLDP peer name '{peer_lldp_sysname}'" )
+                 change = True
+             elif peer_top_count > self.top_count or (peer_level==self.max_level and peer_id>self.top_count):
+                 self.top_count = max(peer_top_count,peer_id)
+                 logging.info( f"self.top_count updated to {self.top_count} based on LLDP peer name '{peer_lldp_sysname}'" )
+                 change = True
+        else:
+            # Simple match, could combine into 1
+            m = re.match( "^((?:super)?spine|leaf)(\d+)$", peer_lldp_sysname )
+            if m:
+               peer_role, peer_id = m.groups()
+               peer_level = self.node_level(peer_role)
+               if peer_level > self.max_level:
+                  self.max_level = peer_level
+                  change = True
+               if peer_level > self.node_level() and int(peer_id)>self.top_count:
+                  self.top_count = int(peer_id)
+                  change = True
+            else:
+               logging.warning( f"update_max_level: no match {peer_lldp_sysname}" )
+    
+        return change and self.evpn_rr == "auto_top_nodes"
 
     def __str__(self):
        return str(self.__class__) + ": " + str(self.__dict__)
@@ -1148,13 +1233,13 @@ def Run():
                     logging.info('TO DO -commit.end config')
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
+
+                       # Add some delay to avoid exceptions during startup
+                       logging.info( "Adding 5s delay before LLDP subscribe..." )
+                       time.sleep( 5 )
+
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
-
-                    # Program router_id only when changed
-                    # if state.router_id != old_router_id:
-                    #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
-                    # logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
         logging.error(f'grpc._channel._Rendezvous: {err}')

@@ -120,8 +120,19 @@ module auto_config_agent {
                 default "disabled";
             }
             leaf evpn-rr {
-                description "Prefix to match EVPN Route Reflector IDs on (super)spines, defaults to all spines";
-                type srl_nokia-comm:ipv4-prefix;
+                description "Where to run an EVPN Route Reflector, defaults to the top node(s) as determined dynamically";
+                type union {
+                 type string {  // List of router IDs, slightly simplified pattern
+                  pattern '[0-9]{1,3}(\.[0-9]{1,3}){3}([,][0-9]{1,3}(\.[0-9]{1,3}){3})*';
+                 }
+                 type enumeration {
+                  enum auto-top-nodes;
+                  enum spine;
+                  enum superspine;
+                  enum disabled;
+                 }
+                }
+                default auto-top-nodes;
             }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";

@@ -17,12 +17,7 @@ PEER_TYPE="${10}"
 PEER_ROUTER_ID="${11}" # Not currently used
 IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
-RR_ROUTER_ID="${14}"
-OVERLAY_BGP_ADMIN_STATE="${15}" # 'disable' or 'enable'
-
-if [[ "$ROUTER_ID" == "$RR_ROUTER_ID" ]]; then
-IS_EVPN_RR="1"
-fi
+OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
 
 # echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
@@ -260,7 +255,11 @@ EOF
 
 fi
 
-if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$IS_EVPN_RR" == "1" ]]; then
+#
+# Enable all (super)spines to be EVPN Route Reflectors, may not get used
+#
+if [[ "$USE_EVPN_OVERLAY" != "disabled" && ("$ROLE"=="$evpn_rr" || \
+    ("$evpn_rr"=="auto_top_nodes" && ("$ROLE"=="superspine" || ("$ROLE"=="spine" && "$max_level"=="1")))) ]]; then
 IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
 {
   "group-name": "evpn-leaves",
@@ -734,16 +733,15 @@ EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 fi # "$PEER_TYPE" != "host"
-
 fi # $ROLE != "endpoint"
 
-# Peer router ID only set for spines when this node is a leaf
-if [[ "$ROLE" == "leaf" ]] && [[ "$RR_ROUTER_ID" != "" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+# Handle evpn_rr=="spine" case here, on a per-uplink basis
+if [[ "$ROLE" == "leaf" && "$PEER_TYPE" == "spine" && "$USE_EVPN_OVERLAY" != "disabled" && "$evpn_rr" == "spine" ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "evpn-rr", "description": "EVPN Route Reflector for overlay" }
 EOF
-echo "Adding BGP peer ${RR_ROUTER_ID} as EVPN route reflector..."
-$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$RR_ROUTER_ID] --update-file $temp_file
+echo "Adding spine BGP peer ${PEER_ROUTER_ID} as EVPN route reflector..."
+$GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi
 
