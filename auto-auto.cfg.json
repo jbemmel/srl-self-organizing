@@ -1,6 +1,5 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "role": "auto",
     "use-ospfv3": true,
     "use-evpn": true
   },

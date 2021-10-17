@@ -810,6 +810,9 @@ def Handle_Notification(obj, state):
                     # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
                     state.set_EVPN_RR( data['evpn_rr_enum'][13:] )
                     logging.info( f"EVPN RR strategy: {state.evpn_rr}" )
+                elif 'evpn_rr_string' in data: # IP address
+                    state.set_EVPN_RR( data['evpn_rr_string']['value'] )
+                    logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
                 # else
                     # Default to all nodes in spine layer
                     # state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
@@ -1181,7 +1184,7 @@ class State(object):
                   change = True
             else:
                logging.warning( f"update_max_level: no match {peer_lldp_sysname}" )
-    
+
         return change and self.evpn_rr == "auto_top_nodes"
 
     def __str__(self):
