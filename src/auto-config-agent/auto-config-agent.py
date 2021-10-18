@@ -540,6 +540,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
 
 def Update_EVPN_RR_Neighbors(state,first_time=False):
 
+   deletes = []
    if state.evpn_rr[0].isdigit():
      if not first_time:
          return # Skip
@@ -547,11 +548,13 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
    elif state.evpn_rr in ["superspine","auto_top_nodes"]:
      rr_ids = [ state._router_id_by_level( state.max_level, n )
                 for n in range(1,state.top_count+1) ]
+
+     if not first_time: # Undo previous config
+        prefix = ".".join( str(state.loopbacks_prefix.network_address).split('.')[0:2] )
+        deletes=[f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}.*]']
    else:
      return # 'spine' handled in gnmic-configure-interface.sh
 
-   prefix = ".".join( str(state.loopbacks_prefix.network_address).split('.')[0:2] )
-   deletes=[f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}.*]']
    updates = []
    for id in rr_ids:
       _p = f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={id}]'
