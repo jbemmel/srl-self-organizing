@@ -803,7 +803,7 @@ def Handle_Notification(obj, state):
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
                 if 'enable_bfd' in data:
-                    state.enable_bfd = data['enable_bfd'][11:]
+                    state.enable_bfd = "true" if data['enable_bfd']['value'] else "false"
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
                 if 'evpn_auto_lags' in data:

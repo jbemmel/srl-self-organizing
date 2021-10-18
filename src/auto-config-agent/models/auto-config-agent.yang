@@ -145,10 +145,7 @@ module auto_config_agent {
             }
             leaf enable-bfd {
                 description "Whether to enable BFD for IGP, default 'true'";
-                type enumeration {
-                  enum true;
-                  enum false;
-                }
+                type boolean;
                 default true;
             }
             leaf use-bgp-unnumbered {
