@@ -143,6 +143,14 @@ module auto_config_agent {
                 }
                 default ospf; // v3
             }
+            leaf enable-bfd {
+                description "Whether to enable BFD for IGP, default 'true'";
+                type enumeration {
+                  enum true;
+                  enum false;
+                }
+                default true;
+            }
             leaf use-bgp-unnumbered {
                 description "Provision BGP unnumbered on fabric interfaces, using FRR agent";
                 type boolean;

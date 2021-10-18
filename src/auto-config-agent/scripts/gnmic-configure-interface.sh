@@ -58,6 +58,7 @@ $GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_fi
 exitcode+=$?
 
 # Enable BFD for loopback
+if [[ "$enable_bfd" == "true" ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
@@ -68,6 +69,7 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${LOOPBACK_IF}0.0] --replace-file $temp_file
 exitcode+=$?
+fi
 
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
 exitcode+=$?
@@ -215,7 +217,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "admin-state": "enable",
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
-    "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+    "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
     "timers": { "connect-retry": 10 },
     "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
     "peer-as": ${PEER_AS_MIN}
@@ -246,7 +248,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   ${AS_PATH_OPTIONS}
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
@@ -304,7 +306,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       ]
     }
 },
-"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+"failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
 ${EVPN_SECTION}
 "group": [
     ${EBGP_PEER_GROUP}
@@ -409,7 +411,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
@@ -432,7 +434,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   "keep-all-routes": true,
   "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
 },
-"failure-detection": { "enable-bfd" : true, "fast-failover" : true },
+"failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
 "preference": {
  "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },
 $DEFAULT_DYNAMIC_HOST_PEERING
@@ -673,7 +675,7 @@ cat > $temp_file << EOF
  "admin-state": "enable",
  "interface-type": "point-to-point",
  "failure-detection": {
-   "enable-bfd": true
+   "enable-bfd": ${enable_bfd}
  }
 }
 EOF
@@ -685,7 +687,7 @@ cat > $temp_file << EOF
 {
  "admin-state": "enable",
  "ipv4-unicast": { "admin-state": "disable" },
- "ipv6-unicast": { "admin-state": "enable", "enable-bfd": true }
+ "ipv6-unicast": { "admin-state": "enable", "enable-bfd": ${enable_bfd} }
 }
 EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
