@@ -33,9 +33,10 @@ exitcode=0
 #
 if [[ "$ROUTER_ID" != "" ]]; then
 
-if [[ "$disable_icmp_ttl0_rate_limiting" == "True" ]]; then
- echo "Disabling ICMP TTL 0 rate limiting by setting net.ipv4.icmp_ratemask=4120"
- sudo sysctl -w net.ipv4.icmp_ratemask=4120
+if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
+ echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
+ # Setting is per netns
+ /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
 fi
 
 if [[ "$ROLE" == "leaf" ]]; then
