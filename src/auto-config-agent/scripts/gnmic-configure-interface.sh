@@ -33,6 +33,10 @@ exitcode=0
 #
 if [[ "$ROUTER_ID" != "" ]]; then
 
+if [[ "$disable_icmp_ttl0_rate_limiting" == "True" ]]; then
+ sudo sysctl -w net.ipv4.icmp_ratemask=4120
+fi
+
 if [[ "$ROLE" == "leaf" ]]; then
 # XXX cannot ping system0 interface? may want to create lo0.0 with ipv6 addr
 LOOPBACK_IF="system"

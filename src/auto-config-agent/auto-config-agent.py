@@ -830,6 +830,11 @@ def Handle_Notification(obj, state):
                 if 'anycast_gw' in data:
                     state.anycast_gw = data['anycast_gw']['value']
 
+                if 'tweaks' in data:
+                    tweaks = data['tweaks']
+                    if 'disable-icmp-ttl0-rate-limiting' in tweaks:
+                      state.disable_icmp_ttl0_rate_limiting = tweaks['disable_icmp_ttl0_rate_limiting']['value']
+
                 return state.role is not None
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
@@ -1063,7 +1068,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
-       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int] } # **kwargs
+       my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
