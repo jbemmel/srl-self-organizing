@@ -832,7 +832,7 @@ def Handle_Notification(obj, state):
 
                 if 'tweaks' in data:
                     tweaks = data['tweaks']
-                    if 'disable-icmp-ttl0-rate-limiting' in tweaks:
+                    if 'disable_icmp_ttl0_rate_limiting' in tweaks:
                       state.disable_icmp_ttl0_rate_limiting = tweaks['disable_icmp_ttl0_rate_limiting']['value']
 
                 return state.role is not None
