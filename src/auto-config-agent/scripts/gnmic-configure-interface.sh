@@ -33,22 +33,22 @@ exitcode=0
 #
 if [[ "$ROUTER_ID" != "" ]]; then
 
-if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
- echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
- # Setting is per netns (could put this in a separate agent...)
- /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
-fi
+# if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
+#  echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
+#  # Setting is per netns (could put this in a separate agent...)
+#  /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
+# fi
 
 if [[ "$ROLE" == "leaf" ]]; then
 # XXX cannot ping system0 interface? may want to create lo0.0 with ipv6 addr
 LOOPBACK_IF="system"
-LOOPBACK_IP4="$ROUTER_ID/31" # Use /31 to have multiple source IPs for traceroute
-LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/127"
+# LOOPBACK_IP4="$ROUTER_ID/31" # Use /31 to have multiple source IPs for traceroute
+# LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/127"
 else
 LOOPBACK_IF="lo"
+fi
 LOOPBACK_IP4="$ROUTER_ID/32"
 LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/128"
-fi
 
 cat > $temp_file << EOF
 {
