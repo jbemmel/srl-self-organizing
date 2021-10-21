@@ -188,16 +188,16 @@ module auto_config_agent {
                 type srl_nokia-comm:ipv4-prefix-with-host-bits;
             }
 
-            container tweaks {
-               presence "Minor system tweaks for various demo purposes";
-               description "Contains some custom flags to tweak system settings";
+            // container tweaks {
+            //    presence "Minor system tweaks for various demo purposes";
+            //    description "Contains some custom flags to tweak system settings";
 
-               leaf disable-icmp-ttl0-rate-limiting {
-                  description "Configures net.ipv4.icmp_ratemask as 4120 to keep TTL=0 ICMP errors from being rate limited to 1pps";
-                  type boolean;
-                  default true;
-               }
-            }
+            //    leaf disable-icmp-ttl0-rate-limiting {
+            //       description "Configures net.ipv4.icmp_ratemask as 4120 to keep TTL=0 ICMP errors from being rate limited to 1pps";
+            //       type boolean;
+            //       default true;
+            //    }
+            // }
 
             // info from state
             list leaf {

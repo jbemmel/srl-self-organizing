@@ -830,10 +830,10 @@ def Handle_Notification(obj, state):
                 if 'anycast_gw' in data:
                     state.anycast_gw = data['anycast_gw']['value']
 
-                if 'tweaks' in data:
-                    tweaks = data['tweaks']
-                    if 'disable_icmp_ttl0_rate_limiting' in tweaks:
-                      state.disable_icmp_ttl0_rate_limiting = tweaks['disable_icmp_ttl0_rate_limiting']['value']
+                # if 'tweaks' in data:
+                #     tweaks = data['tweaks']
+                #     if 'disable_icmp_ttl0_rate_limiting' in tweaks:
+                #       state.disable_icmp_ttl0_rate_limiting = tweaks['disable_icmp_ttl0_rate_limiting']['value']
 
                 return state.role is not None
     elif obj.HasField('lldp_neighbor'):
