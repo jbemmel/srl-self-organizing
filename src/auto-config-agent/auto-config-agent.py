@@ -1154,6 +1154,8 @@ class State(object):
         return self._router_id_by_level( _l, node_id )
 
     def _router_id_by_level( self, level, node_id ):
+       if level==0: # For leaves, use /31 router IDs (system0 = even IP)
+           node_id *= 2
        return str( self.loopbacks_prefix[ 256 * level + node_id ] )
 
     def node_level(self,other_role=None):
