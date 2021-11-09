@@ -40,15 +40,15 @@ if [[ "$ROUTER_ID" != "" ]]; then
 # fi
 
 if [[ "$ROLE" == "leaf" ]]; then
-# XXX cannot ping system0 interface? may want to create lo0.0 with ipv6 addr
 LOOPBACK_IF="system"
-# LOOPBACK_IP4="$ROUTER_ID/31" # Use /31 to have multiple source IPs for traceroute
-# LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/127"
+#LOOPBACK_IP4="$ROUTER_ID/31" # Use /31 to have multiple source IPs for traceroute
+#LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/127"
 else
 LOOPBACK_IF="lo"
 fi
 LOOPBACK_IP4="$ROUTER_ID/32"
 LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/128"
+# fi
 
 cat > $temp_file << EOF
 {
