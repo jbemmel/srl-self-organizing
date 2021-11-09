@@ -800,6 +800,10 @@ def Handle_Notification(obj, state):
                     state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
                 if 'max_lag_links' in data:
                     state.max_lag_links = int( data['max_lag_links']['value'] )
+
+                state.evpn_overlay_as = 0
+                state.evpn = state.evpn_auto_lags = 'disabled'
+                state.evpn_rr = None
                 if 'evpn' in data:
                     evpn = data['evpn']
                     if 'model' in evpn:
