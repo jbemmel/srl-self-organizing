@@ -1127,9 +1127,12 @@ class State(object):
        role_id = re.match( "^(\w+)[-]?(\d+).*$", hostname ) # Ignore trailing router ID, if set
        if role_id:
            self.role = role_id.groups()[0]
+           if self.role not in ["leaf","spine","superspine"]:
+              self.role = "endpoint"
            self.id_from_hostname = int( role_id.groups()[1] )
            self.max_level = self.node_level()
            logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
+
 
            # TODO super<n>spine
        else:
