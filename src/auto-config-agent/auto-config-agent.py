@@ -1028,14 +1028,16 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Reuse link IPs between overlay and underlay
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
-     if not state.use_bgp_unnumbered or peer_type=='host':
-       if peer_type!='host' or state.hostlinks_size == 31:
-         _ip = str( list(state.peerlinks[link_index].hosts())[_r] ) + '/31'
-         _peer = str( list(state.peerlinks[link_index].hosts())[1-_r] )
+     if not state.use_bgp_unnumbered or peer_type=='host' or state.role == 'endpoint':
+       if (peer_type!='host' and state.role!='endpoint'):
+         _p = '/31'
+         _links = state.peerlinks
        else:
          _p = f"/{state.hostlinks_size}"
-         _ip = str( list(state.hostlinks[link_index].hosts())[0] ) + _p
-         _peer = str( list(state.hostlinks[link_index].hosts())[1] )
+         _links = state.hostlinks
+       _hosts = list(_links[link_index].hosts())
+       _ip = str( _hosts[_r] ) + _p
+       _peer = str( _hosts[1-_r] )
      else:
        _ip = ""
        _peer = "*"
