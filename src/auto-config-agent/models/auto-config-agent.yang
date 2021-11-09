@@ -100,6 +100,7 @@ module auto_config_agent {
                 default 4; // Too high -> out of peer link IP space
             }
             container evpn {
+             presence "EVPN settings";
              leaf model {
                 description "BGP EVPN control plane model to use for VXLAN endpoints";
                 type enumeration {
