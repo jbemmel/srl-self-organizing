@@ -785,8 +785,7 @@ def Handle_Notification(obj, state):
                 if 'loopbacks_prefix' in data:
                     # state.loopbacks = list(ipaddress.ip_network(data['loopbacks_prefix']['value']).subnets(new_prefix=32))
                     state.loopbacks_prefix = ipaddress.ip_network(data['loopbacks_prefix']['value'])
-                if 'evpn_overlay_as' in data:
-                    state.evpn_overlay_as = int( data['evpn_overlay_as']['value'] )
+
                 if 'base_as' in data:
                     state.base_as = int( data['base_as']['value'] )
                 if 'leaf_as' in data:
@@ -802,22 +801,27 @@ def Handle_Notification(obj, state):
                 if 'max_lag_links' in data:
                     state.max_lag_links = int( data['max_lag_links']['value'] )
                 if 'evpn' in data:
-                    state.evpn = data['evpn'][5:] # strip "EVPN_"
+                    evpn = data['evpn']
+                    if 'model' in evpn:
+                       state.evpn = evpn['model'][5:] # strip "EVPN_"
+                    if 'overlay_as' in evpn:
+                       state.evpn_overlay_as = int( evpn['overlay_as']['value'] )
+                    if 'auto_lags' in evpn:
+                       state.evpn_auto_lags = evpn['auto_lags'][15:]
+                    if 'route_reflector_enum' in evpn:
+                        # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
+                        logging.info( f"EVPN RR strategy: {state.evpn_rr}" )
+                        state.set_EVPN_RR( evpn['route_reflector_enum'][13:] )
+                    elif 'route_reflector_string' in evpn: # IP address
+                        state.set_EVPN_RR( evpn['route_reflector_string']['value'] )
+                        logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
+
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
                 if 'enable_bfd' in data:
                     state.enable_bfd = "true" if data['enable_bfd']['value'] else "false"
                 if 'use_bgp_unnumbered' in data:
                     state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
-                if 'evpn_auto_lags' in data:
-                    state.evpn_auto_lags = data['evpn_auto_lags'][15:]
-                if 'evpn_rr_enum' in data:
-                    # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
-                    state.set_EVPN_RR( data['evpn_rr_enum'][13:] )
-                    logging.info( f"EVPN RR strategy: {state.evpn_rr}" )
-                elif 'evpn_rr_string' in data: # IP address
-                    state.set_EVPN_RR( data['evpn_rr_string']['value'] )
-                    logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
                 # else
                     # Default to all nodes in spine layer
                     # state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]

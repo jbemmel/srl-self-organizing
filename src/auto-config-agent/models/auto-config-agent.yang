@@ -29,17 +29,6 @@ module auto_config_agent {
             description "Top level enclosing container for auto config agent sample app
                          config and operational state data";
 
-            leaf evpn-overlay-as {
-                description "iBGP AS number to use for the EVPN overlay, should not overlap with underlay";
-                type uint32;
-                default 65534;    // 65535 SHOULD NOT be used because of overlap with special communities
-                // default 65000; // Use 2-byte AS for easier RT interop
-                // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
-
-                must ". != 65535" {
-                  error-message "Private AS 65535 overlaps with certain reserved communities and SHOULD NOT be used";
-                }
-            }
             leaf base-as {
                 description "Baseline 2-byte or 4-byte Autonomous System to auto-assign for EBGP";
                 // type srl_nokia-comm:as-number;
@@ -110,7 +99,8 @@ module auto_config_agent {
                 type uint8;
                 default 4; // Too high -> out of peer link IP space
             }
-            leaf evpn {
+            container evpn {
+             leaf model {
                 description "BGP EVPN control plane model to use for VXLAN endpoints";
                 type enumeration {
                   enum asymmetric-irb;
@@ -118,8 +108,19 @@ module auto_config_agent {
                   enum disabled;
                 }
                 default "disabled";
-            }
-            leaf evpn-rr {
+             }
+             leaf overlay-as {
+                 description "iBGP AS number to use for the EVPN overlay, should not overlap with underlay";
+                 type uint32;
+                 default 65534;    // 65535 SHOULD NOT be used because of overlap with special communities
+                 // default 65000; // Use 2-byte AS for easier RT interop
+                 // see https://www.ipspace.net/Data_Center_BGP/EVPN_Route_Target_Considerations
+
+                 must ". != 65535" {
+                   error-message "Private AS 65535 overlaps with certain reserved communities and SHOULD NOT be used";
+                 }
+             }
+             leaf route-reflector {
                 description "Where to run an EVPN Route Reflector, defaults to the top node(s) as determined dynamically";
                 type union {
                  type string {  // List of router IDs, slightly simplified pattern
@@ -133,6 +134,20 @@ module auto_config_agent {
                  }
                 }
                 default auto-top-nodes;
+             }
+             leaf auto-lags {
+                 description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
+                 type enumeration {
+                   enum encoded-ipv6; // LLDP data encoded as IPv6 loopback IPs
+                   enum large-communities; // LLDP data encoded as communities
+                   enum disabled;
+                 }
+                 default "encoded-ipv6";
+
+                 must ". = 'disabled' or ../model != 'disabled'" {
+                   error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
+                 }
+             }
             }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";
@@ -169,19 +184,6 @@ module auto_config_agent {
                   enum enable;
                 }
                 default enable;
-            }
-            leaf evpn-auto-lags {
-                description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
-                type enumeration {
-                  enum encoded-ipv6; // LLDP data encoded as IPv6 loopback IPs
-                  enum large-communities; // LLDP data encoded as communities
-                  enum disabled;
-                }
-                default "encoded-ipv6";
-
-                must ". = 'disabled' or ../evpn != 'disabled'" {
-                  error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
-                }
             }
             leaf anycast-gw {
                 description "IPv4 anycast gateway to provision";
