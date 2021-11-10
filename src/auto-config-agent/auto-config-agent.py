@@ -814,8 +814,8 @@ def Handle_Notification(obj, state):
                        state.evpn_auto_lags = evpn['auto_lags'][15:]
                     if 'route_reflector_enum' in evpn:
                         # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
+                        state.set_EVPN_RR( evpn['route_reflector_enum'][21:] )
                         logging.info( f"EVPN RR strategy: {state.evpn_rr}" )
-                        state.set_EVPN_RR( evpn['route_reflector_enum'][13:] )
                     elif 'route_reflector_string' in evpn: # IP address
                         state.set_EVPN_RR( evpn['route_reflector_string']['value'] )
                         logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
