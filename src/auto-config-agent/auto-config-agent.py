@@ -614,7 +614,7 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
     }
    }
 
-   # Update IRB interface to learn unsolicited ARPs
+   # Update IRB interface to learn unsolicited ARPs and populate RT5 routes
    # Based on 8.1.1 p72 in https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf
    url = "https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf"
    arp = {
@@ -623,7 +623,10 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
       "evpn": { "advertise": [ {
         "route-type": "dynamic",
         "_annotate": "for ARP synchronization across MH leaf nodes"
-      } ] }
+      } ] },
+      "host-route": {
+        "populate": [ { "route-type": "dynamic" } ]
+      },
    }
 
    updates = [
