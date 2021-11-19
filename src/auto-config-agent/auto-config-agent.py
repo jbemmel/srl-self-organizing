@@ -820,7 +820,7 @@ def Handle_Notification(obj, state):
                     if 'overlay_as' in evpn:
                        state.evpn_overlay_as = int( evpn['overlay_as']['value'] )
                     if 'auto_lags' in evpn:
-                       state.evpn_auto_lags = evpn['auto_lags'][15:]
+                       state.evpn_auto_lags = evpn['auto_lags'][9:]
                     if 'route_reflector_enum' in evpn:
                         # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
                         state.set_EVPN_RR( evpn['route_reflector_enum'][21:] )
