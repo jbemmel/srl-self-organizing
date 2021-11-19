@@ -1,0 +1,60 @@
+#
+# Inspired by https://stubarea51.net/2021/11/18/migrating-from-fabricpath-to-evpn-vxlan/
+#
+
+name: spine-leaf-evpn
+
+topology:
+  kinds:
+    srl:
+      # image: ghcr.io/nokia/srlinux
+      image: srl/auto-config-v2:latest
+      startup-config: auto-config.json
+      extras:
+        srl-agents: [ ../../auto-config-agent.yml ]
+    linux:
+      # image: ghcr.io/hellt/network-multitool
+      image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
+  nodes:
+    leaf1:
+      kind: srl
+      type: ixrd2
+    leaf2:
+      kind: srl
+      type: ixrd2
+    leaf3:
+      kind: srl
+      type: ixrd2
+    leaf4:
+      kind: srl
+      type: ixrd2
+
+    spine1:
+      kind: srl
+      type: ixr6
+    spine2:
+      kind: srl
+      type: ixr6
+
+    client1:
+      kind: linux
+    client2:
+      kind: linux
+
+  links:
+    - endpoints: ["leaf1:e1-1", "spine1:e1-1"]
+    - endpoints: ["leaf1:e1-2", "spine2:e1-1"]
+    - endpoints: ["leaf2:e1-1", "spine1:e1-2"]
+    - endpoints: ["leaf2:e1-2", "spine2:e1-2"]
+
+    - endpoints: ["leaf3:e1-1", "spine1:e1-3"]
+    - endpoints: ["leaf3:e1-2", "spine2:e1-3"]
+    - endpoints: ["leaf4:e1-1", "spine1:e1-4"]
+    - endpoints: ["leaf4:e1-2", "spine2:e1-4"]
+
+    # LAGs to pairs of leaves
+    - endpoints: ["client1:eth1", "leaf1:e1-3"]
+    - endpoints: ["client1:eth2", "leaf2:e1-3"]
+
+    - endpoints: ["client2:eth1", "leaf3:e1-3"]
+    - endpoints: ["client2:eth2", "leaf4:e1-3"]
