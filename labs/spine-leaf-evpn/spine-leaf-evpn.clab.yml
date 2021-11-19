@@ -38,8 +38,12 @@ topology:
 
     client1:
       kind: linux
+      binds:
+      - interfaces.client1:/etc/network/interfaces
     client2:
       kind: linux
+      binds:
+      - interfaces.client2:/etc/network/interfaces
 
   links:
     - endpoints: ["leaf1:e1-1", "spine1:e1-1"]
