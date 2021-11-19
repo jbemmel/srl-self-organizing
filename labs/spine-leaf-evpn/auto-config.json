@@ -1163,7 +1163,7 @@
     "srl_nokia-gnmi-server:gnmi-server": {
       "admin-state": "enable",
       "timeout": 7200,
-      "rate-limit": 60,
+      "rate-limit": 1000,
       "session-limit": 20,
       "network-instance": [
         {
