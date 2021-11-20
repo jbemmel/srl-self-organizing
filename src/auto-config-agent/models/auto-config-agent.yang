@@ -137,7 +137,7 @@ module auto_config_agent {
                 default auto-top-nodes;
              }
              leaf auto-lags {
-                 description "Discover and provision LAGs on leaves, using LLDP and EVPN communities";
+                 description "Discover and provision LAGs on leaves, using LLDP and EVPN communities or IPv6";
                  type enumeration {
                    enum encoded-ipv6; // LLDP data encoded as IPv6 loopback IPs
                    enum large-communities; // LLDP data encoded as communities
@@ -149,6 +149,16 @@ module auto_config_agent {
                    error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
                  }
              }
+            }
+            // Cannot reference systemp lacp settings group due to must clause
+            leaf lacp {
+              description "Enable LACP towards hosts";
+              type enumeration {
+                enum active;
+                enum passive;
+                enum disabled;
+              }
+              default disabled;
             }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";

@@ -416,11 +416,17 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
          }
        }
       ],
-      "srl_nokia-interfaces-lag:lag": {
-       "lag-type": "static",
+      "lag": {
+       "lag-type": "static" if state.lacp=="disabled" else "lacp",
        "member-speed": "25G"
       }
    }
+   if state.lacp!="disabled":
+       lag['lag']['lacp'] = {
+         'interval' : "FAST", # or SLOW
+         'lacp-mode': state.lacp.upper(),
+         'system-id-mac': "02:00:00:00:00:00", # Must match for A/A MC-LAG
+       }
 
    irb_if = {
     "admin-state": "enable",
@@ -832,6 +838,8 @@ def Handle_Notification(obj, state):
 
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
+                if 'lacp' in data:
+                    state.lacp = data['lacp'][5:]
                 if 'enable_bfd' in data:
                     state.enable_bfd = "true" if data['enable_bfd']['value'] else "false"
                 if 'use_bgp_unnumbered' in data:

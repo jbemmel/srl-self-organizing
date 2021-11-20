@@ -6,6 +6,7 @@
       "overlay-as": 8675309,
       "route-reflector": "spine"
     },
+    "lacp": "passive",
     "anycast-gw": "100.127.10.2/24"
   },
   "srl_nokia-acl:acl": {
