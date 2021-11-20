@@ -18,7 +18,8 @@ iface bond0 inet static
   # bond0 uses standard IEEE 802.3ad LACP bonding protocol
   bond-mode 4
   bond-miimon 100
-  bond-lacp-rate 1 # FAST
+  bond-lacp-rate 1
+  bond-xmit-hash-policy layer3+4
   bond-slaves eth1 eth2
   # post-up ip link set eth1 up; ip link set eth2 up
 
