@@ -54,6 +54,12 @@ topology:
       binds:
       - /lib/modules:/lib/modules:ro
       - interfaces.client2:/etc/network/interfaces
+    client3:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.client3:/etc/network/interfaces
 
   links:
     - endpoints: ["leaf1:e1-1", "spine1:e1-1"]
@@ -72,3 +78,6 @@ topology:
 
     - endpoints: ["client2:eth1", "leaf3:e1-3"]
     - endpoints: ["client2:eth2", "leaf4:e1-3"]
+
+    - endpoints: ["client3:eth1", "leaf1:e1-4"]
+    - endpoints: ["client3:eth2", "leaf2:e1-4"]
