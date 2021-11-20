@@ -1052,7 +1052,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       link_index = (lldp_my_port - 1)
       if not state.reuse_overlay_ips:
          link_index += (state.node_id-1) * state.max_leaves
-      peer_type = 'host'
+
+      # Support a/b leaf pairs
+      peer_type = 'leaf' if 'leaf' in lldp_peer_name else 'host'
       min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
