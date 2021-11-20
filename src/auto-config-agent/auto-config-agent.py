@@ -427,7 +427,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
        "member-speed": "25G"
       }
    }
-   if state.lacp!="disabled":
+   if state.lacp != "disabled":
        lag['lag']['lacp'] = {
          'interval' : "SLOW", # or FAST, matters if passive?
          'lacp-mode': state.lacp.upper(),
@@ -553,15 +553,18 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
        }
 
    updates=[ (f'/interface[name=lag{port}]',lag),
-             (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
              (f'/network-instance[name=overlay-l2]', mac_vrf),
-             (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
            ]
    if state.evpn != 'disabled':
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
          # ('/routing-policy', export_policy)
+       ]
+   if state.evpn != 'l2_only_leaves':
+       updates += [
+         (f'/interface[name=irb0]', irb_if),
+         (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
        ]
 
    logging.info(f"gNMI SET deletes={deletes} updates={updates}" )

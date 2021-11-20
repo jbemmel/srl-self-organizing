@@ -1,9 +1,9 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "igp": "isis",
+    "igp": "bgp",
     "evpn": {
-      "model": "symmetric-irb",
-      "overlay-as": 8675309,
+      "model": "l2-only-leaves",
+      "overlay-as": 65536,
       "route-reflector": "spine"
     },
     "lacp": "passive",

@@ -106,6 +106,7 @@ module auto_config_agent {
                 type enumeration {
                   enum asymmetric-irb;
                   enum symmetric-irb;
+                  enum l2-only-leaves; // no ip-vrf on leaves
                   enum disabled;
                 }
                 default "disabled";

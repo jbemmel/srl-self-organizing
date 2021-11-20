@@ -62,7 +62,7 @@ topology:
   links:
     # Leaf interconnects for EVPN MC-LAG sync
     - endpoints: ["leaf2a:e1-3", "leaf2b:e1-3"]
-    - endpoints: ["leaf3a:e1-3", "leaf3b:e1-3"]
+    - endpoints: ["leaf3a:e1-4", "leaf3b:e1-4"]
 
     # Leaf 3a/b to single spine
     - endpoints: ["leaf3a:e1-1", "spine1:e1-1"]
