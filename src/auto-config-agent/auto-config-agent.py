@@ -540,7 +540,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
-             (f'/network-instance[name=lag{port}]', mac_vrf),
+             (f'/network-instance[name=overlay-l2]', mac_vrf),
              (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
            ]
    if state.evpn != 'disabled':
