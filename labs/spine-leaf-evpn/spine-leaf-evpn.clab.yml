@@ -41,6 +41,7 @@ topology:
       binds:
       - /lib/modules:/lib/modules:ro # for bonding module
       - interfaces.client1:/etc/network/interfaces
+      - bonding:/etc/network/if-pre-up.d/bonding
     client2:
       kind: linux
       binds:
