@@ -8,7 +8,7 @@ iface bond0 inet static
 	# gateway 100.127.10.2
 	# bond0 uses standard IEEE 802.3ad LACP bonding protocol
   bond-mode 4
-  bond-miimon 100
+  # bond-miimon 100
   bond-lacp-rate 1
   bond-xmit-hash-policy layer3+4
   bond-slaves eth1 eth2
