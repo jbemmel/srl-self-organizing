@@ -265,13 +265,19 @@ class EVPNRouteMonitoringThread(Thread):
                    logging.info( f"LLDP Communities from {peer_id}: {sorted(lldp_ports)}" )
                    for p in lldp_ports:
                        parts = p.split(':')
-                       key = parts[1] + ':' + parts[2]
+                       key = parts[1] + ':' + parts[2] # 48-bit MAC in 2 parts
                        if key in self.state.local_lldp:
                            lag_port = self.state.local_lldp[ key ]
                            logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
+                           m = int(parts[1]) << 24 + int(parts[2])
+                           mac = []
+                           for i in range(0,6):
+                               mac += [ f'{(m&0xff):02X}' ]
+                               m >>= 8
+                           mac = ":".join(mac)
                            try:
                               # This repeatedly provisions the same thing...
-                              Convert_lag_to_mc_lag( self.state, lag_port, peer_id, parts[0], gnmiClient )
+                              Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]), gnmiClient )
                            except Exception as ex:
                               logging.error( f"BUG: {ex}" )
 
@@ -297,9 +303,9 @@ class EVPNRouteMonitoringThread(Thread):
              if mac in self.state.local_lldp:
                  lag_port = self.state.local_lldp[ mac ]
                  peer_router_id = encoded_parts[2:4] # 2 x 16 bits
-                 peer_port = encoded_parts[4]
+                 peer_port = int(encoded_parts[4])
                  # TODO update ipv6 route (tag or community or IP) to reflect count of peers
-                 Convert_lag_to_mc_lag( self.state, lag_port, peer_id, peer_port, gnmiClient )
+                 Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port, gnmiClient )
 
 ############################################################
 ## Function to populate state of agent config
@@ -588,8 +594,8 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
 #
-def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
-   logging.info(f"Convert_lag_to_mc_lag :: port={port} peer_leaf={peer_leaf} peer_port={peer_port}")
+def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
+   logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port={peer_port}")
 
    if port in state.mc_lags:
       state.mc_lags[port].update( { peer_leaf : peer_port } )
@@ -616,7 +622,7 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
-              "esi": f"02:22:22:22:22:22:22:00:00:{int(port):02x}",
+              "esi": f"02:{mac}:00:00:{min(int(port),peer_port):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
               "interface": f"lag{port}",
               "multi-homing-mode": "all-active"
