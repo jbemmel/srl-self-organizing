@@ -399,7 +399,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
     return False
 
 ###
-# Converts an ethernet interface to a lag, creating a mac-vrf, irb,
+# Converts an ethernet interface to a lag, creating/joining a LAN mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
 def Convert_to_lag(state,port,ip,vrf="overlay"):
@@ -438,7 +438,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
     "admin-state": "enable",
     "subinterface": [
     {
-      "index": int(port),
+      "index": 0, # Port independent
       "admin-state": "enable",
       "ipv4": {
         "address": [
@@ -473,9 +473,10 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
        } )
 
    # EVPN VXLAN interface
+   VNI_EVI = 4095 # Cannot use 0
    vxlan_if = {
       "type": "srl_nokia-interfaces:bridged",
-      "ingress": { "vni": int(port) },
+      "ingress": { "vni": VNI_EVI },
       "egress": { "source-ip": "use-system-ipv4-address" }
    }
 
@@ -483,22 +484,23 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    mac_vrf = {
      "type": "srl_nokia-network-instance:mac-vrf",
      "admin-state": "enable",
-     "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.{port}" } ],
+     # Update, may already have other lag interfaces
+     "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.0" } ],
    }
    if state.evpn != 'disabled':
-      rt = f"target:{state.base_as}:{port}"
+      # rt = f"target:{state.base_as}:0"
 
       mac_vrf.update(
       {
-        "vxlan-interface": [ { "name": f"vxlan0.{port}" } ],
+        "vxlan-interface": [ { "name": f"vxlan0.0" } ],
         "protocols": {
          "bgp-evpn": {
           "srl_nokia-bgp-evpn:bgp-instance": [
            {
              "id": 1,
              "admin-state": "enable",
-             "vxlan-interface": f"vxlan0.{port}",
-             "evi": int(port),
+             "vxlan-interface": f"vxlan0.0",
+             "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
              "ecmp": 8,
              #"routes": {
              # "bridge-table": {
@@ -539,11 +541,11 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
              (f'/interface[name=irb0]', irb_if),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
              (f'/network-instance[name=lag{port}]', mac_vrf),
-             (f'/network-instance[name={vrf}]/interface[name=irb0.{port}]', {}),
+             (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
            ]
    if state.evpn != 'disabled':
        updates += [
-         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
+         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
          # ('/routing-policy', export_policy)
        ]
 
