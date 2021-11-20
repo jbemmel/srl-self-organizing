@@ -130,6 +130,7 @@ module auto_config_agent {
                  }
                  type enumeration {
                   enum auto-top-nodes;
+                  enum leaf-pairs; // Topology in which pairs of leaves are peered
                   enum spine;
                   enum superspine;
                   enum disabled;

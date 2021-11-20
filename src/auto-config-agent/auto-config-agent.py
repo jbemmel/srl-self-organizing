@@ -850,7 +850,8 @@ def Handle_Notification(obj, state):
                 if 'evpn' in data:
                     evpn = data['evpn']
                     if 'model' in evpn:
-                       state.evpn = evpn['model'][5:] # strip "EVPN_"
+                       state.evpn = evpn['model'][6:] # strip "MODEL_"
+                       logging.info( f"EVPN model: {state.evpn}" )
                     if 'overlay_as' in evpn:
                        state.evpn_overlay_as = int( evpn['overlay_as']['value'] )
                     if 'auto_lags' in evpn:
