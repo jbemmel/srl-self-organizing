@@ -486,71 +486,74 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
      "type": "srl_nokia-network-instance:mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
-     "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.0" } ],
+     "interface": [ { "name": f"lag{port}.0" } ],
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
-   if state.evpn != 'disabled':
+   if state.evpn != "l2_only_leaves":
+      mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
 
-      # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
-      # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
-      # IRB subinterface should be set to a value that is 30 seconds lower than
-      # the age-time configured in the MAC-VRF. This avoids transient packet loss situations
-      # triggered by the MAC address of an active ARP/ND entry being removed from the MAC
-      # table.
-      IRB_ARP_ND_TIMEOUT = 300 - 30
-      ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
+      if state.evpn != 'disabled':
 
-      mac_vrf.update(
-      {
-        "vxlan-interface": [ { "name": f"vxlan0.0" } ],
-        "protocols": {
-         "bgp-evpn": {
-          "srl_nokia-bgp-evpn:bgp-instance": [
-           {
-             "id": 1,
-             "admin-state": "enable",
-             "vxlan-interface": f"vxlan0.0",
-             "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
-             "ecmp": 8,
-             #"routes": {
-             # "bridge-table": {
-             #    "mac-ip": {
-             #      "advertise": False # Avoid duplicate IPs on links
-             #    }
-             #  }
-             # }
-           }
-          ]
-         },
-         "srl_nokia-bgp-vpn:bgp-vpn": {
-           "bgp-instance": [
-            { "id": 1,
-              # "export-policy": f"add-rt-{state.base_as}-{port}",
-              #"route-target": {
-              # "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
-              # "export-rt": rt,
-              # "import-rt": rt
-              #}
+         # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
+         # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
+         # IRB subinterface should be set to a value that is 30 seconds lower than
+         # the age-time configured in the MAC-VRF. This avoids transient packet loss situations
+         # triggered by the MAC address of an active ARP/ND entry being removed from the MAC
+         # table.
+         IRB_ARP_ND_TIMEOUT = 300 - 30
+         ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
+
+         mac_vrf.update(
+         {
+           "vxlan-interface": [ { "name": f"vxlan0.0" } ],
+           "protocols": {
+            "bgp-evpn": {
+             "srl_nokia-bgp-evpn:bgp-instance": [
+              {
+                "id": 1,
+                "admin-state": "enable",
+                "vxlan-interface": f"vxlan0.0",
+                "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
+                "ecmp": 8,
+                #"routes": {
+                # "bridge-table": {
+                #    "mac-ip": {
+                #      "advertise": False # Avoid duplicate IPs on links
+                #    }
+                #  }
+                # }
+              }
+             ]
+            },
+            "srl_nokia-bgp-vpn:bgp-vpn": {
+              "bgp-instance": [
+               { "id": 1,
+                 # "export-policy": f"add-rt-{state.base_as}-{port}",
+                 #"route-target": {
+                 # "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
+                 # "export-rt": rt,
+                 # "import-rt": rt
+                 #}
+               }
+              ]
             }
-           ]
-         }
-        }
-      })
+           }
+         })
 
-   else:
-      IRB_ARP_ND_TIMEOUT = 300
-      ANNOTATION = "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
+      else:
+         IRB_ARP_ND_TIMEOUT = 300
+         ANNOTATION = "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
 
-   irb_if['subinterface'][0]['ipv4']['arp'] = {
-     'timeout': IRB_ARP_ND_TIMEOUT,
-     '_annotate_timeout': ANNOTATION
-   }
-   if 'ipv6' in irb_if['subinterface'][0]:
-       irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
-         'stale-time': IRB_ARP_ND_TIMEOUT,
-         '_annotate_stale-time': ANNOTATION
-       }
+      irb_if['subinterface'][0]['ipv4']['arp'] = {
+        'timeout': IRB_ARP_ND_TIMEOUT,
+        '_annotate_timeout': ANNOTATION
+      }
+      if 'ipv6' in irb_if['subinterface'][0]:
+          irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
+            'stale-time': IRB_ARP_ND_TIMEOUT,
+            '_annotate_stale-time': ANNOTATION
+          }
 
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
