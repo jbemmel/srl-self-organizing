@@ -19,9 +19,14 @@ build:
 build-submodules:
 	make -C ../srl-baseimage
 
-all: build-submodules build build-frr
+all: build-submodules build build-frr build-alpine
 
 build-frr:
 	cd .. && sudo docker build --build-arg http_proxy=${HTTP_PROXY} --build-arg https_proxy=${HTTP_PROXY} \
 	         -f Docker/Dockerfile.frr -t frr-with-lldp .
 	sudo docker tag frr-with-lldp frr-with-lldp:latest
+
+build-alpine:
+		cd .. && sudo docker build --build-arg http_proxy=${HTTP_PROXY} --build-arg https_proxy=${HTTP_PROXY} \
+		         -f Docker/Dockerfile.alpine -t alpine-with-lldp .
+		sudo docker tag alpine-with-lldp alpine-with-lldp:latest

@@ -14,7 +14,7 @@ topology:
         srl-agents: [ ../../auto-config-agent.yml ]
     linux:
       # image: ghcr.io/hellt/network-multitool
-      image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
+      image: alpine-with-lldp:latest # Custom built image with lldpad
   nodes:
     leaf1:
       kind: srl
@@ -39,10 +39,12 @@ topology:
     client1:
       kind: linux
       binds:
+      - /lib/modules:/lib/modules:ro # for bonding module
       - interfaces.client1:/etc/network/interfaces
     client2:
       kind: linux
       binds:
+      - /lib/modules:/lib/modules:ro
       - interfaces.client2:/etc/network/interfaces
 
   links:

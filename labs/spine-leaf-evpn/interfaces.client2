@@ -1,14 +1,24 @@
 auto lo
 iface lo inet loopback
 
+auto eth1
+iface eth1 inet manual
+	post-up ip link set $IFACE up
+
+auto eth2
+iface eth2 inet manual
+	post-up ip link set $IFACE up
+
 auto bond0
 iface bond0 inet static
-	address 100.127.10.102/24
-	gateway 100.127.10.2
+	address 100.127.10.102
+	netmask 255.255.255.0
+	# gateway 100.127.10.2
   # specify the ethernet interfaces that should be bonded
   bond-slaves eth1 eth2
 
 iface bond0 inet6 static
-  address 2001:100:127:10::102/64
-  gateway 2001:100:127:10::2
+  address 2001:100:127:10::102
+	netmask 64
+  # gateway 2001:100:127:10::2
   pre-up echo 0 > /proc/sys/net/ipv6/conf/eth0/accept_ra
