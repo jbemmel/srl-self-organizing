@@ -429,7 +429,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    }
    if state.lacp!="disabled":
        lag['lag']['lacp'] = {
-         'interval' : "FAST", # or SLOW
+         'interval' : "SLOW", # or FAST, matters if passive?
          'lacp-mode': state.lacp.upper(),
          'system-id-mac': "02:00:00:00:00:00", # Must match for A/A MC-LAG
        }
