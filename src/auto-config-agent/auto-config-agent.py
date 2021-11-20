@@ -450,6 +450,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
         "arp": {
           # reusing same IPs across EVPN fabric, MAC routes or OSPF causes dup
           #  "duplicate-address-detection": False
+          # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
           "evpn": { "advertise": [ {
             "route-type": "dynamic" # TODO only for asymmetric model?
           } ] },
@@ -486,9 +487,19 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
      "admin-state": "enable",
      # Update, may already have other lag interfaces
      "interface": [ { "name": f"lag{port}.0" }, { "name" : f"irb0.0" } ],
+
+     # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
    if state.evpn != 'disabled':
-      # rt = f"target:{state.base_as}:0"
+
+      # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
+      # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
+      # IRB subinterface should be set to a value that is 30 seconds lower than
+      # the age-time configured in the MAC-VRF. This avoids transient packet loss situations
+      # triggered by the MAC address of an active ARP/ND entry being removed from the MAC
+      # table.
+      IRB_ARP_ND_TIMEOUT = 300 - 30
+      ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
 
       mac_vrf.update(
       {
@@ -526,16 +537,20 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
          }
         }
       })
+
    else:
-     irb_if['subinterface'][0]['ipv4']['arp'] = {
-       'timeout': 300,
-       '_annotate_timeout': "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
-     }
-     if 'ipv6' in irb_if['subinterface'][0]:
-        irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
-          'stale-time': 300,
-          '_annotate_stale-time': "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
-        }
+      IRB_ARP_ND_TIMEOUT = 300
+      ANNOTATION = "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
+
+   irb_if['subinterface'][0]['ipv4']['arp'] = {
+     'timeout': IRB_ARP_ND_TIMEOUT,
+     '_annotate_timeout': ANNOTATION
+   }
+   if 'ipv6' in irb_if['subinterface'][0]:
+       irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
+         'stale-time': IRB_ARP_ND_TIMEOUT,
+         '_annotate_stale-time': ANNOTATION
+       }
 
    updates=[ (f'/interface[name=lag{port}]',lag),
              (f'/interface[name=irb0]', irb_if),

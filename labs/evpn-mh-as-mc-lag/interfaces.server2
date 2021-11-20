@@ -1,0 +1,14 @@
+auto lo
+iface lo inet loopback
+
+auto eth1
+iface eth1 inet static
+  address 10.0.0.102
+  netmask 255.255.255.0
+  gateway 10.0.0.1
+
+iface eth1 inet6 static
+  address 2001:10:0:0::102
+  netmask 64
+  gateway 2001:10:0:0::1
+  pre-up echo 0 > /proc/sys/net/ipv6/conf/eth0/accept_ra
