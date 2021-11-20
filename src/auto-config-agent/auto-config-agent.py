@@ -614,7 +614,9 @@ def Convert_lag_to_mc_lag(state,port,peer_leaf,peer_port,gnmiClient):
             {
               "name": f"mc-lag{port}",
               "admin-state": "enable",
-              "esi": f"00:12:12:12:12:12:12:00:00:{int(port):02x}",
+              # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
+              # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
+              "esi": f"02:22:22:22:22:22:22:00:00:{int(port):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
               "interface": f"lag{port}",
               "multi-homing-mode": "all-active"

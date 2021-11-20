@@ -18,31 +18,39 @@ topology:
   nodes:
     leaf1:
       kind: srl
+      group: leaves
       type: ixrd2
     leaf2:
       kind: srl
+      group: leaves
       type: ixrd2
     leaf3:
       kind: srl
+      group: leaves
       type: ixrd2
     leaf4:
       kind: srl
+      group: leaves
       type: ixrd2
 
     spine1:
       kind: srl
+      group: spines
       type: ixr6
     spine2:
       kind: srl
+      group: spines
       type: ixr6
 
     client1:
       kind: linux
+      group: hosts
       binds:
       - /lib/modules:/lib/modules:ro # for bonding module
       - interfaces.client1:/etc/network/interfaces
     client2:
       kind: linux
+      group: hosts
       binds:
       - /lib/modules:/lib/modules:ro
       - interfaces.client2:/etc/network/interfaces
