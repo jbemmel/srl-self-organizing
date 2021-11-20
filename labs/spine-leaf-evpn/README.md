@@ -1,1 +1,1 @@
-![plot](spine-leaf-evpn.png)
+![plot](spine-leaf-evpn-clab.png)
