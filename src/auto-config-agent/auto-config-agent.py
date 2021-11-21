@@ -320,7 +320,7 @@ def Set_LLDP_Systemname(name):
 
 def Set_Default_Systemname(state):
     if state.pair_role > 0:
-        _id = f"{int(state.node_id/2)}{ 'a' if state.pair_role==1 else 'b'}"
+        _id = f"{int((state.node_id+1)/2)}{ 'a' if state.pair_role==1 else 'b'}"
     else:
         _id = str(state.node_id)
     _name = f"{state.get_role()}-{_id}-{state.router_id}"
@@ -526,7 +526,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
         }
       })
 
-   if state.evpn != "l2_only_leaves":
+   if state.evpn != "l2_only_leaves": # TODO check host_use_irb
       mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
 
       if state.evpn != 'disabled':
@@ -995,8 +995,8 @@ def Handle_Notification(obj, state):
 #####
 def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name ):
 
-   if state.id_from_hostname != 0:
-       return state.id_from_hostname
+   if state.effective_id != 0:
+       return state.effective_id
 
    if state.is_spine():
        # TODO spine-spine link case
@@ -1059,25 +1059,28 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     else:
       # Reuse underlay address space, optionally allocate unique IPs per leaf
       link_index = (lldp_my_port - 1)
-      if not state.reuse_overlay_ips:
-         link_index += (state.node_id-1) * state.max_leaves
 
       # Support a/b leaf pairs
       leaf_pair = re.match("^leaf(\d+)(a|b)?.*", lldp_peer_name)
       if leaf_pair:
-        peer_type = 'leaf'
-        peer_id = int( leaf_pair.groups()[0] )
-        if state.pair_role!=0 and int(node_id/2)==peer_id and len(leaf_pair.groups())==2:
-          leaf_pair_link = True
-          logging.info( f"Detected leaf pair link: peer_id={peer_id}")
-          peer_node_id = node_id + (1 if state.pair_role==1 else -1)
-          peer_router_id = state.determine_router_id( peer_type, peer_node_id )
-          _r = state.pair_role - 1  # a = .0, b = .1
-        else:
-          _r = 0 if int(node_id/2)<peer_id else 1
+         peer_type = 'leaf'
+         peer_id = int( leaf_pair.groups()[0] )
+         same_pair = (state.id_from_hostname == peer_id) # XXX todo 'auto'
+         if state.pair_role!=0 and len(leaf_pair.groups())==2 and same_pair:
+            leaf_pair_link = True
+            logging.info( f"Detected leaf pair link: peer_id={peer_id}")
+            peer_node_id = node_id + (1 if state.pair_role==1 else -1)
+            peer_router_id = state.determine_router_id( peer_type, peer_node_id )
+            _r = state.pair_role - 1  # a = .0, b = .1
+         else:
+            _r = 0 if state.id_from_hostname<peer_id else 1
       else:
+         logging.info( f"No leaf pair link -> 'host' lldp_peer_name={lldp_peer_name}")
          peer_type = 'host'
          _r = 0
+         if not state.reuse_overlay_ips:
+            link_index += (state.node_id-1) * state.max_leaves
+
       min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
@@ -1121,7 +1124,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          intf_name,
          _ip,
          lldp_peer_desc,
-         _peer if _r==1 or leaf_pair_link else '*', # Only when connecting "upwards"
+         _peer if ((peer_type=='spine' and _r==1) or leaf_pair_link) else '*', # Only when connecting "upwards"
          state.router_id if set_router_id else "",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
@@ -1131,11 +1134,12 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      )
      setattr( state, link_name, _ip )
 
-     # For access ports, convert to L2 service if requested
-     if peer_type=='host' and state.host_use_irb:
+     # For access ports or L2-only leaves, convert to L2 service if requested
+     if ((peer_type=='host' and state.host_use_irb) or
+        (state.evpn=='l2_only_leaves' and state.get_role()=='leaf' and peer_type=='leaf' and not leaf_pair_link)):
         Convert_to_lag( state, lldp_my_port, _ip ) # No EVPN MC-LAG yet
      else:
-       logging.info( f"Not a host facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
+        logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
      if state.use_bgp_unnumbered:
          if (peer_type!='host' and state.get_role() != 'endpoint'):
@@ -1209,11 +1213,11 @@ class State(object):
            self.role = role_id.groups()[0]
            if self.role not in ["leaf","spine","superspine"]:
               self.role = "endpoint"
-           self.id_from_hostname = int( role_id.groups()[1] )
+           self.id_from_hostname = self.effective_id = int( role_id.groups()[1] )
            self.pair_role = 0
            if len( role_id.groups() ) == 3:
               self.pair_role = 1 if role_id.groups()[2] == 'a' else 2
-              self.id_from_hostname = (self.id_from_hostname-1) * 2 + self.pair_role
+              self.effective_id = (self.id_from_hostname-1) * 2 + self.pair_role
            self.max_level = self.node_level()
            logging.info( f"_determine_role: role={self.role} pair_role={self.pair_role} id={self.id_from_hostname}" )
 
@@ -1222,7 +1226,7 @@ class State(object):
        else:
            logging.warning( f"_determine_role: Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
            self.role = "auto"
-           self.id_from_hostname = 0
+           self.id_from_hostname = self.effective_id = 0
 
     def _determine_local_as(self,node_id):
        self.node_id = node_id # Store it

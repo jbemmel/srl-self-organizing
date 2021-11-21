@@ -24,8 +24,10 @@ OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
 
 if [[ "$evpn_rr" == "leaf_pairs" ]]; then
 EVPN_PEER_GROUPNAME="evpn-peer-leaf"
+EVPN_PEER_DESC="EVPN leaf-pair to support MC-LAG based on MH"
 else
 EVPN_PEER_GROUPNAME="evpn-rr"
+EVPN_PEER_DESC="EVPN route-reflector for overlay services"
 fi
 
 # Can add --debug
@@ -760,9 +762,9 @@ fi # $ROLE != "endpoint"
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
   (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf_pairs")) ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": "${EVPN_PEER_GROUPNAME}", "description": "EVPN peer ${evpn_rr} for overlay" }
+{ "admin-state": "enable", "peer-group": "${EVPN_PEER_GROUPNAME}", "description": "${EVPN_PEER_DESC}" }
 EOF
-echo "Adding ${PEER_TYPE} BGP peer ${PEER_ROUTER_ID} as EVPN route reflector..."
+echo "Adding ${PEER_TYPE} EVPN BGP peer ${PEER_ROUTER_ID}..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi
