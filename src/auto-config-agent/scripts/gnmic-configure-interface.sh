@@ -385,7 +385,7 @@ DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
 IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
 {
-  "group-name": ${EVPN_PEER_GROUPNAME},
+  "group-name": "${EVPN_PEER_GROUPNAME}",
   "admin-state": "enable",
   "import-policy": "accept-all",
   "export-policy": "reject-link-routes",
@@ -757,7 +757,7 @@ fi # $ROLE != "endpoint"
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
   (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf-pairs")) ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": ${EVPN_PEER_GROUPNAME}, "description": "EVPN peer ${evpn_rr} for overlay" }
+{ "admin-state": "enable", "peer-group": "${EVPN_PEER_GROUPNAME}", "description": "EVPN peer ${evpn_rr} for overlay" }
 EOF
 echo "Adding ${PEER_TYPE} BGP peer ${PEER_ROUTER_ID} as EVPN route reflector..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
