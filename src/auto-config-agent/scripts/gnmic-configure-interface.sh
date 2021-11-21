@@ -397,7 +397,9 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
   "transport" : { "local-address" : "${ROUTER_ID}" },
-  "timers": { "connect-retry": 10 }
+  "timers": { "connect-retry": 10 },
+  "ipv4-unicast": { "admin-state": "disable" },
+  "ipv6-unicast": { "admin-state": "disable" }
 }
 EOF
 
