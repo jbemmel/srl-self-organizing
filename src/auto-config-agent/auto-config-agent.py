@@ -1021,7 +1021,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Number links based on spine ID
   spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
   node_id = int(spineId.groups()[0]) if spineId else state.node_id
-  igp = state.igp
   leaf_pair_link = False
   if state.is_spine(): # (super)spines
 
@@ -1075,8 +1074,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
             _r = state.pair_role - 1  # a = .0, b = .1
          else:
             _r = 0 if state.id_from_hostname<peer_id else 1
-            if state.evpn == "l2_only_leaves":
-                igp = "none"
 
          # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
          if len( leaf_pair.groups() ) == 2:
@@ -1140,7 +1137,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id,
-         igp # Disabled in case of l2_only_leaves
      )
      setattr( state, link_name, _ip )
 
@@ -1161,10 +1157,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,igp):
+def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
-                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max} igp={igp}' )
+                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
@@ -1172,7 +1168,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
-                                       peer_type,peer_rid,igp,
+                                       peer_type, peer_rid, state.igp,
                                        state.evpn, state.overlay_bgp_admin_state],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)

@@ -433,7 +433,6 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
-  "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
 EOF
@@ -721,6 +720,7 @@ cat > $temp_file << EOF
 {
   "admin-state": "enable",
   "peer-group": "ebgp-peers",
+  "peer-as": $PEER_AS_MIN,
   "description": "$PEER"
 }
 EOF
