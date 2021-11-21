@@ -17,20 +17,20 @@ topology:
       image: alpine-with-lldp:latest # Custom built image with lldpad
   nodes:
     # ---- Leaf pair 2a/2b ----
+    leaf1a:
+      kind: srl
+      group: leaves
+      type: ixrd2
+    leaf1b:
+      kind: srl
+      group: leaves
+      type: ixrd2
+    # ---- Leaf pair 3a/3b ----
     leaf2a:
       kind: srl
       group: leaves
       type: ixrd2
     leaf2b:
-      kind: srl
-      group: leaves
-      type: ixrd2
-    # ---- Leaf pair 3a/3b ----
-    leaf3a:
-      kind: srl
-      group: leaves
-      type: ixrd2
-    leaf3b:
       kind: srl
       group: leaves
       type: ixrd2
@@ -61,25 +61,25 @@ topology:
 
   links:
     # Leaf interconnects for EVPN MC-LAG sync
-    - endpoints: ["leaf2a:e1-3", "leaf2b:e1-3"]
-    - endpoints: ["leaf3a:e1-4", "leaf3b:e1-4"]
+    - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
+    - endpoints: ["leaf2a:e1-4", "leaf2b:e1-4"]
 
     # Leaf 3a/b to single spine
-    - endpoints: ["leaf3a:e1-1", "spine1:e1-1"]
-    - endpoints: ["leaf3b:e1-1", "spine1:e1-2"]
+    - endpoints: ["leaf2a:e1-1", "spine1:e1-1"]
+    - endpoints: ["leaf2b:e1-1", "spine1:e1-2"]
 
     # Leaf 3a/b cross connect to leaf 2a/b
-    - endpoints: ["leaf3a:e1-2", "leaf2a:e1-4"]
-    - endpoints: ["leaf3a:e1-3", "leaf2b:e1-4"]
-    - endpoints: ["leaf3b:e1-2", "leaf2a:e1-5"]
-    - endpoints: ["leaf3b:e1-3", "leaf2b:e1-5"]
+    - endpoints: ["leaf2a:e1-2", "leaf1a:e1-4"]
+    - endpoints: ["leaf2a:e1-3", "leaf1b:e1-4"]
+    - endpoints: ["leaf2b:e1-2", "leaf1a:e1-5"]
+    - endpoints: ["leaf2b:e1-3", "leaf1b:e1-5"]
 
     # Server1 is single connected
-    - endpoints: ["server1:eth1", "leaf2a:e1-1"]
+    - endpoints: ["server1:eth1", "leaf1a:e1-1"]
 
     # Server2 is single connected
-    - endpoints: ["server2:eth1", "leaf2b:e1-1"]
+    - endpoints: ["server2:eth1", "leaf1b:e1-1"]
 
     # Server3 is dual connected
-    - endpoints: ["server3:eth1", "leaf2a:e1-2"]
-    - endpoints: ["server3:eth2", "leaf2b:e1-2"]
+    - endpoints: ["server3:eth1", "leaf1a:e1-2"]
+    - endpoints: ["server3:eth2", "leaf1b:e1-2"]
