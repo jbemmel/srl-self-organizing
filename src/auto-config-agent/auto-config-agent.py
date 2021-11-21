@@ -1221,14 +1221,14 @@ class State(object):
        self.node_id = node_id # Store it
        _role = self.get_role()
        if _role == "superspine":
-           self.local_as = self.base_as
+          self.local_as = self.base_as
        elif _role == "spine":
-           self.local_as = self.base_as + 1
+          self.local_as = self.base_as + 1
        elif _role == "leaf":
-          offset = self.node_id/2 if self.pair_role > 0 else self.node_id
+          offset = int(self.node_id/2) if self.pair_role > 0 else self.node_id
           self.local_as = self.base_as + 1 + offset
        else: # host
-           self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
+          self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 
     ###
     # Calculates an IPv4 address to be used as router ID for the given node/role

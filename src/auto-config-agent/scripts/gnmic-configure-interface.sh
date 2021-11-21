@@ -22,7 +22,7 @@ OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
 # echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
 
-if [[ "$evpn_rr" == "leaf-pairs" ]]; then
+if [[ "$evpn_rr" == "leaf_pairs" ]]; then
 EVPN_PEER_GROUPNAME="evpn-peer-leaf"
 else
 EVPN_PEER_GROUPNAME="evpn-rr"
@@ -239,9 +239,9 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "peer-as": ${PEER_AS_MIN}
   }
 EOF
-DYNAMIC_EBPG_GROUP="ebgp-leaves"
+DYNAMIC_EBGP_GROUP="ebgp-leaves"
 else
-DYNAMIC_EBPG_GROUP="ebgp-spines"
+DYNAMIC_EBGP_GROUP="ebgp-spines"
 IFS='' read -r -d '' AS_PATH_OPTIONS << EOF
 "as-path-options": {
     "replace-peer-as": true,
@@ -253,14 +253,14 @@ fi
 IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "${DYNAMIC_EBPG_GROUP}"
+  "peer-group": "${DYNAMIC_EBGP_GROUP}"
 }
 EOF
 EBGP_NEIGHBORS_COMMA=","
 
 IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
-  "group-name": "${DYNAMIC_EBPG_GROUP}",
+  "group-name": "${DYNAMIC_EBGP_GROUP}",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
@@ -493,6 +493,7 @@ cat > $temp_file << EOF
 
 EOF
 
+# $GNMIC --debug --log-file /tmp/debug.log set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
 exitcode+=$?
 
