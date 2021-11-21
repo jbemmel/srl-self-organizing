@@ -227,13 +227,15 @@ if [[ "$ROLE" == "spine" ]]; then
 # Could also use "as-path-options": { "allow-own-as": 1(or 2 on leaves) },
 # instead of "prepend-global-as": false
 #
+# XXX benefit to enable BFD on directly connected links?
+#
 IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
   ,{
     "group-name": "ebgp-superspines",
     "admin-state": "enable",
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
-    "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
+    "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
     "timers": { "connect-retry": 10 },
     "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
     "peer-as": ${PEER_AS_MIN}
@@ -241,7 +243,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
 EOF
 DYNAMIC_EBGP_GROUP="ebgp-leaves"
 else
-DYNAMIC_EBGP_GROUP="ebgp-spines"
+DYNAMIC_EBGP_GROUP="ebgp-peers"
 IFS='' read -r -d '' AS_PATH_OPTIONS << EOF
 "as-path-options": {
     "replace-peer-as": true,
@@ -264,7 +266,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
   ${AS_PATH_OPTIONS}
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
@@ -423,11 +425,11 @@ EOF
 if [[ "$IGP" == "bgp" ]]; then
 IFS='' read -r -d '' SPINES_GROUP << EOF
 {
-  "group-name": "ebgp-spines",
+  "group-name": "ebgp-peers",
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
   "peer-as": $PEER_AS_MIN,
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
@@ -506,7 +508,7 @@ $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
 # For leaves, create L3 VXLAN tunnel interface vxlan0 for overlay VRF
-if [[ "$ROLE" == "leaf" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+if [[ "$ROLE" == "leaf" && ("$USE_EVPN_OVERLAY" == "symmetric_irb" || "$USE_EVPN_OVERLAY" == "asymmetric_irb") ]]; then
 
 if [[ "$USE_EVPN_OVERLAY" == "symmetric_irb" ]]; then
 cat > $temp_file << EOF
@@ -716,7 +718,7 @@ if [[ "$PEER_IP" != "*" ]]; then
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
-  "peer-group": "ebgp-${PEER_TYPE}s",
+  "peer-group": "ebgp-peers",
   "description": "$PEER"
 }
 EOF

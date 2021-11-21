@@ -1023,7 +1023,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   node_id = int(spineId.groups()[0]) if spineId else state.node_id
   leaf_pair_link = False
   if state.is_spine(): # (super)spines
-    _i = 0
 
     # Could dynamically determine # of active spine ports, and use less addresses
     # state.max_spine_ports default = 6
@@ -1051,9 +1050,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     # Could calculate link_index purely based on node IDs, not LLDP
     logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index}[{_r}] local_port={lldp_my_port} peer_port={lldp_peer_port}")
   elif (state.role != 'endpoint'): # Leaves
-    _r = 0 if (not spineId and state.get_role()=='leaf' and state.pair_role<2) else 1
-    _i = 1
     if spineId: # For spine facing links, pick based on peer_port
+      _r = 1
       link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
       peer_type = 'spine'
       peer_router_id = state.determine_router_id( peer_type, int(spineId.groups()[0]) )
@@ -1065,11 +1063,21 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          link_index += (state.node_id-1) * state.max_leaves
 
       # Support a/b leaf pairs
-      peer_type = 'leaf' if 'leaf' in lldp_peer_name else 'host'
-      if peer_type=='leaf' and state.pair_role != 0:
-         leaf_pair_link = True
-         peer_id = state.node_id + (1 if state.pair_role==1 else -1)
-         peer_router_id = state.determine_router_id( peer_type, peer_id )
+      leaf_pair = re.match("^leaf(\d+)(a|b)?.*", lldp_peer_name)
+      if leaf_pair:
+        peer_type = 'leaf'
+        peer_id = int( leaf_pair.groups()[0] )
+        if state.pair_role!=0 and int(node_id/2)==peer_id and len(leaf_pair.groups())==2:
+          leaf_pair_link = True
+          logging.info( f"Detected leaf pair link: peer_id={peer_id}")
+          peer_node_id = node_id + (1 if state.pair_role==1 else -1)
+          peer_router_id = state.determine_router_id( peer_type, peer_node_id )
+          _r = state.pair_role - 1  # a = .0, b = .1
+        else:
+          _r = 0 if int(node_id/2)<peer_id else 1
+      else:
+         peer_type = 'host'
+         _r = 0
       min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
@@ -1079,7 +1087,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} peer_router_id={peer_router_id}")
   else: # Emulated Hosts
     _r = 1
-    _i = 2
     min_peer_as = max_peer_as = state.evpn_overlay_as
     peer_type = 'leaf'
 
@@ -1206,9 +1213,9 @@ class State(object):
            self.pair_role = 0
            if len( role_id.groups() ) == 3:
               self.pair_role = 1 if role_id.groups()[2] == 'a' else 2
-              self.id_from_hostname = (self.id_from_hostname-1) * 2 + (self.pair_role-1)
+              self.id_from_hostname = (self.id_from_hostname-1) * 2 + self.pair_role
            self.max_level = self.node_level()
-           logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
+           logging.info( f"_determine_role: role={self.role} pair_role={self.pair_role} id={self.id_from_hostname}" )
 
 
            # TODO super<n>spine
