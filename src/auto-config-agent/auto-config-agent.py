@@ -1021,6 +1021,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Number links based on spine ID
   spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
   node_id = int(spineId.groups()[0]) if spineId else state.node_id
+  leaf_pair_link = False
   if state.is_spine(): # (super)spines
     _i = 0
 
@@ -1066,8 +1067,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       # Support a/b leaf pairs
       peer_type = 'leaf' if 'leaf' in lldp_peer_name else 'host'
       if peer_type=='leaf' and state.pair_role != 0:
+         leaf_pair_link = True
          peer_id = state.node_id + (1 if state.pair_role==1 else -1)
-         peer_router_id = state.determine_router_id( peer_type, peer_id )  
+         peer_router_id = state.determine_router_id( peer_type, peer_id )
       min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
@@ -1093,7 +1095,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Reuse link IPs between overlay and underlay
   link_name = f"link{link_index}-{peer_type}"
   if not hasattr(state,link_name):
-     if not state.use_bgp_unnumbered or peer_type=='host' or state.role == 'endpoint':
+     if not state.use_bgp_unnumbered or peer_type=='host' or leaf_pair_link or state.role == 'endpoint':
        if (peer_type!='host' and state.role!='endpoint'):
          _p = '/31'
          _links = state.peerlinks
