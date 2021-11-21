@@ -1182,12 +1182,16 @@ class State(object):
        Determine this node's role and relative ID based on the hostname
        """
        hostname = socket.gethostname()
-       role_id = re.match( "^(\w+)[-]?(\d+).*$", hostname ) # Ignore trailing router ID, if set
+       role_id = re.match( "^(\w+)[-]?(\d+)(a|b)?.*$", hostname ) # Ignore trailing router ID, if set
        if role_id:
            self.role = role_id.groups()[0]
            if self.role not in ["leaf","spine","superspine"]:
               self.role = "endpoint"
            self.id_from_hostname = int( role_id.groups()[1] )
+           self.pair_role = 0
+           if len( role_id.groups() ) == 2:
+              self.pair_role = 1 if role_id.groups()[2] == 'a' else 2
+              self.id_from_hostname = self.id_from_hostname * 2 + (self.pair_role-1)
            self.max_level = self.node_level()
            logging.info( f"_determine_role: role={self.role} id={self.id_from_hostname}" )
 
