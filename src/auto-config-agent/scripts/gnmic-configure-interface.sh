@@ -237,7 +237,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "admin-state": "enable",
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
-    "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
+    "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
     "timers": { "connect-retry": 10 },
     "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
     "peer-as": ${PEER_AS_MIN}
@@ -268,7 +268,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   ${AS_PATH_OPTIONS}
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
@@ -431,7 +431,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "admin-state": "enable",
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
-  "failure-detection": { "enable-bfd" : false, "fast-failover" : true },
+  "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
   "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
 }
@@ -743,8 +743,8 @@ exitcode+=$?
 fi # "$PEER_IP" != "*"
 fi # IGP logic
 
-# Enable BFD, except for host facing interfaces
-if [[ "$PEER_TYPE" != "host" ]]; then
+# Enable BFD, except for host facing interfaces or L2-only leaf-leaf
+if [[ "$PEER_TYPE" != "host" && ( "$PEER_TYPE" != "leaf" || "$evpn" != "l2_only_leaves" || "$PEER_ROUTER_ID"!="" ) ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
