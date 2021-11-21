@@ -411,14 +411,12 @@ fi
 
 IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
 "ipv4-unicast": {
-  "admin-state": "enable",
   "multipath": {
     "max-paths-level-1": 8,
     "max-paths-level-2": 8
   }
 },
 "ipv6-unicast": {
-  "admin-state": "enable",
   "multipath": {
     "max-paths-level-1": 8,
     "max-paths-level-2": 8
@@ -435,7 +433,9 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
-  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
+  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
+  "ipv4-unicast": { "admin-state": "enable" },
+  "ipv6-unicast": { "admin-state": "enable" }
 }
 EOF
 else
