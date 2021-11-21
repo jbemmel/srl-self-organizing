@@ -1189,7 +1189,7 @@ class State(object):
               self.role = "endpoint"
            self.id_from_hostname = int( role_id.groups()[1] )
            self.pair_role = 0
-           if len( role_id.groups() ) == 2:
+           if len( role_id.groups() ) == 3:
               self.pair_role = 1 if role_id.groups()[2] == 'a' else 2
               self.id_from_hostname = self.id_from_hostname * 2 + (self.pair_role-1)
            self.max_level = self.node_level()
