@@ -22,6 +22,12 @@ OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
 # echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
 
+if [[ "$evpn_rr" == "leaf-pairs" ]]; then
+EVPN_PEER_GROUPNAME="evpn-peer-leaf"
+else
+EVPN_PEER_GROUPNAME="evpn-rr"
+fi
+
 # Can add --debug
 GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
 
@@ -377,9 +383,9 @@ EOF
 if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
-IFS='' read -r -d '' EVPN_RR_GROUP << EOF
+IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
 {
-  "group-name": "evpn-rr",
+  "group-name": ${EVPN_PEER_GROUPNAME},
   "admin-state": "enable",
   "import-policy": "accept-all",
   "export-policy": "reject-link-routes",
@@ -394,7 +400,7 @@ EOF
 else
 DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
 DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
-EVPN_RR_GROUP=""
+EVPN_PEER_GROUP=""
 fi
 
 IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
@@ -434,8 +440,8 @@ fi
 if [[ "$DEFAULT_HOSTS_GROUP" != "" ]] && [[ "$SPINES_GROUP" != "" ]]; then
 SPINES_GROUP=",$SPINES_GROUP"
 fi
-if [[ "$SPINES_GROUP" != "" ]] && [[ "$EVPN_RR_GROUP" != "" ]]; then
-EVPN_RR_GROUP=",$EVPN_RR_GROUP"
+if [[ "$SPINES_GROUP" != "" ]] && [[ "$EVPN_PEER_GROUP" != "" ]]; then
+EVPN_PEER_GROUP=",$EVPN_PEER_GROUP"
 fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
@@ -451,7 +457,7 @@ $DEFAULT_DYNAMIC_HOST_PEERING
 "group": [
     $DEFAULT_HOSTS_GROUP
     $SPINES_GROUP
-    $EVPN_RR_GROUP
+    $EVPN_PEER_GROUP
 ],
 EOF
 else
@@ -747,12 +753,13 @@ exitcode+=$?
 fi # "$PEER_TYPE" != "host"
 fi # $ROLE != "endpoint"
 
-# Handle evpn_rr=="spine" case here, on a per-uplink basis
-if [[ "$ROLE" == "leaf" && "$PEER_TYPE" == "spine" && "$USE_EVPN_OVERLAY" != "disabled" && "$evpn_rr" == "spine" ]]; then
+# Handle evpn_rr=="spine" or "leaf-pairs" case here, on a per-uplink basis
+if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
+  (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf-pairs")) ]]; then
 cat > $temp_file << EOF
-{ "admin-state": "enable", "peer-group": "evpn-rr", "description": "EVPN Route Reflector for overlay" }
+{ "admin-state": "enable", "peer-group": ${EVPN_PEER_GROUPNAME}, "description": "EVPN peer ${evpn_rr} for overlay" }
 EOF
-echo "Adding spine BGP peer ${PEER_ROUTER_ID} as EVPN route reflector..."
+echo "Adding ${PEER_TYPE} BGP peer ${PEER_ROUTER_ID} as EVPN route reflector..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi

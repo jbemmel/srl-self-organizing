@@ -1050,7 +1050,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     # Could calculate link_index purely based on node IDs, not LLDP
     logging.info(f"Configure SPINE port towards {peer_type}: link_index={link_index}[{_r}] local_port={lldp_my_port} peer_port={lldp_peer_port}")
   elif (state.role != 'endpoint'): # Leaves
-    _r = 0 if (not spineId and state.get_role()=='leaf') else 1
+    _r = 0 if (not spineId and state.get_role()=='leaf' and state.pair_role<2) else 1
     _i = 1
     if spineId: # For spine facing links, pick based on peer_port
       link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
@@ -1065,6 +1065,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
       # Support a/b leaf pairs
       peer_type = 'leaf' if 'leaf' in lldp_peer_name else 'host'
+      if peer_type=='leaf' and state.pair_role != 0:
+         peer_id = state.node_id + (1 if state.pair_role==1 else -1)
+         peer_router_id = state.determine_router_id( peer_type, peer_id )  
       min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
