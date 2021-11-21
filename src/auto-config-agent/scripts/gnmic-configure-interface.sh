@@ -756,7 +756,7 @@ fi # $ROLE != "endpoint"
 
 # Handle evpn_rr=="spine" or "leaf-pairs" case here, on a per-uplink basis
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
-  (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf-pairs")) ]]; then
+  (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf_pairs")) ]]; then
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "${EVPN_PEER_GROUPNAME}", "description": "EVPN peer ${evpn_rr} for overlay" }
 EOF
