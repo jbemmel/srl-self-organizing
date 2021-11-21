@@ -1074,6 +1074,11 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
             _r = state.pair_role - 1  # a = .0, b = .1
          else:
             _r = 0 if state.id_from_hostname<peer_id else 1
+
+         # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
+         if len( leaf_pair.groups() ) == 2:
+            peer_id = (peer_id-1)*2 + (1 if leaf_pair.groups()[1]=='a' else 2)
+         min_peer_as = max_peer_as = state.base_as + 1 + peer_id
       else:
          logging.info( f"No leaf pair link -> 'host' lldp_peer_name={lldp_peer_name}")
          peer_type = 'host'
@@ -1081,7 +1086,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          if not state.reuse_overlay_ips:
             link_index += (state.node_id-1) * state.max_leaves
 
-      min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
+         min_peer_as = max_peer_as = state.host_as if state.host_as!=0 else state.evpn_overlay_as
 
       # For access ports, announce LLDP events if auto_lags is enabled
       # if state.auto_lags:
@@ -1236,8 +1241,8 @@ class State(object):
        elif _role == "spine":
           self.local_as = self.base_as + 1
        elif _role == "leaf":
-          offset = int(self.node_id/2) if self.pair_role > 0 else self.node_id
-          self.local_as = self.base_as + 1 + offset
+          # Also leaf pairs have unique AS for EBGP
+          self.local_as = self.base_as + 1 + self.node_id
        else: # host
           self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 
