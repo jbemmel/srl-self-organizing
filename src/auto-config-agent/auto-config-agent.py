@@ -427,16 +427,10 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
        }
       ],
       "lag": {
-       "lag-type": "static" if state.lacp=="disabled" else "lacp",
+       "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
        "member-speed": "25G"
       }
    }
-   if state.lacp != "disabled":
-       lag['lag']['lacp'] = {
-         'interval' : "SLOW", # or FAST, matters if passive?
-         'lacp-mode': state.lacp.upper(),
-         'system-id-mac': "02:00:00:00:00:00", # Must match for A/A MC-LAG
-       }
 
    irb_if = {
     "admin-state": "enable",
@@ -680,6 +674,18 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
      ('/system/network-instance/protocols', sys_bgp_evpn ),
      (f'/interface[name=irb0]/subinterface[index={port}]/ipv4/arp', arp)
    ]
+
+   # Update LAG to use LACP if configured
+   if state.lacp != "disabled":
+       lag = {
+          'lag-type': 'lacp',
+          'lacp': {
+           'interval' : "SLOW", # or FAST, matters if passive?
+           'lacp-mode': state.lacp.upper(), # ACTIVE or PASSIVE
+           'system-id-mac': "02:00:00:00:00:00", # Must match for A/A MC-LAG
+          }
+       }
+       updates += [ (f'/interface[name=lag{port}]/lag',lag) ]
 
    logging.info(f"gNMI SET updates={updates}" )
    gnmiClient.set( encoding='json_ietf', update=updates )
