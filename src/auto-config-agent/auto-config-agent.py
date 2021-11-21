@@ -1253,9 +1253,12 @@ class State(object):
                  change = True
         else:
             # Simple match, could combine into 1
-            m = re.match( "^((?:super)?spine|leaf)(\d+)$", peer_lldp_sysname )
+            m = re.match( "^((?:super)?spine|leaf)(\d+)(a|b)?$", peer_lldp_sysname )
             if m:
-               peer_role, peer_id = m.groups()
+               peer_role = m.groups()[0]
+               peer_id = m.groups()[1]
+               if len(m.groups())==3:
+                  peer_id = int(peer_id) * 2 # a/b pairs
                peer_level = self.node_level(peer_role)
                if peer_level > self.max_level:
                   self.max_level = peer_level
