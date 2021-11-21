@@ -1021,6 +1021,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   # Number links based on spine ID
   spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
   node_id = int(spineId.groups()[0]) if spineId else state.node_id
+  igp = state.igp
   leaf_pair_link = False
   if state.is_spine(): # (super)spines
 
@@ -1074,10 +1075,13 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
             _r = state.pair_role - 1  # a = .0, b = .1
          else:
             _r = 0 if state.id_from_hostname<peer_id else 1
+            if state.evpn == "l2_only_leaves":
+                igp = "none"
 
          # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
          if len( leaf_pair.groups() ) == 2:
             peer_id = (peer_id-1)*2 + (1 if leaf_pair.groups()[1]=='a' else 2)
+            logging.info( f"Effective leaf pair AS offset: {peer_id}" )
          min_peer_as = max_peer_as = state.base_as + 1 + peer_id
       else:
          logging.info( f"No leaf pair link -> 'host' lldp_peer_name={lldp_peer_name}")
@@ -1092,7 +1096,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       # if state.auto_lags:
       #     Announce_LLDP_peer( state, lldp_peer_name, lldp_my_port )
 
-    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} peer_router_id={peer_router_id}")
+    logging.info(f"Configure LEAF port towards {peer_type}: link_index={link_index} local_port={lldp_my_port} peer_port={lldp_peer_port} peer_router_id={peer_router_id} min_peer_as={min_peer_as}")
   else: # Emulated Hosts
     _r = 1
     min_peer_as = max_peer_as = state.evpn_overlay_as
@@ -1135,7 +1139,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          max_peer_as,
          state.peerlinks_prefix,
          peer_type,
-         peer_router_id
+         peer_router_id,
+         igp # Disabled in case of l2_only_leaves
      )
      setattr( state, link_name, _ip )
 
@@ -1156,10 +1161,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
+def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,igp):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
-                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
+                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max} igp={igp}' )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
@@ -1167,8 +1172,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
-                                       peer_type,peer_rid,
-                                       state.igp,
+                                       peer_type,peer_rid,igp,
                                        state.evpn, state.overlay_bgp_admin_state],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
