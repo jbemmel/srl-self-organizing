@@ -320,7 +320,7 @@ def Set_LLDP_Systemname(name):
 
 def Set_Default_Systemname(state):
     if state.pair_role > 0:
-        _id = f"{state.node_id/2}{ 'a' if state.pair_role==1 else 'b'}"
+        _id = f"{int(state.node_id/2)}{ 'a' if state.pair_role==1 else 'b'}"
     else:
         _id = str(state.node_id)
     _name = f"{state.get_role()}-{_id}-{state.router_id}"
