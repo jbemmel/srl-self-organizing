@@ -319,7 +319,11 @@ def Set_LLDP_Systemname(name):
       c.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] )
 
 def Set_Default_Systemname(state):
-    _name = f"{state.get_role()}-{state.node_id}-{state.router_id}"
+    if state.pair_role > 0:
+        _id = f"{state.node_id/2}{ 'a' if state.pair_role==1 else 'b'}"
+    else:
+        _id = str(state.node_id)
+    _name = f"{state.get_role()}-{_id}-{state.router_id}"
     if state.evpn_rr == "auto_top_nodes":
         _name += f"L{state.max_level}N{state.top_count}"
     Set_LLDP_Systemname( _name )
@@ -1210,7 +1214,8 @@ class State(object):
        elif _role == "spine":
            self.local_as = self.base_as + 1
        elif _role == "leaf":
-           self.local_as = self.base_as + 1 + self.node_id
+          offset = self.node_id/2 if self.pair_role > 0 else self.node_id
+          self.local_as = self.base_as + 1 + offset
        else: # host
            self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 
