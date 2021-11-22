@@ -678,18 +678,16 @@ EOF
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode+=$?
 
-# Add it to the correct instance? Host interfaces managed in Python code
-# if [[ "$ROLE" == "leaf" && "$PEER_TYPE" == "host" && "$USE_EVPN_OVERLAY" != "disabled" ]]; then
-#  if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
-#   VRF="overlay-l2"
-#  else
-#   VRF="overlay"
-#  fi
-# else
-# VRF="default"
-# fi
-# $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
-# exitcode+=$?
+# Add it to the correct instance - host (lag) interfaces managed in Python code
+if [[ "$PEER_TYPE" != "host" ]]; then
+ if [[ "$ROLE" == "leaf" && "$USE_EVPN_OVERLAY" == "l2_only_leaves" && $PEER_ROUTER_ID=="?" ]]; then
+  VRF="overlay-l2"
+ else
+  VRF="default"
+ fi
+ $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
+ exitcode+=$?
+fi
 
 # Add it to OSPF (if enabled)
 # Note: To view: info from state /bfd
