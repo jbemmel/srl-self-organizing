@@ -678,13 +678,19 @@ EOF
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode+=$?
 
+VRF="default"
+if [[ "$ROLE" == "leaf" ]]; then
+ if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
+  if [[ "$PEER_ROUTER_ID"=="?" ]]; then
+   VRF="overlay-l2"
+  fi
+ elif [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+  VRF="overlay"
+ fi
+fi
+
 # Add it to the correct instance - host (lag) interfaces managed in Python code
 if [[ "$PEER_TYPE" != "host" ]]; then
- if [[ "$ROLE" == "leaf" && "$USE_EVPN_OVERLAY" == "l2_only_leaves" && $PEER_ROUTER_ID=="?" ]]; then
-  VRF="overlay-l2"
- else
-  VRF="default"
- fi
  $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
  exitcode+=$?
 fi
