@@ -435,7 +435,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
                  lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
-                 lag_desc = f"Leaf pair mc-lag on ports {pair.values()}"
+                 lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
