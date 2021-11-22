@@ -279,7 +279,7 @@ class EVPNRouteMonitoringThread(Thread):
                               # This repeatedly provisions the same thing...
                               Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]), gnmiClient )
                            except Exception as ex:
-                              logging.error( f"BUG: {ex}" )
+                              logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
 
    def checkIPv6Routes(self,gnmiClient):
      """
@@ -305,7 +305,10 @@ class EVPNRouteMonitoringThread(Thread):
                  peer_router_id = encoded_parts[2:4] # 2 x 16 bits
                  peer_port = int(encoded_parts[4])
                  # TODO update ipv6 route (tag or community or IP) to reflect count of peers
-                 Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port, gnmiClient )
+                 try:
+                    Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port, gnmiClient )
+                 except Exception as ex:
+                   logging.error( f"checkIPv6Routes: {ex}" )    
 
 ############################################################
 ## Function to populate state of agent config
@@ -443,9 +446,9 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                   (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',{ 'aggregate-id' : lag_id } ),
                  ]
 
-                 # Flag ports for mc-lag conversion
-                 state.leaf_pairs[ pair['a'] ] = True
-                 state.leaf_pairs[ pair['b'] ] = True
+                 # Record port number for mc-lag conversion
+                 state.leaf_pairs[ pair['a'] ] = pair['a']
+                 state.leaf_pairs[ pair['b'] ] = pair['a']
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
@@ -672,6 +675,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
 
    peers = str( sorted( state.mc_lags[port].items() ) )
 
+   lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
+
    # EVPN MC-LAG
    sys_bgp_evpn = {
     "bgp-vpn": { "bgp-instance": [ { "id": 1 } ] },
@@ -682,13 +687,13 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
           "id": 1,
           "ethernet-segment": [
             {
-              "name": f"mc-lag{port}",
+              "name": f"mc-lag{lag_port}",
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
               "esi": f"02:{mac}:00:00:{min(int(port),peer_port):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
-              "interface": f"lag{port}",
+              "interface": f"lag{lag_port}",
               "multi-homing-mode": "all-active"
             }
           ]
@@ -717,22 +722,23 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
      ('/system/network-instance/protocols', sys_bgp_evpn ),
    ]
    if state.evpn != "l2_only_leaves":
-       updates += [ (f'/interface[name=irb0]/subinterface[index={port}]/ipv4/arp', arp) ]
+       updates += [ (f'/interface[name=irb0]/subinterface[index={lag_port}]/ipv4/arp', arp) ]
 
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
+       mac_id = state.id_from_hostname if leaf_pair_lag else 0
        lag = {
           'lag-type': 'lacp',
           'lacp': {
            'interval' : "SLOW", # or FAST, matters if passive?
            'lacp-mode': "ACTIVE" if leaf_pair_lag  else state.lacp.upper(), # ACTIVE or PASSIVE
-           'system-id-mac': f"02:00:00:00:00:0{ 2 if leaf_pair_lag else 0 }", # Must match for A/A MC-LAG
+           'system-id-mac': f"02:00:00:00:00:{ mac_id:02x }", # Must match for A/A MC-LAG
           }
        }
-       updates += [ (f'/interface[name=lag{port}]/lag',lag) ]
+       updates += [ (f'/interface[name=lag{lag_port}]/lag',lag) ]
 
-   logging.info(f"gNMI SET updates={updates}" )
+   logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
    gnmiClient.set( encoding='json_ietf', update=updates )
 
 ###
@@ -1337,7 +1343,7 @@ class State(object):
                  change = True
         else:
             # Simple match, could combine into 1
-            m = re.match( "^((?:super)?spine|leaf)[-]?(\d+)(a|b)?$", peer_lldp_sysname )
+            m = re.match( "^((?:super)?spine|leaf)[-]?(\d+)(a|b)?.*$", peer_lldp_sysname )
             if m:
                peer_role = m.groups()[0]
                peer_id = m.groups()[1]
