@@ -14,7 +14,7 @@ PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
 PEER_AS_MAX="$8"     # Host AS in case of leaf-host
 LINK_PREFIX="${9}"   # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${10}"
-PEER_ROUTER_ID="${11}"
+PEER_ROUTER_ID="${11}" # '?' if not set
 IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
@@ -31,7 +31,7 @@ EVPN_PEER_DESC="EVPN route-reflector for overlay services"
 fi
 
 # Can add --debug
-GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --skip-verify -e json_ietf"
+GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
@@ -641,14 +641,14 @@ if [[ "${IP_PREFIX}" != "" ]]; then
 
 # Replace ipv4 prefix with /127 for ipv6
 if [[ "$PEER_TYPE" != "host" ]]; then
-_IP127=":${IP_PREFIX//\/31/\/127}"
+_IP127="${IP_PREFIX//\/31/\/127}"
 else
-# Use /64 towards each host
-_IP127="${IP_PREFIX//\/[23][0-9]/::\/64}"
+# Use /64 towards each host? Note host bits cannot be 0
+_IP127="${IP_PREFIX//\/[23][0-9]/\/64}"
 fi
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
- "ipv6": { "address": [ { "ip-prefix": "2001:${_IP127//\./:}" } ] }
+ "ipv6": { "address": [ { "ip-prefix": "2001::${_IP127//\./:}" } ] }
 EOF
 else
 # Enable IPv4+IPv6 but don't put addresses (yet)
@@ -678,14 +678,18 @@ EOF
 $GNMIC set --replace-path /interface[name=$INTF] --replace-file $temp_file
 exitcode+=$?
 
-# Add it to the correct instance
-if [[ "$ROLE" == "leaf" ]] && [[ "$PEER_TYPE" == "host" ]] && [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
-VRF="overlay"
-else
-VRF="default"
-fi
-$GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
-exitcode+=$?
+# Add it to the correct instance? Host interfaces managed in Python code
+# if [[ "$ROLE" == "leaf" && "$PEER_TYPE" == "host" && "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+#  if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
+#   VRF="overlay-l2"
+#  else
+#   VRF="overlay"
+#  fi
+# else
+# VRF="default"
+# fi
+# $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
+# exitcode+=$?
 
 # Add it to OSPF (if enabled)
 # Note: To view: info from state /bfd
@@ -746,7 +750,7 @@ fi # "$PEER_IP" != "*"
 fi # IGP logic
 
 # Enable BFD, except for host facing interfaces or L2-only leaf-leaf
-if [[ "$PEER_TYPE" != "host" && ( "$PEER_TYPE" != "leaf" || "$evpn" != "l2_only_leaves" || "$PEER_ROUTER_ID"!="" ) ]]; then
+if [[ "$PEER_TYPE" != "host" && ( "$PEER_TYPE" != "leaf" || "$USE_EVPN_OVERLAY" != "l2_only_leaves" || "$PEER_ROUTER_ID"!="?" ) ]]; then
 cat > $temp_file << EOF
 {
  "admin-state" : "enable",
@@ -761,6 +765,7 @@ fi # "$PEER_TYPE" != "host"
 fi # $ROLE != "endpoint"
 
 # Handle evpn_rr=="spine" or "leaf-pairs" case here, on a per-uplink basis
+if [[ "$PEER_ROUTER_ID" != "?" ]]; then
 if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
   (("$PEER_TYPE" == "spine" && "$evpn_rr" == "spine")||("$PEER_TYPE" == "leaf" && "$evpn_rr" == "leaf_pairs")) ]]; then
 cat > $temp_file << EOF
@@ -769,6 +774,7 @@ EOF
 echo "Adding ${PEER_TYPE} EVPN BGP peer ${PEER_ROUTER_ID}..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
+fi
 fi
 
 echo "Done, cleaning up ${temp_file}..."

@@ -673,8 +673,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
 
    updates = [
      ('/system/network-instance/protocols', sys_bgp_evpn ),
-     (f'/interface[name=irb0]/subinterface[index={port}]/ipv4/arp', arp)
    ]
+   if state.evpn != "l2_only_leaves":
+       updates += [ (f'/interface[name=irb0]/subinterface[index={port}]/ipv4/arp', arp) ]
 
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
@@ -1017,7 +1018,7 @@ def determine_local_node_id( state, lldp_my_port, lldp_peer_port, lldp_peer_name
 def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
                          lldp_peer_name, lldp_peer_desc, set_router_id=False ):
   # For spine-spine connections, build iBGP
-  peer_router_id = ""
+  peer_router_id = "?"
 
   # Number links based on spine ID
   spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
