@@ -682,7 +682,7 @@ VRF="default"
 if [[ "$ROLE" == "leaf" ]]; then
  if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
   if [[ "$PEER_ROUTER_ID"=="?" ]]; then
-   VRF="overlay-l2"
+   VRF="none"
   fi
  elif [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
   VRF="overlay"
@@ -690,10 +690,9 @@ if [[ "$ROLE" == "leaf" ]]; then
 fi
 
 # Add it to the correct instance - host (lag) interfaces managed in Python code
-if [[ "$PEER_TYPE" != "host" ]]; then
+if [[ "$VRF" != "none" ]]; then
  $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
  exitcode+=$?
-fi
 
 # Add it to OSPF (if enabled)
 # Note: To view: info from state /bfd
@@ -723,7 +722,7 @@ EOF
 $GNMIC set --replace-path /network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 
-elif [[ "$IGP" == "bgp" || "$PEER_TYPE" == "host" ]]; then
+elif [[ ("$IGP" == "bgp" || "$PEER_TYPE" == "host") ]]; then
 
 if [[ "$PEER_IP" != "*" ]]; then
 cat > $temp_file << EOF
@@ -749,8 +748,8 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
 exitcode+=$?
-
 fi # "$PEER_IP" != "*"
+
 fi # IGP logic
 
 # Enable BFD, except for host facing interfaces or L2-only leaf-leaf
@@ -780,6 +779,8 @@ $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[
 exitcode+=$?
 fi
 fi
+
+fi # VRF != "none"
 
 echo "Done, cleaning up ${temp_file}..."
 rm -f $temp_file
