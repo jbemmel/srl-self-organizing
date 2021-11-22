@@ -406,14 +406,47 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # Converts an ethernet interface to a lag, creating/joining a LAN mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(state,port,ip,vrf="overlay"):
+def Convert_to_lag(state,port,ip,peer_data,vrf):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
-   eth = f'name=ethernet-1/{port}'
-   deletes=[ f'/interface[{eth}]/subinterface[index=*]',
-             f'/bfd/subinterface[id=ethernet-1/{port}.0]',
-             f'/interface[{eth}]/vlan-tagging' ]
-   if state.evpn != 'disabled' or vrf!='overlay':
-       deletes.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
+
+   def deletes_for_port(p):
+     eth = f'name=ethernet-1/{p}'
+     ds = [ f'/interface[{eth}]/subinterface[index=*]',
+            f'/bfd/subinterface[id=ethernet-1/{p}.0]',
+            f'/interface[{eth}]/vlan-tagging' ]
+     if state.evpn != 'disabled' or vrf!='overlay':
+       ds.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
+
+     return ds
+
+   deletes = deletes_for_port(port)
+
+   # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
+   # form a lag on this side
+   lag_id = f"lag{port}"
+   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
+   if peer_data['type']=='leaf' and state.get_role()=='leaf':
+      pair_key = re.match( peer_data['name'], '^leaf-(\d+)(a|b).*$')
+      if pair_key:
+         _pk, _ab = pair_key.groups()
+         if _pk in state.leaf_pairs:
+             pair = state.leaf_pairs[_pk]
+             pair[ _ab ] = peer_data['port']
+             if len(pair)==2:
+                 lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
+                 deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
+                 updates = [
+                  (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',{ 'aggregate-id' : lag_id } ),
+                  (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',{ 'aggregate-id' : lag_id } ),
+                 ]
+             else:
+                 logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
+                 return
+         else:
+             state.leaf_pairs[_pk] = { _ab : peer_data['port'] }
+             logging.info( "Convert_to_lag: Defer until 2nd MC-LAG port is known" )
+             return
+
    lag = {
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": True,
@@ -485,7 +518,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
      "type": "srl_nokia-network-instance:mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
-     "interface": [ { "name": f"lag{port}.0" } ],
+     "interface": [ { "name": f"{lag_id}.0" } ],
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
@@ -554,10 +587,9 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
             '_annotate_stale-time': ANNOTATION
           }
 
-   updates=[ (f'/interface[name=lag{port}]',lag),
-             (f'/interface[{eth}]/ethernet',{ 'aggregate-id' : f'lag{port}' } ),
-             (f'/network-instance[name=overlay-l2]', mac_vrf),
-           ]
+   updates += [ (f'/interface[name={lag_id}]',lag),
+               (f'/network-instance[name=overlay-l2]', mac_vrf),
+              ]
    if state.evpn != 'disabled':
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
@@ -1133,7 +1165,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          _ip,
          lldp_peer_desc,
          _peer if ((peer_type=='spine' and _r==1) or leaf_pair_link) else '*', # Only when connecting "upwards"
-         state.router_id if set_router_id else "",
+         state.router_id if set_router_id else "*",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
          state.peerlinks_prefix,
@@ -1146,7 +1178,12 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      if ((peer_type=='host' and state.host_use_irb) or
         (state.evpn=='l2_only_leaves' and state.get_role()=='leaf' and peer_type=='leaf' and not leaf_pair_link)):
         vrf = "default" if state.evpn=='l2_only_leaves' else "overlay"
-        Convert_to_lag( state, lldp_my_port, _ip, vrf=vrf ) # No EVPN MC-LAG yet
+        peer_data = {
+          'name': lldp_peer_name,
+          'type': peer_type,
+          'port': lldp_peer_port
+        }
+        Convert_to_lag( state, lldp_my_port, _ip, peer_data, vrf ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
@@ -1193,6 +1230,7 @@ class State(object):
         self.leaf_lldp_seen = False # To auto-detect superspines: >= leaf connected
         self.spine_lldp_seen = False # To auto-detect superspines: >= spine connected
         self.pending_peers = {} # LLDP data received before we can determine ID
+        self.leaf_pairs = {} # Leaf pairs for MC-LAG between pairs of leaves
 
         self.announcing = ""    # Becomes Boolean for spines
         self.pending_announcements = []
@@ -1288,7 +1326,7 @@ class State(object):
                  change = True
         else:
             # Simple match, could combine into 1
-            m = re.match( "^((?:super)?spine|leaf)(\d+)(a|b)?$", peer_lldp_sysname )
+            m = re.match( "^((?:super)?spine|leaf)[-]?(\d+)(a|b)?$", peer_lldp_sysname )
             if m:
                peer_role = m.groups()[0]
                peer_id = m.groups()[1]

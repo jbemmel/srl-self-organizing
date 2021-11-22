@@ -9,7 +9,7 @@ INTF="$2"
 IP_PREFIX="$3"
 PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
-ROUTER_ID="$6"
+ROUTER_ID="$6"       # '*' when not set
 PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
 PEER_AS_MAX="$8"     # Host AS in case of leaf-host
 LINK_PREFIX="${9}"   # IP subnet used for allocation of IPs to BGP peers
@@ -19,7 +19,7 @@ IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
 
-# echo "DEBUG: ROUTER_ID='$ROUTER_ID'"
+echo "DEBUG: PEER='$PEER' PEER_IP='$PEER_IP' PEER_TYPE='$PEER_TYPE' PEER_ROUTER_ID='$PEER_ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
 
 if [[ "$evpn_rr" == "leaf_pairs" ]]; then
@@ -39,7 +39,7 @@ exitcode=0
 #
 # 1) One-time configuration at startup, when ROUTER_ID is provided
 #
-if [[ "$ROUTER_ID" != "" ]]; then
+if [[ "$ROUTER_ID" != "*" ]]; then
 
 # if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
 #  echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
@@ -630,7 +630,7 @@ fi # if ROUTER_ID provided, first time only
 # 2) Per-link provisioning
 #
 
-if [[ "$PEER_TYPE" != "host" ]] && [[ "$ROLE" != "endpoint" ]]; then
+if [[ "$PEER_TYPE" != "host" && "$ROLE" != "endpoint" ]]; then
   _ROUTED='"type" : "routed",'
 fi
 #if [[ "$PEER_TYPE" == "host" ]] || [[ "$ROLE" == "endpoint" ]]; then
@@ -681,13 +681,14 @@ exitcode+=$?
 VRF="default"
 if [[ "$ROLE" == "leaf" ]]; then
  if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
-  if [[ "$PEER_ROUTER_ID"=="?" ]]; then
+  if [[ "$PEER_ROUTER_ID" == "?" ]]; then
    VRF="none"
   fi
  elif [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
   VRF="overlay"
  fi
 fi
+echo "Selected VRF: ${VRF} for INTF=${INTF}.0"
 
 # Add it to the correct instance - host (lag) interfaces managed in Python code
 if [[ "$VRF" != "none" ]]; then
