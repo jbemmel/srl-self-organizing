@@ -407,7 +407,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
 def Convert_to_lag(state,port,ip,peer_data,vrf):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} peer_data={peer_data} vrf={vrf}")
 
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
@@ -424,31 +424,41 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
    lag_id = f"lag{port}"
+   lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
    if peer_data['type']=='leaf' and state.get_role()=='leaf':
-      pair_key = re.match( peer_data['name'], '^leaf-(\d+)(a|b).*$')
+      pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
          _pk, _ab = pair_key.groups()
          if _pk in state.leaf_pairs:
-             pair = state.leaf_pairs[_pk]
-             pair[ _ab ] = peer_data['port']
-             if len(pair)==2:
+             pair = state.leaf_pairs[_pk] # string type key
+             pair[ _ab ] = port # peer_data['port']
+             if len(pair)==2: # XXX Could have up to 4 ports
                  lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
+                 lag_desc = f"Leaf pair mc-lag on ports {pair.values()}"
+                 logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',{ 'aggregate-id' : lag_id } ),
                   (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',{ 'aggregate-id' : lag_id } ),
                  ]
+
+                 # Flag ports for mc-lag conversion
+                 state.leaf_pairs[ pair['a'] ] = True
+                 state.leaf_pairs[ pair['b'] ] = True
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
          else:
-             state.leaf_pairs[_pk] = { _ab : peer_data['port'] }
-             logging.info( "Convert_to_lag: Defer until 2nd MC-LAG port is known" )
+             state.leaf_pairs[_pk] = { _ab : port }
+             logging.info( f"Convert_to_lag: Defer {port} until 2nd MC-LAG port is known" )
              return
+      else:
+         logging.warning( "Convert_to_lag: LEAF-LEAF link but no pair_key match!" )
 
    lag = {
       "admin-state": "enable",
+      "description": lag_desc,
       "srl_nokia-interfaces-vlans:vlan-tagging": True,
       "subinterface": [
        {
@@ -711,12 +721,13 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
 
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
+       leaf_pair_lag = port in state.leaf_pairs
        lag = {
           'lag-type': 'lacp',
           'lacp': {
            'interval' : "SLOW", # or FAST, matters if passive?
-           'lacp-mode': state.lacp.upper(), # ACTIVE or PASSIVE
-           'system-id-mac': "02:00:00:00:00:00", # Must match for A/A MC-LAG
+           'lacp-mode': "ACTIVE" if leaf_pair_lag  else state.lacp.upper(), # ACTIVE or PASSIVE
+           'system-id-mac': f"02:00:00:00:00:0{ 2 if leaf_pair_lag else 0 }", # Must match for A/A MC-LAG
           }
        }
        updates += [ (f'/interface[name=lag{port}]/lag',lag) ]
