@@ -410,6 +410,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} vrf={vrf}")
    eth = f'name=ethernet-1/{port}'
    deletes=[ f'/interface[{eth}]/subinterface[index=*]',
+             f'/bfd/subinterface[id=ethernet-1/{port}.0]',
              f'/interface[{eth}]/vlan-tagging' ]
    if state.evpn != 'disabled' or vrf!='overlay':
        deletes.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
@@ -568,7 +569,7 @@ def Convert_to_lag(state,port,ip,vrf="overlay"):
          (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
        ]
 
-   logging.info(f"gNMI SET deletes={deletes} updates={updates}" )
+   logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                      username="admin",password="admin",insecure=True) as c:
       try:
@@ -1143,7 +1144,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      # For access ports or L2-only leaves, convert to L2 service if requested
      if ((peer_type=='host' and state.host_use_irb) or
         (state.evpn=='l2_only_leaves' and state.get_role()=='leaf' and peer_type=='leaf' and not leaf_pair_link)):
-        Convert_to_lag( state, lldp_my_port, _ip ) # No EVPN MC-LAG yet
+        vrf = "default" if state.evpn=='l2_only_leaves' else "overlay"
+        Convert_to_lag( state, lldp_my_port, _ip, vrf=vrf ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 

@@ -12,9 +12,9 @@ PEER_IP="$5"
 ROUTER_ID="$6"
 PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
 PEER_AS_MAX="$8"     # Host AS in case of leaf-host
-LINK_PREFIX="${9}"  # IP subnet used for allocation of IPs to BGP peers
+LINK_PREFIX="${9}"   # IP subnet used for allocation of IPs to BGP peers
 PEER_TYPE="${10}"
-PEER_ROUTER_ID="${11}" # Not currently used
+PEER_ROUTER_ID="${11}"
 IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
@@ -729,7 +729,7 @@ EOF
 echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
 exitcode+=$?
-else
+elif [[ "$ROLE" != "leaf" || "$evpn" != "l2_only_leaves" ]]; then
 
 # Update EBGP dynamic peering group on (super)spines and leaves with correct AS range
 cat > $temp_file << EOF
