@@ -460,6 +460,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       else:
          logging.warning( "Convert_to_lag: LEAF-LEAF link but no pair_key match!" )
 
+   is_routed = peer_data['type']=="spine" or state.is_spine()
    lag = {
       "admin-state": "enable",
       "description": lag_desc,
@@ -467,10 +468,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       "subinterface": [
        {
          "index": 0,
-         "type": "srl_nokia-interfaces:bridged",
+         "type": "routed" if is_routed else "bridged",
          "srl_nokia-interfaces-vlans:vlan": {
-           # "encap": { "single-tagged": { "vlan-id": 1 } }
-           "encap": { "untagged": { } }
+           # Routed interface cannot be untagged, and cannot use VLAN 0
+           "encap": { "single-tagged": { "vlan-id": 4094 } } if is_routed
+                    else { "untagged": { } }
          }
        }
       ],
@@ -536,7 +538,8 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
-   if state.evpn != 'disabled':
+   use_evpn_vxlan = state.evpn != 'disabled' and not state.is_spine()
+   if use_evpn_vxlan:
       mac_vrf.update(
       {
         "vxlan-interface": [ { "name": f"vxlan0.0" } ],
@@ -574,7 +577,8 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
         }
       })
 
-   if state.evpn != "l2_only_leaves": # TODO check host_use_irb
+   use_irb = state.evpn != "l2_only_leaves" or state.is_spine() # TODO check host_use_irb
+   if use_irb:
       mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
 
       if state.evpn != 'disabled':
@@ -604,12 +608,12 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    updates += [ (f'/interface[name={lag_id}]',lag),
                (f'/network-instance[name=overlay-l2]', mac_vrf),
               ]
-   if state.evpn != 'disabled':
+   if use_evpn_vxlan:
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
          # ('/routing-policy', export_policy)
        ]
-   if state.evpn != 'l2_only_leaves':
+   if use_irb:
        updates += [
          (f'/interface[name=irb0]', irb_if),
          (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
