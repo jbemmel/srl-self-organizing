@@ -775,7 +775,7 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
 
 #
 # Creates a special IP-VRF to announce a loopback RT5 route with extended
-# communities based on discovered LLDP peers (MAC addresses)
+# communities or IPv6 host routes based on discovered LLDP peers (MAC addresses)
 #
 def CreateEVPNCommunicationVRF(state,gnmiClient):
    logging.info("CreateEVPNCommunicationVRF")
@@ -801,6 +801,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
       "egress": { "source-ip": "use-system-ipv4-address" }
    }
 
+   # Could scope the community to the spine AS, smaller than the base AS
    lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS, EVI 0 doesnt exist
 
    # For VXLAN interface, avoid any possible overlap with ports
@@ -830,7 +831,7 @@ def CreateEVPNCommunicationVRF(state,gnmiClient):
              "_annotate": "Special RT/RD for EVPN LAG coordination",
              "import-rt": lldp_rt
            },
-           # Use router_id here (not AS) such that RD identifies leaf
+           # Use router_id here (not AS) such that RD identifies leaf nexthop
            "route-distinguisher": { "rd": f"{state.router_id}:0" }
         }
         ]
@@ -1194,8 +1195,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      setattr( state, link_name, _ip )
 
      # For access ports or L2-only leaves, convert to L2 service if requested
-     if ((peer_type=='host' and state.host_use_irb) or
-        (state.evpn=='l2_only_leaves' and state.get_role()=='leaf' and peer_type=='leaf' and not leaf_pair_link)):
+     if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
+         (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')] and not leaf_pair_link)):
         vrf = "default" if state.evpn=='l2_only_leaves' else "overlay"
         peer_data = {
           'name': lldp_peer_name,
