@@ -200,11 +200,26 @@ module auto_config_agent {
                 }
                 default enable;
             }
-            leaf anycast-gw {
-                if-feature "srl_feat:anycast-gw"; // Only supported on platforms with anycast support
+            container anycast-gw {
+                // Allow a single config to be loaded across multiple types of platforms
+                leaf supported {
+                  if-feature "srl_feat:anycast-gw"; // Only supported on platforms with anycast support
+                  description "Flag that gets set when platform supports anycast-gw";
+                  type boolean;
+                  default true;
+                }
 
-                description "IPv4 anycast gateway to provision";
-                type srl_nokia-comm:ipv4-prefix-with-host-bits;
+                leaf ipv4 {
+                   description "IPv4 anycast gateway address to provision";
+                   type srl_nokia-comm:ipv4-prefix-with-host-bits;
+                }
+            }
+
+            leaf bridging-supported {
+              if-feature "srl_feat:bridged";
+              description "Flag that gets set when platform supports bridging / mac-vrfs / irb interfaces";
+              type boolean;
+              default true;
             }
 
             // container tweaks {

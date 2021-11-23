@@ -6,7 +6,10 @@
       "overlay-as": 65536,
       "route-reflector": "leaf-pairs"
     },
-    "lacp": "passive"
+    "lacp": "passive",
+    "anycast-gw": {
+      "ipv4": "10.0.0.1/24"
+    }
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {

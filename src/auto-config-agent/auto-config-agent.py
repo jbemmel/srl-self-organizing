@@ -517,7 +517,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    if hasattr(state,'anycast_gw'):
        irb_if['anycast-gw'] = {} # Some platforms like ixr6 don't support this
        irb_if['subinterface'][0]['ipv4']['address'].append( {
-         "ip-prefix": state.anycast_gw,
+         "ip-prefix": state.anycast_gw['ipv4'],
          "anycast-gw": True
        } )
 
@@ -577,7 +577,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
         }
       })
 
-   use_irb = state.evpn != "l2_only_leaves" or state.is_spine() # TODO check host_use_irb
+   use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
    if use_irb:
       mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
 
@@ -955,7 +955,13 @@ def Handle_Notification(obj, state):
                     _b = data['overlay_bgp_admin_state'][24:]
                     state.overlay_bgp_admin_state = _b
                 if 'anycast_gw' in data:
-                    state.anycast_gw = data['anycast_gw']['value']
+                    anycast_gw = data['anycast_gw']
+                    if 'supported' in anycast_gw and 'ipv4' in anycast_gw:
+                       state.anycast_gw = { 'ipv4': anycast_gw['ipv4']['value'] }
+
+                # Flag that gets set based on platform feature 'bridged'
+                state.bridging_supported = 'bridging_supported' in data
+                logging.info( f"Platform supports bridging/mac-vrfs/irb: {state.bridging_supported}" )
 
                 # if 'tweaks' in data:
                 #     tweaks = data['tweaks']
