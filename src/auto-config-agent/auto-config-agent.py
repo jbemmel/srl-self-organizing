@@ -308,7 +308,8 @@ class EVPNRouteMonitoringThread(Thread):
                  try:
                     Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port, gnmiClient )
                  except Exception as ex:
-                   logging.error( f"checkIPv6Routes: {ex}" )    
+                    traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
+                    logging.error( f"checkIPv6Routes: {ex} ~ {traceback_str}" )
 
 ############################################################
 ## Function to populate state of agent config
@@ -727,13 +728,14 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
-       mac_id = state.id_from_hostname if leaf_pair_lag else 0
+       mac_id = state.effective_id if leaf_pair_lag else 0
+       logging.info( f"MAC bits: {mac_id} type={ type(mac_id) }" )
        lag = {
           'lag-type': 'lacp',
           'lacp': {
            'interval' : "SLOW", # or FAST, matters if passive?
-           'lacp-mode': "ACTIVE" if leaf_pair_lag  else state.lacp.upper(), # ACTIVE or PASSIVE
-           'system-id-mac': f"02:00:00:00:00:{ mac_id:02x }", # Must match for A/A MC-LAG
+           'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
+           'system-id-mac': f"02:00:00:00:00:{mac_id:02x}", # Must match for A/A MC-LAG
           }
        }
        updates += [ (f'/interface[name=lag{lag_port}]/lag',lag) ]
@@ -1070,7 +1072,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   peer_router_id = "?"
 
   # Number links based on spine ID
-  spineId = re.match("^(?:spine)[-]?(\d+).*", lldp_peer_name)
+  spineId = re.match("^spine[-]?(\d+).*", lldp_peer_name)
   node_id = int(spineId.groups()[0]) if spineId else state.node_id
   leaf_pair_link = False
   if state.is_spine(): # (super)spines
@@ -1117,7 +1119,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          peer_type = 'leaf'
          peer_id = int( leaf_pair.groups()[0] )
          same_pair = (state.id_from_hostname == peer_id) # XXX todo 'auto'
-         if state.pair_role!=0 and len(leaf_pair.groups())==2 and same_pair:
+         if state.pair_role!=0 and leaf_pair.groups()[1] and same_pair:
             leaf_pair_link = True
             logging.info( f"Detected leaf pair link: peer_id={peer_id}")
             peer_node_id = node_id + (1 if state.pair_role==1 else -1)
@@ -1127,7 +1129,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
             _r = 0 if state.id_from_hostname<peer_id else 1
 
          # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
-         if len( leaf_pair.groups() ) == 2:
+         if leaf_pair.groups()[1]:
             peer_id = (peer_id-1)*2 + (1 if leaf_pair.groups()[1]=='a' else 2)
             logging.info( f"Effective leaf pair AS offset: {peer_id}" )
          min_peer_as = max_peer_as = state.base_as + 1 + peer_id
@@ -1278,7 +1280,7 @@ class State(object):
               self.role = "endpoint"
            self.id_from_hostname = self.effective_id = int( role_id.groups()[1] )
            self.pair_role = 0
-           if len( role_id.groups() ) == 3:
+           if role_id.groups()[2]:
               self.pair_role = 1 if role_id.groups()[2] == 'a' else 2
               self.effective_id = (self.id_from_hostname-1) * 2 + self.pair_role
            self.max_level = self.node_level()
@@ -1347,8 +1349,9 @@ class State(object):
             if m:
                peer_role = m.groups()[0]
                peer_id = m.groups()[1]
-               if len(m.groups())==3:
+               if m.groups()[2]:
                   peer_id = int(peer_id) * 2 # a/b pairs
+                  logging.info( f"update_max_level: detected leaf-pair peer -> effective id {peer_id}" )
                peer_level = self.node_level(peer_role)
                if peer_level > self.max_level:
                   self.max_level = peer_level
