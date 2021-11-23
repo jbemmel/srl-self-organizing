@@ -16,6 +16,8 @@ module auto_config_agent {
       prefix srl_nokia-ext;
     }
 
+    import srl_nokia-features {prefix srl_feat; }
+
     revision "2021-04-11" {
         description "Initial revision";
         reference "TBD";
@@ -199,6 +201,8 @@ module auto_config_agent {
                 default enable;
             }
             leaf anycast-gw {
+                if-feature "srl_feat:anycast-gw"; // Only supported on platforms with anycast support
+
                 description "IPv4 anycast gateway to provision";
                 type srl_nokia-comm:ipv4-prefix-with-host-bits;
             }

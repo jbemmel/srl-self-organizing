@@ -506,8 +506,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
             "populate": [ { "route-type": "dynamic" } ]
           },
         },
-      },
-      "anycast-gw": {}
+      }
     }
     ]
    }
@@ -516,6 +515,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        irb_if['subinterface'][0]['ipv6'] = { }
 
    if hasattr(state,'anycast_gw'):
+       irb_if['anycast-gw'] = {} # Some platforms like ixr6 don't support this
        irb_if['subinterface'][0]['ipv4']['address'].append( {
          "ip-prefix": state.anycast_gw,
          "anycast-gw": True
@@ -605,9 +605,10 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
             '_annotate_stale-time': ANNOTATION
           }
 
-   updates += [ (f'/interface[name={lag_id}]',lag),
-               (f'/network-instance[name=overlay-l2]', mac_vrf),
-              ]
+   updates += [ (f'/interface[name={lag_id}]',lag) ]
+   if not state.is_spine():
+       # Only leaves support mac-vrfs
+       updates += [ (f'/network-instance[name=overlay-l2]', mac_vrf) ]
    if use_evpn_vxlan:
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
