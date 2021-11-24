@@ -478,7 +478,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       ],
       "lag": {
        "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
-       "member-speed": "100G" # 25G not supported on spines, put max
+       # "member-speed": "100G" # 25G not supported on spines, 100G not on leaves
       }
    }
 
