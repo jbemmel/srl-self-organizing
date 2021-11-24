@@ -170,7 +170,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
        router_id = f'{_r[0]}{_r[1]}:{_r[2]}{_r[3]}'
        encoded_ipv6 = f'fdad::{router_id}:{int(port):02x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
-                   "_annotate": f"for EVPN auto-lag discovery on port {desc if desc else port}" } ] } ) ]
+                   "_annotate": f"for EVPN auto-lag discovery on {desc if desc else f'port {port}' }" } ] } ) ]
 
        state.local_lldp[ chassis_mac ] = port # MAC uses CAPITALS
     else:
@@ -432,7 +432,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    lag_id = f"lag{port}"
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
-   if peer_data['type']=='leaf' and state.get_role()=='leaf':
+   if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
       pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
          _pk, _ab = pair_key.groups()
@@ -450,13 +450,14 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                  ]
 
                  # Record port number for mc-lag conversion
-                 state.leaf_pairs[ pair['a'] ] = pair['a']
-                 state.leaf_pairs[ pair['b'] ] = pair['a']
+                 if not state.is_spine():
+                    state.leaf_pairs[ pair['a'] ] = pair['a']
+                    state.leaf_pairs[ pair['b'] ] = pair['a']
 
-                 # Announce virtual port pair community, using combined ports
-                 pair_port = (pair['a'] << 4)&0xf0 + (pair['b'] & 0x0f)
-                 Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
-                   pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
+                    # Announce virtual port pair community, using combined ports
+                    pair_port = (pair['a'] << 4)&0xf0 + (pair['b'] & 0x0f)
+                    Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
+                      pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
@@ -1206,7 +1207,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          intf_name,
          _ip,
          lldp_peer_desc,
-         _peer if ((peer_type=='spine' and _r==1) or leaf_pair_link) else '*', # Only when connecting "upwards"
+         _peer if ((peer_type=='spine' and _r==1 and state.evpn!="l2_only_leaves")
+                   or leaf_pair_link) else '*', # Only when connecting "upwards"
          state.router_id if set_router_id else "*",
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
