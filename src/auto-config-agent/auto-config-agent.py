@@ -606,9 +606,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           }
 
    updates += [ (f'/interface[name={lag_id}]',lag) ]
-   if not state.is_spine():
+   if state.bridging_supported and not state.is_spine():
        # Only leaves support mac-vrfs
        updates += [ (f'/network-instance[name=overlay-l2]', mac_vrf) ]
+   else:
+       updates += [ (f'/network-instance[name={vrf}]/interface[name={lag_id}.0]', {}) ]
    if use_evpn_vxlan:
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
@@ -960,7 +962,8 @@ def Handle_Notification(obj, state):
                        state.anycast_gw = { 'ipv4': anycast_gw['ipv4']['value'] }
 
                 # Flag that gets set based on platform feature 'bridged'
-                state.bridging_supported = 'bridging_supported' in data
+                # User can disable it explicitly too, even if supported
+                state.bridging_supported = 'bridging_supported' in data and data['bridging_supported']['value']
                 logging.info( f"Platform supports bridging/mac-vrfs/irb: {state.bridging_supported}" )
 
                 # if 'tweaks' in data:

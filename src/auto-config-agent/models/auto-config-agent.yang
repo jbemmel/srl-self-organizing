@@ -216,7 +216,7 @@ module auto_config_agent {
             }
 
             leaf bridging-supported {
-              if-feature "srl_feat:bridged";
+              if-feature "srl_feat:bridged"; // Could use YANG 1.1 and 'not'?
               description "Flag that gets set when platform supports bridging / mac-vrfs / irb interfaces";
               type boolean;
               default true;
