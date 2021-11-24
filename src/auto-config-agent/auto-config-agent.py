@@ -133,7 +133,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 #
 # Can also have LAGs to spines ( options: routed(default), static LAG, LACP )
 #
-def Announce_LLDP_using_EVPN(state,chassis_mac,port):
+def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
     logging.info(f"Announce_LLDP_using_EVPN({state.evpn_auto_lags}) :: {port}={chassis_mac}")
     bytes = chassis_mac.split(':')
 
@@ -170,7 +170,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
        router_id = f'{_r[0]}{_r[1]}:{_r[2]}{_r[3]}'
        encoded_ipv6 = f'fdad::{router_id}:{int(port):02x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
-                   "_annotate": f"for EVPN auto-lag discovery on port {port}" } ] } ) ]
+                   "_annotate": f"for EVPN auto-lag discovery on port {desc if desc else port}" } ] } ) ]
 
        state.local_lldp[ chassis_mac ] = port # MAC uses CAPITALS
     else:
@@ -178,9 +178,9 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port):
         return False
 
     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
-    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                      username="admin",password="admin",insecure=True) as c:
-       c.set( encoding='json_ietf', update=updates, delete=deletes )
+    # with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+    #                  username="admin",password="admin",insecure=True) as c:
+    state.gnmi.set( encoding='json_ietf', update=updates, delete=deletes )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
 from threading import Thread
@@ -212,21 +212,22 @@ class EVPNRouteMonitoringThread(Thread):
       'mode': 'stream',
       'encoding': 'json'
     }
-    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                          username="admin",password="admin",
-                          insecure=True, debug=False) as c:
-
+    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+    #                      username="admin",password="admin",
+    #                      insecure=True, debug=False) as c:
+    with self.state.gnmi as c:
       CreateEVPNCommunicationVRF( self.state, c )
 
       telemetry_stream = c.subscribe(subscribe=subscribe)
-      for m in telemetry_stream:
+      try:
+       for m in telemetry_stream:
         if m.HasField('update'): # both update and delete events
             # Filter out only toplevel events
             parsed = telemetryParser(m)
-            logging.info(f"gNMI change event :: {parsed}")
+            logging.info(f"EVPNRouteMonitoringThread gNMI change event :: {parsed}")
             update = parsed['update']
             if update['update']:
-                logging.info( f"Update: {update['update']}")
+                logging.info( f"EVPNRouteMonitoringThread: {update['update']}")
 
                 # Assume routes changed, get attributes.
                 if self.state.evpn_auto_lags == "large_communities":
@@ -236,7 +237,8 @@ class EVPNRouteMonitoringThread(Thread):
                     self.checkIPv6Routes(c)
                 else:
                     logging.error( f"Unexpected value: {self.state.evpn_auto_lags}" )
-
+      except Exception as ex:
+       logging.error(ex)
     logging.info("Leaving gNMI subscribe loop")
 
    def checkCommunities(self,gnmiClient):
@@ -277,7 +279,7 @@ class EVPNRouteMonitoringThread(Thread):
                            mac = ":".join(mac)
                            try:
                               # This repeatedly provisions the same thing...
-                              Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]), gnmiClient )
+                              Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]) )
                            except Exception as ex:
                               logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
 
@@ -295,10 +297,10 @@ class EVPNRouteMonitoringThread(Thread):
            for route in u2['val']['ip-prefix-routes']:
              peer_id = route['route-distinguisher'].split(':')[0]
              encoded_lldp = route['ip-prefix'].split('/')[0] # /128 loopback IP
-             encoded_parts = encoded_lldp.split(':')
+             encoded_parts = encoded_lldp.split(':') # XX can have '::'
              mac = ":".join( [ f'{(i>>8):02X}:{(i&0xff):02X}'
                                for b in encoded_parts[5:]
-                               for i in [int(b,16)] ] )
+                               for i in [int(b,16) if b!='' else 0 ] ] )
              logging.info( f"Process {encoded_lldp} from {peer_id}: {mac}" )
              if mac in self.state.local_lldp:
                  lag_port = self.state.local_lldp[ mac ]
@@ -306,7 +308,7 @@ class EVPNRouteMonitoringThread(Thread):
                  peer_port = int(encoded_parts[4])
                  # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                  try:
-                    Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port, gnmiClient )
+                    Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port )
                  except Exception as ex:
                     traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
                     logging.error( f"checkIPv6Routes: {ex} ~ {traceback_str}" )
@@ -315,12 +317,12 @@ class EVPNRouteMonitoringThread(Thread):
 ## Function to populate state of agent config
 ## using telemetry -- add/update info from state
 ############################################################
-def Set_LLDP_Systemname(name):
+def Set_LLDP_Systemname(state,name):
    logging.info(f"Set_LLDP_Systemname :: name={name}")
    value = { "host-name" : name }
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                     username="admin",password="admin",insecure=True) as c:
-      c.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] )
+   #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+   #                username="admin",password="admin",insecure=True) as c:
+   state.gnmi.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] )
 
 def Set_Default_Systemname(state):
     if state.pair_role > 0:
@@ -330,7 +332,7 @@ def Set_Default_Systemname(state):
     _name = f"{state.get_role()}-{_id}-{state.router_id}"
     if state.evpn_rr == "auto_top_nodes":
         _name += f"L{state.max_level}N{state.top_count}"
-    Set_LLDP_Systemname( _name )
+    Set_LLDP_Systemname(state,_name)
 
 # Only used on LEAVES when auto_lags==True
 def Announce_LLDP_peer(state,name,port):
@@ -347,7 +349,7 @@ def Announce_LLDP_peer(state,name,port):
         state.pending_announcements.append( (name,port) )
       else:
         state.announcing = f"{state.router_id}-{port}-{name}"
-        Set_LLDP_Systemname( state.announcing )
+        Set_LLDP_Systemname( state, state.announcing )
 
 def HandleLLDPChange(state,peername,my_port,their_port):
     # XXX assumes port=single digit, only ethernet-1/x
@@ -365,7 +367,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                 name, port = state.pending_announcements.pop(0)
                 logging.info(f"Announce_next_LLDP_peer :: name={name} port={port}")
                 state.announcing = f"{state.router_id}-{port}-{name}"
-                Set_LLDP_Systemname( state.announcing )
+                Set_LLDP_Systemname( state, state.announcing )
             else:
                 logging.info("LEAF: No more pending announcements")
                 state.announcing = ""
@@ -378,13 +380,13 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                    state.pending_announcements.append( (my_port,peername) )
                else:
                    state.announcing = my_port
-                   Set_LLDP_Systemname( peername )
+                   Set_LLDP_Systemname( state, peername )
             else:
                # To avoid deadlock on spine, re-announce if match
                if state.announcing == "" and peer_ip == state.router_id:
                   logging.info(f"LEAF ACK {peername} on {my_port}")
                   state.announcing = peername.replace( "spine", "ACK" )
-                  Set_LLDP_Systemname( state.announcing )
+                  Set_LLDP_Systemname( state, state.announcing )
 
                Add_Discovered_Node( state, peer_ip, peer_if, peer_hostnode )
 
@@ -396,7 +398,7 @@ def HandleLLDPChange(state,peername,my_port,their_port):
                if state.pending_announcements!=[]:
                    next_port, nextpeer = state.pending_announcements.pop(0)
                    state.announcing = next_port
-                   Set_LLDP_Systemname(nextpeer)
+                   Set_LLDP_Systemname(state,nextpeer)
                else:
                    state.announcing = ""
                    Set_Default_Systemname(state)
@@ -450,6 +452,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                  # Record port number for mc-lag conversion
                  state.leaf_pairs[ pair['a'] ] = pair['a']
                  state.leaf_pairs[ pair['b'] ] = pair['a']
+
+                 # Announce virtual port pair community, using combined ports
+                 pair_port = (pair['a'] << 4)&0xf0 + (pair['b'] & 0x0f)
+                 Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
+                   pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
@@ -669,7 +676,7 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
 #
-def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
+def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
    logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port={peer_port}")
 
    if port in state.mc_lags:
@@ -735,7 +742,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
-       mac_id = state.effective_id if leaf_pair_lag else 0
+       # Both members on the split side need same ID
+       mac_id = state.id_from_hostname if leaf_pair_lag else 0
        logging.info( f"MAC bits: {mac_id} type={ type(mac_id) }" )
        lag = {
           'lag-type': 'lacp',
@@ -748,7 +756,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port,gnmiClient):
        updates += [ (f'/interface[name=lag{lag_port}]/lag',lag) ]
 
    logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
-   gnmiClient.set( encoding='json_ietf', update=updates )
+   state.gnmi.set( encoding='json_ietf', update=updates )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -1129,7 +1137,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       link_index = (lldp_my_port - 1)
 
       # Support a/b leaf pairs
-      leaf_pair = re.match("^leaf(\d+)(a|b)?.*", lldp_peer_name)
+      leaf_pair = re.match("^leaf[-]?(\d+)?(a|b)?.*", lldp_peer_name)
       if leaf_pair:
          peer_type = 'leaf'
          peer_id = int( leaf_pair.groups()[0] )
@@ -1277,6 +1285,13 @@ class State(object):
         self.mc_lags = {}
         self.loopbacks_prefix = []
         self.evpn_rr = None
+
+    # Use single, globally shared gNMI connection
+    def connectGNMI(self):
+        self.gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                               username="admin",password="admin",insecure=True,
+                               gnmi_timeout=0)
+        self.gnmi.connect() # Dont wait here
 
     def set_EVPN_RR(self,evpn_rr):
         self.evpn_rr = evpn_rr
@@ -1429,12 +1444,16 @@ def Run():
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
 
+                       # Open gNMI connection first
+                       state.connectGNMI()
+
                        # Add some delay to avoid exceptions during startup
                        logging.info( "Adding 5s delay before LLDP subscribe..." )
                        time.sleep( 5 )
 
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
+
 
     except grpc._channel._Rendezvous as err:
         logging.error(f'grpc._channel._Rendezvous: {err}')
@@ -1446,6 +1465,7 @@ def Run():
         #if file_name != None:
         #    Update_Result(file_name, action='delete')
     finally:
+        state.gnmi.close()
         Exit_Gracefully(0,0)
 
 ############################################################
