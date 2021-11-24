@@ -460,7 +460,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       else:
          logging.warning( "Convert_to_lag: LEAF-LEAF link but no pair_key match!" )
 
-   is_routed = peer_data['type']=="spine" or state.is_spine()
+   is_routed = (peer_data['type']=="spine" and state.evpn!="l2_only_leaves") or state.is_spine()
    lag = {
       "admin-state": "enable",
       "description": lag_desc,
