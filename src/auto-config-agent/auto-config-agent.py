@@ -606,7 +606,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           }
 
    updates += [ (f'/interface[name={lag_id}]',lag) ]
-   if state.bridging_supported and not state.is_spine():
+   if state.bridging_supported and not is_routed:
        # Only leaves support mac-vrfs
        updates += [ (f'/network-instance[name=overlay-l2]', mac_vrf) ]
    else:
