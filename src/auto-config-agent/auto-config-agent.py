@@ -1235,13 +1235,14 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      # For access ports or L2-only leaves, convert to L2 service if requested
      if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
          (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')] and not leaf_pair_link)):
-        vrf = "default" if state.evpn=='l2_only_leaves' else "overlay"
         peer_data = {
           'name': lldp_peer_name,
           'type': peer_type,
           'port': lldp_peer_port
         }
-        Convert_to_lag( state, lldp_my_port, _ip, peer_data, vrf ) # No EVPN MC-LAG yet
+        # Only support 1 overlay service
+        vrf = "overlay-l2" if state.evpn=="l2_only_leaves" and state.get_role()=="leaf" else "overlay"
+        Convert_to_lag( state, lldp_my_port, _ip, peer_data, vrf=vrf ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
