@@ -537,7 +537,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           if 'ipv4' in l3_intf['subinterface'][0]:
             l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
           else:
-            l3_intf['subinterface'][0] = { 'ipv4' : { 'address': [ addr ] } }
+            l3_intf['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
 
    # EVPN VXLAN interface
    VNI_EVI = 4095 # Cannot use 0
