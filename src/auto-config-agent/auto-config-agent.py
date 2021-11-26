@@ -755,15 +755,16 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
    # Update LAG to use LACP if configured
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
-       # Both members on the split side need same ID
-       mac_id = state.id_from_hostname if leaf_pair_lag else 0
+       # Both members on the split side need same ID, also when spine facing
+       mac_id = state.id_from_hostname # if leaf_pair_lag else 0
+       member_count = len( state.mc_lags[port] ) + 1
        logging.info( f"MAC bits: {mac_id} type={ type(mac_id) }" )
        lag = {
           'lag-type': 'lacp',
           'lacp': {
-           'interval' : "SLOW", # or FAST, matters if passive?
+           'interval' : "SLOW", # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
-           'system-id-mac': f"02:00:00:00:00:{mac_id:02x}", # Must match for A/A MC-LAG
+           'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
           }
        }
        updates += [ (f'/interface[name=lag{lag_port}]/lag',lag) ]
