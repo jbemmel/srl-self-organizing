@@ -202,25 +202,28 @@ module auto_config_agent {
             }
             container gateway {
                 // Allow a single config to be loaded across multiple types of platforms
-                leaf use-anycast {
+                leaf anycast-supported {
                   if-feature "srl_feat:anycast-gw"; // Only supported on platforms with anycast support
                   description "Flag that gets set when platform supports anycast-gw";
                   type boolean;
                   default true;
                 }
-
+                leaf use-anycast-if-supported {
+                  description "Allows user to disable use of anycast feature";
+                  type boolean;
+                  default true;
+                }
                 leaf ipv4 {
                    description "IPv4 gateway address to provision";
                    type srl_nokia-comm:ipv4-prefix-with-host-bits;
                 }
-
                 leaf location {
-                 description "Location for the L3 gateway, default on each leaf";
-                 type enumeration {
-                   enum leaf;
-                   enum spine;
-                 }
-                 default leaf;
+                   description "Location for the L3 gateway, default on each leaf";
+                   type enumeration {
+                     enum leaf;
+                     enum spine;
+                   }
+                   default leaf;
                 }
             }
 

@@ -973,8 +973,8 @@ def Handle_Notification(obj, state):
                     if 'ipv4' in gw:
                       state.gateway = {
                         'ipv4': gw['ipv4']['value'],
-                        'location': gw['location'][:9] if 'location' in gw else "leaf",
-                        'anycast': 'use_anycast' in gw and gw['use_anycast']['value'],
+                        'location': gw['location'][:9], # default 'leaf'
+                        'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
                       }
 
                 # Flag that gets set based on platform feature 'bridged'
