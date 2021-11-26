@@ -8,7 +8,8 @@
     },
     "lacp": "passive",
     "gateway": {
-      "ipv4": "10.0.0.1/24"
+      "ipv4": "10.0.0.1/24",
+      "location": "spine"
     }
   },
   "srl_nokia-acl:acl": {

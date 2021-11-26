@@ -487,10 +487,13 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       ],
       "lag": {
        "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
-       "member-speed": "25G" if state.bridging_supported else "100G" # 25G not supported on spines, 100G not on leaves
+
+       # 25G not supported on spines, 100G not on leaves, indirect hint
+       "member-speed": "25G" if state.bridging_supported else "100G"
       }
    }
 
+   use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
    irb_if = {
     "admin-state": "enable",
     "subinterface": [
@@ -505,9 +508,8 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           }
         ],
         "arp": {
-          # reusing same IPs across EVPN fabric, MAC routes or OSPF causes dup
-          #  "duplicate-address-detection": False
           # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
+          # Could make this depend on EVPN support
           "evpn": { "advertise": [ {
             "route-type": "dynamic" # TODO only for asymmetric model?
           } ] },
@@ -519,9 +521,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
     }
     ]
    }
+
+   l3_intf = irb_if if use_irb else lag
    if state.host_enable_ipv6:
        # TODO could add ipv6 link IP too
-       irb_if['subinterface'][0]['ipv6'] = { }
+       l3_intf['subinterface'][0]['ipv6'] = { }
 
    if hasattr(state,'gateway'):
        gw = state.gateway
@@ -530,7 +534,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           if gw['anycast']: # Some platforms like ixr6 don't support this
             irb_if['anycast-gw'] = {}
             addr[ 'anycast-gw' ] = True
-          irb_if['subinterface'][0]['ipv4']['address'].append( addr )
+          l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
 
    # EVPN VXLAN interface
    VNI_EVI = 4095 # Cannot use 0
@@ -588,7 +592,6 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
         }
       })
 
-   use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
    if use_irb:
       mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
 
@@ -973,7 +976,8 @@ def Handle_Notification(obj, state):
                     if 'ipv4' in gw:
                       state.gateway = {
                         'ipv4': gw['ipv4']['value'],
-                        'location': gw['location'][:9], # default 'leaf'
+                        'location': ('spine' if state.evpn == 'l2_only_leaves'
+                                     else gw['location'][:9]), # default 'leaf'
                         'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
                       }
 
