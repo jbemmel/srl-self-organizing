@@ -154,9 +154,9 @@ module auto_config_agent {
                  }
              }
             }
-            // Cannot reference systemp lacp settings group due to must clause
+            // Cannot reference system lacp settings group due to must clause
             leaf lacp {
-              description "Enable LACP towards hosts";
+              description "Enable LACP on LAGs";
               type enumeration {
                 enum active;
                 enum passive;

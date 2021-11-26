@@ -420,13 +420,14 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
      return [ f'/interface[{eth}]/subinterface[index=*]',
               f'/bfd/subinterface[id=ethernet-1/{p}.0]',
               f'/interface[{eth}]/vlan-tagging',
-              f'/network-instance[name={vrf}]/interface[{eth}.0]' ]
+              f'/network-instance[name=default]/interface[{eth}.0]' ]
 
    deletes = deletes_for_port(port)
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
    lag_id = f"lag{port}"
+   mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
@@ -437,6 +438,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
              pair = state.leaf_pairs[_pk] # string type key
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
+                 mc_lag = True
                  lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
@@ -488,6 +490,14 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        # 25G not supported on spines, 100G not on leaves, indirect hint
        "member-speed": "25G" if state.bridging_supported else "100G"
       }
+   }
+   if mc_lag and state.lacp != "disabled":
+       lag['lag']['lag-type'] = "lacp"
+       lag['lag']['lacp'] = {
+        'interval' : "SLOW", # or FAST
+        'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
+        'system-id-mac': f"02:00:00:00:00:00", # Must match for A/A MC-LAG
+       }
    }
 
    use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
@@ -1052,7 +1062,7 @@ def Handle_Notification(obj, state):
             peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
 
           # Could also announce communities for spines
-          if state.get_role() == "leaf" and not "spine" in peer_sys_name:
+          if state.get_role() == "leaf":
              Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
           else:
              logging.info( f"Not creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
