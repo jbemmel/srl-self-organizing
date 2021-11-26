@@ -200,9 +200,9 @@ module auto_config_agent {
                 }
                 default enable;
             }
-            container anycast-gw {
+            container gateway {
                 // Allow a single config to be loaded across multiple types of platforms
-                leaf supported {
+                leaf use-anycast {
                   if-feature "srl_feat:anycast-gw"; // Only supported on platforms with anycast support
                   description "Flag that gets set when platform supports anycast-gw";
                   type boolean;
@@ -210,8 +210,17 @@ module auto_config_agent {
                 }
 
                 leaf ipv4 {
-                   description "IPv4 anycast gateway address to provision";
+                   description "IPv4 gateway address to provision";
                    type srl_nokia-comm:ipv4-prefix-with-host-bits;
+                }
+
+                leaf location {
+                 description "Location for the L3 gateway, default on each leaf";
+                 type enumeration {
+                   enum leaf;
+                   enum spine;
+                 }
+                 default leaf;
                 }
             }
 

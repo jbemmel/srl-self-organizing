@@ -479,8 +479,9 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
          "type": "routed" if is_routed else "bridged",
          "srl_nokia-interfaces-vlans:vlan": {
            # Routed interface cannot be untagged, and cannot use VLAN 0
-           "encap": { "single-tagged": { "vlan-id": 4094 } } if is_routed
-                    else { "untagged": { } }
+           # Implies bridge interface must have matching vlan tag too
+           "encap": { "single-tagged": { "vlan-id": 4094 } } # if is_routed
+                    # else { "untagged": { } }
          }
        }
       ],
@@ -522,12 +523,14 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        # TODO could add ipv6 link IP too
        irb_if['subinterface'][0]['ipv6'] = { }
 
-   if hasattr(state,'anycast_gw'):
-       irb_if['anycast-gw'] = {} # Some platforms like ixr6 don't support this
-       irb_if['subinterface'][0]['ipv4']['address'].append( {
-         "ip-prefix": state.anycast_gw['ipv4'],
-         "anycast-gw": True
-       } )
+   if hasattr(state,'gateway'):
+       gw = state.gateway
+       if gw['location'] == state.get_role():
+          addr = { "ip-prefix": state.gateway['ipv4'] }
+          if gw['anycast']: # Some platforms like ixr6 don't support this
+            irb_if['anycast-gw'] = {}
+            addr[ 'anycast-gw' ] = True
+          irb_if['subinterface'][0]['ipv4']['address'].append( addr )
 
    # EVPN VXLAN interface
    VNI_EVI = 4095 # Cannot use 0
@@ -965,10 +968,14 @@ def Handle_Notification(obj, state):
                 if 'overlay_bgp_admin_state' in data:
                     _b = data['overlay_bgp_admin_state'][24:]
                     state.overlay_bgp_admin_state = _b
-                if 'anycast_gw' in data:
-                    anycast_gw = data['anycast_gw']
-                    if 'supported' in anycast_gw and 'ipv4' in anycast_gw:
-                       state.anycast_gw = { 'ipv4': anycast_gw['ipv4']['value'] }
+                if 'gateway' in data:
+                    gw = data['gateway']
+                    if 'ipv4' in gw:
+                      state.gateway = {
+                        'ipv4': gw['ipv4']['value'],
+                        'location': gw['location'][:9] if 'location' in gw else "leaf",
+                        'anycast': 'use_anycast' in gw and gw['use_anycast']['value'],
+                      }
 
                 # Flag that gets set based on platform feature 'bridged'
                 # User can disable it explicitly too, even if supported
