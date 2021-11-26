@@ -159,7 +159,7 @@ module auto_config_agent {
               description "Enable LACP on LAGs";
               type enumeration {
                 enum active;
-                enum passive;
+                enum passive; // When SLOW may add up to 30s of delay to 'up'
                 enum disabled;
               }
               default disabled;

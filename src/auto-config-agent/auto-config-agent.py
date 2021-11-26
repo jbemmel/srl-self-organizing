@@ -705,7 +705,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
        return False
 
-   peers = str( sorted( state.mc_lags[port].items() ) )
+   peers = ",".join( sorted( state.mc_lags[port].values() ) ) # No '[' ']' chars
 
    lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
 
