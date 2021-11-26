@@ -705,7 +705,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
        return False
 
-   peers = ",".join( sorted( state.mc_lags[port].values() ) ) # No '[' ']' chars
+   peers = ",".join( map(str, sorted( state.mc_lags[port].items() )) ) # No '[' ']' chars
 
    lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
 
@@ -756,20 +756,23 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
    if state.evpn != "l2_only_leaves":
        updates += [ (f'/interface[name=irb0]/subinterface[index={lag_port}]/ipv4/arp', arp) ]
 
-   # Update LAG to use LACP if configured
    lag = {
     'description': f"Auto-discovered MC-LAG with {peers}"
    }
+
+   # Update LAG to use LACP if configured
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
        # Both members on the split side need same ID, also when spine facing
        mac_id = state.id_from_hostname # if leaf_pair_lag else 0
        member_count = len( state.mc_lags[port] ) + 1
-       lag['lag-type'] = 'lacp'
-       lag['lacp'] = {
+       lag['lag'] = {
+        'lag-type': 'lacp',
+        'lacp': {
            'interval' : "SLOW", # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
+        }
        }
    updates += [ (f'/interface[name=lag{lag_port}]',lag) ]
 
