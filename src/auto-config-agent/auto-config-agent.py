@@ -417,13 +417,10 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
-     ds = [ f'/interface[{eth}]/subinterface[index=*]',
-            f'/bfd/subinterface[id=ethernet-1/{p}.0]',
-            f'/interface[{eth}]/vlan-tagging' ]
-     if state.evpn != 'disabled' or vrf!='overlay':
-       ds.append( f'/network-instance[name={vrf}]/interface[{eth}.0]' )
-
-     return ds
+     return [ f'/interface[{eth}]/subinterface[index=*]',
+              f'/bfd/subinterface[id=ethernet-1/{p}.0]',
+              f'/interface[{eth}]/vlan-tagging',
+              f'/network-instance[name={vrf}]/interface[{eth}.0]' ]
 
    deletes = deletes_for_port(port)
 
@@ -548,17 +545,19 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    }
 
    # Could configure MAC table size here
-   mac_vrf = {
-     "type": "srl_nokia-network-instance:mac-vrf",
+   vrf_inst = {
+     "type": "ip-vrf" if is_routed else "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
      "interface": [ { "name": f"{lag_id}.0" } ],
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
+   updates += [ (f'/network-instance[name={vrf}]', vrf_inst) ]
+
    use_evpn_vxlan = state.evpn != 'disabled' and not state.is_spine()
    if use_evpn_vxlan:
-      mac_vrf.update(
+      vrf_inst.update(
       {
         "vxlan-interface": [ { "name": f"vxlan0.0" } ],
         "protocols": {
@@ -596,7 +595,12 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
       })
 
    if use_irb:
-      mac_vrf['interface'] += [ { "name" : "irb0.0" } ]
+      vrf_inst['interface'] += [ { "name" : "irb0.0" } ]
+      # XXX assumes 'overlay' ip-vrf created elsewhere
+      updates += [
+        (f'/interface[name=irb0]', irb_if),
+        (f'/network-instance[name=overlay]/interface[name=irb0.0]', {}),
+      ]
 
       if state.evpn != 'disabled':
 
@@ -623,20 +627,10 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           }
 
    updates += [ (f'/interface[name={lag_id}]',lag) ]
-   if state.bridging_supported and not is_routed:
-       # Only leaves support mac-vrfs
-       updates += [ (f'/network-instance[name=overlay-l2]', mac_vrf) ]
-   else:
-       updates += [ (f'/network-instance[name={vrf}]/interface[name={lag_id}.0]', {}) ]
    if use_evpn_vxlan:
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
          # ('/routing-policy', export_policy)
-       ]
-   if use_irb:
-       updates += [
-         (f'/interface[name=irb0]', irb_if),
-         (f'/network-instance[name={vrf}]/interface[name=irb0.0]', {}),
        ]
 
    logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
