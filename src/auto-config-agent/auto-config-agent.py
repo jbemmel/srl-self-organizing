@@ -496,7 +496,9 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        lag['lag']['lacp'] = {
         'interval' : "SLOW", # or FAST
         'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
-        'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname}", # Must match for A/A MC-LAG
+
+        # CHANGEME to support spine clusters (up to 16 links)
+        'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname:02x}",
        }
 
    use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
@@ -758,7 +760,6 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
        # Both members on the split side need same ID, also when spine facing
        mac_id = state.id_from_hostname # if leaf_pair_lag else 0
        member_count = len( state.mc_lags[port] ) + 1
-       logging.info( f"MAC bits: {mac_id} type={ type(mac_id) }" )
        lag = {
           'lag-type': 'lacp',
           'lacp': {
