@@ -496,7 +496,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        lag['lag']['lacp'] = {
         'interval' : "SLOW", # or FAST
         'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
-        'system-id-mac': f"02:00:00:00:00:00", # Must match for A/A MC-LAG
+        'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname}", # Must match for A/A MC-LAG
        }
 
    use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
