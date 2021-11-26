@@ -534,7 +534,10 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
           if gw['anycast']: # Some platforms like ixr6 don't support this
             irb_if['anycast-gw'] = {}
             addr[ 'anycast-gw' ] = True
-          l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
+          if 'ipv4' in l3_intf['subinterface'][0]:
+            l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
+          else:
+            l3_intf['subinterface'][0] = { 'ipv4' : { 'address': [ addr ] } }
 
    # EVPN VXLAN interface
    VNI_EVI = 4095 # Cannot use 0
