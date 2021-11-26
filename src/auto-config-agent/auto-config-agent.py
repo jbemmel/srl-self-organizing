@@ -523,11 +523,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    }
 
    l3_intf = irb_if if use_irb else lag
-   if state.host_enable_ipv6:
+   if is_routed and state.host_enable_ipv6:
        # TODO could add ipv6 link IP too
        l3_intf['subinterface'][0]['ipv6'] = { }
 
-   if hasattr(state,'gateway'):
+   if is_routed and hasattr(state,'gateway'):
        gw = state.gateway
        if gw['location'] == state.get_role():
           addr = { "ip-prefix": state.gateway['ipv4'] }
