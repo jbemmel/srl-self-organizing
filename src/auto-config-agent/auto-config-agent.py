@@ -479,8 +479,9 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
          "srl_nokia-interfaces-vlans:vlan": {
            # Routed interface cannot be untagged, and cannot use VLAN 0
            # Implies bridge interface must have matching vlan tag too
-           "encap": { "single-tagged": { "vlan-id": 4094 } } # if is_routed
-                    # else { "untagged": { } }
+           # when fabric-facing
+           "encap": { "single-tagged": { "vlan-id": 4094 } } if peer_data['type']!='host'
+                    else { "untagged": { } }
          }
        }
       ],
