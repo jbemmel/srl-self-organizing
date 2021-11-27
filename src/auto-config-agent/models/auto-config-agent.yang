@@ -168,6 +168,7 @@ module auto_config_agent {
                 description "IGP to use for distributing loopback IPs";
                 type enumeration {
                   enum bgp;
+                  enum bgp-unnumbered; // Using FRR agent
                   enum isis;
                   enum ospf; // could do both v2 and v3
                 }
@@ -177,15 +178,6 @@ module auto_config_agent {
                 description "Whether to enable BFD for IGP, default 'true'";
                 type boolean;
                 default true;
-            }
-            leaf use-bgp-unnumbered {
-                description "Provision BGP unnumbered on fabric interfaces, using FRR agent";
-                type boolean;
-                default false;
-
-                must ". = false() or ../igp = 'bgp'" {
-                  error-message "Cannot use both BGP unnumbered and OSPFv3 or ISIS";
-                }
             }
             leaf host-use-irb {
                 description "Use IRB interface for L2 service towards hosts";

@@ -990,15 +990,11 @@ def Handle_Notification(obj, state):
 
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
+                    state.use_bgp_unnumbered = (state.igp == "bgp_unnumbered")
                 if 'lacp' in data:
                     state.lacp = data['lacp'][5:]
                 if 'enable_bfd' in data:
                     state.enable_bfd = "true" if data['enable_bfd']['value'] else "false"
-                if 'use_bgp_unnumbered' in data:
-                    state.use_bgp_unnumbered = data['use_bgp_unnumbered']['value']
-                # else
-                    # Default to all nodes in spine layer
-                    # state.evpn_rr = list(state.loopbacks_prefix.subnets(new_prefix=24))[1]
 
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
