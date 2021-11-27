@@ -685,11 +685,12 @@ if [[ "$ROLE" == "leaf" ]]; then
   if [[ "$PEER_ROUTER_ID" == "?" ]]; then
    VRF="none"
   fi
-elif [[ "$USE_EVPN_OVERLAY" != "disabled" && "$PEER_TYPE"=="host" ]]; then
+ elif [[ "${USE_EVPN_OVERLAY}" != "disabled" && "${PEER_TYPE}" == "host" ]]; then
+  echo "Peer type 'host' -> overlay"
   VRF="overlay"
  fi
 fi
-echo "Selected VRF: ${VRF} for INTF=${INTF}.0"
+echo "Selected VRF: ${VRF} for INTF=${INTF}.0 towards ${PEER_TYPE}"
 
 # Add it to the correct instance - host (lag) interfaces managed in Python code
 if [[ "$VRF" != "none" ]]; then

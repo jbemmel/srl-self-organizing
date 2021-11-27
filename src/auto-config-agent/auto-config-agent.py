@@ -174,7 +174,8 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
 
        state.local_lldp[ chassis_mac ] = port # MAC uses CAPITALS
     else:
-        logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
+        if state.evpn_auto_lags!="disabled":
+           logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
         return False
 
     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
@@ -429,10 +430,11 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
+     orig_vrf = 'overlay' if peer_data['type']=='host' else 'default'
      return [ f'/interface[{eth}]/subinterface[index=*]',
               f'/bfd/subinterface[id=ethernet-1/{p}.0]',
               f'/interface[{eth}]/vlan-tagging',
-              f'/network-instance[name=default]/interface[{eth}.0]' ]
+              f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
 
    deletes = deletes_for_port(port)
 
@@ -1273,7 +1275,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
           'port': lldp_peer_port
         }
         # Only support 1 overlay service
-        vrf = "overlay-l2" if state.evpn=="l2_only_leaves" and state.get_role()=="leaf" else "overlay"
+        vrf = "overlay" if state.is_spine() else "overlay-l2"
         Convert_to_lag( state, lldp_my_port, _ip, peer_data, vrf=vrf ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
