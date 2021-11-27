@@ -427,7 +427,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
    lag_id = f"lag{port}"
-   mc_lag = False
+   spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
@@ -460,7 +460,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                     Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
                       pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
                  else:
-                    mc_lag = True # Only on spine, don't configure system-id twice differently
+                    spine_mc_lag = True # Only on spine, don't configure system-id twice differently
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
@@ -497,7 +497,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
        "member-speed": "100G"
       }
    }
-   if mc_lag and state.lacp != "disabled":
+   if spine_mc_lag and state.lacp != "disabled":
        lag['lag']['lag-type'] = "lacp"
        lag['lag']['lacp'] = {
         'interval' : "SLOW", # or FAST
