@@ -445,9 +445,9 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
-                   { 'aggregate-id' : lag_id, 'reload-delay': 20 } ),
+                   { 'aggregate-id' : lag_id, **state.reload_delay } ),
                   (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',
-                   { 'aggregate-id' : lag_id, 'reload-delay': 20 } ),
+                   { 'aggregate-id' : lag_id, **state.reload_delay } ),
                  ]
 
                  # Record port number for mc-lag conversion
@@ -776,10 +776,10 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
         }
        }
+   updates += [ (f'/interface[name=lag{lag_port}]',lag) ]
    # Also configure reload-delay timer on corresponding ethernet port
-   updates += [ (f'/interface[name=lag{lag_port}]',lag),
-     (f'/interface[name=ethernet-1/{port}]/ethernet', { 'reload-delay': 20 })
-   ]
+   if state.reload_delay_supported:
+       updates += [ (f'/interface[name=ethernet-1/{port}]/ethernet', state.reload_delay ) ]
 
    logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
    state.gnmi.set( encoding='json_ietf', update=updates )
@@ -1004,6 +1004,10 @@ def Handle_Notification(obj, state):
                 # User can disable it explicitly too, even if supported
                 state.bridging_supported = 'bridging_supported' in data and data['bridging_supported']['value']
                 logging.info( f"Platform supports bridging/mac-vrfs/irb: {state.bridging_supported}" )
+
+                state.reload_delay_supported = 'reload_delay_supported' in data and data['reload_delay_supported']['value']
+                state.reload_delay = { 'reload-delay': 20 } if state.reload_delay_supported else {}
+                logging.info( f"Platform supports reload-delay: {state.reload_delay_supported}" )
 
                 # if 'tweaks' in data:
                 #     tweaks = data['tweaks']

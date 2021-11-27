@@ -234,6 +234,13 @@ module auto_config_agent {
               default true;
             }
 
+            leaf reload-delay-supported {
+              if-feature srl_feat:reload-delay;
+              description "Flag that gets set when reload-delay is supported";
+              type boolean;
+              default true;
+            }
+
             // container tweaks {
             //    presence "Minor system tweaks for various demo purposes";
             //    description "Contains some custom flags to tweak system settings";
