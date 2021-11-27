@@ -438,7 +438,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
              pair = state.leaf_pairs[_pk] # string type key
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
-                 mc_lag = True
+                 # mc_lag = True
                  lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
@@ -459,6 +459,8 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
                     pair_port = (pair['a'] << 4)&0xf0 + (pair['b'] & 0x0f)
                     Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
                       pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
+                 else:
+                    mc_lag = True # Only on spine, don't configure system-id twice differently
              else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
                  return
