@@ -1006,8 +1006,9 @@ def Handle_Notification(obj, state):
                 logging.info( f"Platform supports bridging/mac-vrfs/irb: {state.bridging_supported}" )
 
                 state.reload_delay_supported = 'reload_delay_supported' in data and data['reload_delay_supported']['value']
-                state.reload_delay = { 'reload-delay': 20 } if state.reload_delay_supported else {}
-                logging.info( f"Platform supports reload-delay: {state.reload_delay_supported}" )
+                reload_delay = int( data['reload_delay_secs']['value'] )
+                state.reload_delay = { 'reload-delay': reload_delay } if state.reload_delay_supported and reload_delay>0 else {}
+                logging.info( f"Platform supports reload-delay: {state.reload_delay_supported} secs={reload_delay}" )
 
                 # if 'tweaks' in data:
                 #     tweaks = data['tweaks']
