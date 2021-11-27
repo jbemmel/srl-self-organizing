@@ -568,8 +568,8 @@ cat > $temp_file << EOF
       "index": 0,
       "description": "Overlay loopback",
       "admin-state": "enable",
-      "ipv4": { "address": [ { "ip-prefix": "$ROUTER_ID/32" } ] },
-      "ipv6": { "address": [ { "ip-prefix": "2001::${ROUTER_ID//\./:}/128" } ] }
+      "ipv4": { "address": [ { "ip-prefix": "$LOOPBACK_IP4" } ] },
+      "ipv6": { "address": [ { "ip-prefix": "$LOOPBACK_IP6" } ] }
     }
   ]
 }
@@ -644,11 +644,12 @@ if [[ "$PEER_TYPE" != "host" ]]; then
 _IP127="${IP_PREFIX//\/31/\/127}"
 else
 # Use /64 towards each host? Note host bits cannot be 0
+# Avoid overlap with loopback IPs 2001::
 _IP127="${IP_PREFIX//\/[23][0-9]/\/64}"
 fi
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
- "ipv6": { "address": [ { "ip-prefix": "2001::${_IP127//\./:}" } ] }
+ "ipv6": { "address": [ { "ip-prefix": "2001:1::${_IP127//\./:}" } ] }
 EOF
 else
 # Enable IPv4+IPv6 but don't put addresses (yet)
