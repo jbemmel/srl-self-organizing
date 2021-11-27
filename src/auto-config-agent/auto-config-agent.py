@@ -438,10 +438,10 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
-   lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
+   _lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
    spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
-   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
+   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag_id } ) ]
    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
       pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
@@ -451,15 +451,15 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
                  # mc_lag = True
-                 lag_id = f"lag{ lag_id(pair['a']) }" # Take 'a' port as lag ID
+                 _lag_id = f"lag{ lag_id(pair['a']) }" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
-                 logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
+                 logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag_id}" )
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
-                   { 'aggregate-id' : lag_id, **state.reload_delay } ),
+                   { 'aggregate-id' : _lag_id, **state.reload_delay } ),
                   (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',
-                   { 'aggregate-id' : lag_id, **state.reload_delay } ),
+                   { 'aggregate-id' : _lag_id, **state.reload_delay } ),
                  ]
 
                  # Record port number for mc-lag conversion
@@ -578,7 +578,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
      "type": "ip-vrf" if is_routed else "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
-     "interface": [ { "name": f"{lag_id}.0" } ],
+     "interface": [ { "name": f"{_lag_id}.0" } ],
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
@@ -655,7 +655,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
             '_annotate_stale-time': ANNOTATION
           }
 
-   updates += [ (f'/interface[name={lag_id}]',lag) ]
+   updates += [ (f'/interface[name={_lag_id}]',lag) ]
    if use_evpn_vxlan:
        updates += [
          (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
