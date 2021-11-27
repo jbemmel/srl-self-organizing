@@ -61,19 +61,19 @@ topology:
       - interfaces.server3:/etc/network/interfaces
 
   links:
-    # Leaf interconnects for EVPN MC-LAG sync
+    # Leaf interconnects for EVPN MC-LAG sync, 25G ports
     - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
-    - endpoints: ["leaf2a:e1-4", "leaf2b:e1-4"]
+    - endpoints: ["leaf2a:e1-3", "leaf2b:e1-3"]
 
-    # Leaf 3a/b to single spine
-    - endpoints: ["leaf2a:e1-1", "spine1:e1-1"]
-    - endpoints: ["leaf2b:e1-1", "spine1:e1-2"]
+    # Leaf 3a/b to single spine, using 100G links
+    - endpoints: ["leaf2a:e1-49", "spine1:e1-1"]
+    - endpoints: ["leaf2b:e1-49", "spine1:e1-2"]
 
-    # Leaf 3a/b cross connect to leaf 2a/b
-    - endpoints: ["leaf2a:e1-2", "leaf1a:e1-4"]
-    - endpoints: ["leaf2a:e1-3", "leaf1b:e1-4"]
-    - endpoints: ["leaf2b:e1-2", "leaf1a:e1-5"]
-    - endpoints: ["leaf2b:e1-3", "leaf1b:e1-5"]
+    # Leaf 3a/b cross connect to leaf 2a/b, 100G
+    - endpoints: ["leaf2a:e1-50", "leaf1a:e1-50"]
+    - endpoints: ["leaf2a:e1-51", "leaf1b:e1-50"]
+    - endpoints: ["leaf2b:e1-50", "leaf1a:e1-51"]
+    - endpoints: ["leaf2b:e1-51", "leaf1b:e1-51"]
 
     # Server1 is single connected
     - endpoints: ["server1:eth1", "leaf1a:e1-1"]

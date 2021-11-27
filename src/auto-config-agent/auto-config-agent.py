@@ -408,6 +408,18 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
     return False
 
+def lag_id(port):
+    """
+    Calculates the lag id to use for the given port. Max lag id is 32,
+    using all 8 100G ports as separate lags leaves 1..24 for 25G ports
+    """
+    if port<=24:   # 25G ports on IXR-D2
+        return port
+    elif port>=49: # 8x 100G ports on IXR-D2
+        return 25 + (port-49)
+    else:
+        raise Exception( f"Unable to allocate LAG ID for port {port}" )
+
 ###
 # Converts an ethernet interface to a lag, creating/joining a LAN mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
@@ -426,7 +438,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
-   lag_id = f"lag{port}"
+   lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
    spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : lag_id } ) ]
@@ -439,7 +451,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
                  # mc_lag = True
-                 lag_id = f"lag{pair['a']}" # Take 'a' port as lag ID
+                 lag_id = f"lag{ lag_id(pair['a']) }" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {lag_id}" )
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
@@ -712,6 +724,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
    peers = ",".join( map(str, sorted( state.mc_lags[port].items() )) ) # No '[' ']' chars
 
    lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
+   _lag_id = lag_id( lag_port )
 
    # EVPN MC-LAG
    sys_bgp_evpn = {
@@ -723,13 +736,13 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
           "id": 1,
           "ethernet-segment": [
             {
-              "name": f"mc-lag{lag_port}",
+              "name": f"mc-lag{ _lag_id }",
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
               "esi": f"02:{mac}:00:00:{min(int(port),peer_port):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
-              "interface": f"lag{lag_port}",
+              "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active"
             }
           ]
@@ -778,7 +791,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
         }
        }
-   updates += [ (f'/interface[name=lag{lag_port}]',lag) ]
+   updates += [ (f'/interface[name=lag{ _lag_id }]',lag) ]
    # Also configure reload-delay timer on corresponding ethernet port
    if state.reload_delay_supported:
        updates += [ (f'/interface[name=ethernet-1/{port}]/ethernet', state.reload_delay ) ]
