@@ -743,7 +743,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
               "esi": f"02:{mac}:00:00:{min(int(port),peer_port):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
               "interface": f"lag{ _lag_id }",
-              "multi-homing-mode": "all-active"
+              "multi-homing-mode": "all-active" # default
             }
           ]
         }
