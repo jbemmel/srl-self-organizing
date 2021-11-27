@@ -684,7 +684,7 @@ if [[ "$ROLE" == "leaf" ]]; then
   if [[ "$PEER_ROUTER_ID" == "?" ]]; then
    VRF="none"
   fi
- elif [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+elif [[ "$USE_EVPN_OVERLAY" != "disabled" && "$PEER_TYPE"=="host" ]]; then
   VRF="overlay"
  fi
 fi
