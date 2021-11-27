@@ -243,7 +243,7 @@ module auto_config_agent {
 
             leaf reload-delay-secs {
               description "Length of reload-delay to configure on mc-lag interfaces, if supported. 0=disabled";
-              type uint32 { range "1 .. 86400" };
+              type uint32 { range "0 .. 86400"; }
               default 20;
             }
 
