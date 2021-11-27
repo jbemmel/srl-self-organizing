@@ -441,6 +441,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
    _lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
+   _vxlan_if = f"vxlan0.{port}"     # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag_id } ) ]
@@ -590,14 +591,14 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    if use_evpn_vxlan:
       vrf_inst.update(
       {
-        "vxlan-interface": [ { "name": f"vxlan0.0" } ],
+        "vxlan-interface": [ { "name": _vxlan_if } ],
         "protocols": {
          "bgp-evpn": {
           "srl_nokia-bgp-evpn:bgp-instance": [
            {
              "id": 1,
              "admin-state": "enable",
-             "vxlan-interface": f"vxlan0.0",
+             "vxlan-interface": _vxlan_if,
              "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
              "ecmp": 8,
              #"routes": {
@@ -660,7 +661,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
    updates += [ (f'/interface[name={_lag_id}]',lag) ]
    if use_evpn_vxlan:
        updates += [
-         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]', vxlan_if ),
+         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
          # ('/routing-policy', export_policy)
        ]
 
