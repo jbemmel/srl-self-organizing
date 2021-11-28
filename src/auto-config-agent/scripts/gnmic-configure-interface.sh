@@ -450,7 +450,6 @@ if [[ "$IGP" == "bgp_unnumbered" ]]; then
 BGP_UNNUMBERED_IMPORT_POLICY='"import-policy": "reject-ipv4-to-avoid-crash", "_annotate_import-policy": "Avoid bgp mgr crash on ipv4 routes with ipv6 nexthop",'
 cat > $temp_file << EOF
 {
-  "name": "reject-ipv4-to-avoid-crash",
   "default-action": { "accept": { } },
   "statement": [
    {
@@ -461,7 +460,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
-$GNMIC set --update-path /routing-policy/policy --update-file $temp_file
+$GNMIC set --update-path /routing-policy/policy[name=reject-ipv4-to-avoid-crash] --update-file $temp_file
 exitcode+=$?
 fi
 
