@@ -442,6 +442,29 @@ else
 BGP_IP_UNDERLAY=""
 fi
 
+#
+# For BGP unnumbered, provision a policy to avoid importing IPv4 routes
+# with IPv6 nexthops (bgp mgr crashes up to 21.6.4)
+#
+if [[ "$IGP" == "bgp_unnumbered" ]]; then
+BGP_UNNUMBERED_IMPORT_POLICY='"import-policy": "reject-ipv4-to-avoid-crash", "_annotate_import-policy": "Avoid bgp mgr crash on ipv4 routes with ipv6 nexthop",'
+cat > $temp_file << EOF
+{
+  "name": "reject-ipv4-to-avoid-crash",
+  "default-action": { "accept": { } },
+  "statement": [
+   {
+     "sequence-id": 10,
+     "match": { "family": "srl_nokia-common:ipv4-unicast" },
+     "action": { "reject": { } }
+   }
+  ]
+}
+EOF
+$GNMIC set --update-path /routing-policy/policy --update-file $temp_file
+exitcode+=$?
+fi
+
 if [[ "$DEFAULT_HOSTS_GROUP" != "" ]] && [[ "$SPINES_GROUP" != "" ]]; then
 SPINES_GROUP=",$SPINES_GROUP"
 fi
@@ -491,6 +514,7 @@ cat > $temp_file << EOF
   "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
   $DYNAMIC_NEIGHBORS
   $BGP_IP_UNDERLAY
+  ${BGP_UNNUMBERED_IMPORT_POLICY}
   "route-advertisement": {
     "rapid-withdrawal": true
   }
