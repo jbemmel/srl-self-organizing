@@ -4,7 +4,8 @@
     "evpn": {
       "model": "symmetric-irb",
       "overlay-as": 8675309,
-      "route-reflector": "spine"
+      "route-reflector": "spine",
+      "bgp-peering": "ipv4"
     },
     "lacp": "passive",
     "gateway": {
