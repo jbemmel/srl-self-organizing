@@ -990,6 +990,8 @@ def Handle_Notification(obj, state):
                     elif 'route_reflector_string' in evpn: # IP address
                         state.set_EVPN_RR( evpn['route_reflector_string']['value'] )
                         logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
+                    if 'bgp_peering' in evpn: # ipv4 or ipv6(default)
+                        state.evpn_bgp_peering = evpn['bgp_peering'][12:]
 
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_

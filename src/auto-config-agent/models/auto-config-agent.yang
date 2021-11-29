@@ -153,6 +153,14 @@ module auto_config_agent {
                    error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
                  }
              }
+             leaf bgp-peering {
+                description "IP version to use for iBGP EVPN peering, default ipv6";
+                type enumeration {
+                  enum ipv4;
+                  enum ipv6;
+                }
+                default "ipv6";
+             }
             }
             // Cannot reference system lacp settings group due to must clause
             leaf lacp {

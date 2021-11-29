@@ -298,11 +298,17 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
 }
 EOF
 
+if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
 IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+NBR_PREFIX="$ip1.$ip2.0.0/24"
+else
+# XXX very broad, could reduce this
+NBR_PREFIX="2001::/16"
+fi
 
 IFS='' read -r -d '' EVPN_IBGP_NEIGHBORS << EOF
 $EBGP_NEIGHBORS_COMMA {
-  "prefix": "$ip1.$ip2.0.0/24",
+  "prefix": "${NBR_PREFIX}",
   "peer-group": "evpn-leaves",
   "allowed-peer-as": [ "${evpn_overlay_as}" ]
 }
@@ -387,6 +393,12 @@ EOF
 if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
+
+if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
+  TRANSPORT="${ROUTER_ID}"
+else
+  TRANSPORT="2001::${ROUTER_ID//\./:}"
+fi
 IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
 {
   "group-name": "${EVPN_PEER_GROUPNAME}",
@@ -396,7 +408,7 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "peer-as": ${evpn_overlay_as},
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
-  "transport" : { "local-address" : "${ROUTER_ID}" },
+  "transport" : { "local-address" : "${TRANSPORT}" },
   "timers": { "connect-retry": 10 },
   "ipv4-unicast": { "admin-state": "disable" },
   "ipv6-unicast": { "admin-state": "disable" }
@@ -802,7 +814,10 @@ if [[ "$USE_EVPN_OVERLAY" != "disabled" && "$ROLE" == "leaf" && \
 cat > $temp_file << EOF
 { "admin-state": "enable", "peer-group": "${EVPN_PEER_GROUPNAME}", "description": "${EVPN_PEER_DESC}" }
 EOF
-echo "Adding ${PEER_TYPE} EVPN BGP peer ${PEER_ROUTER_ID}..."
+if [[ "$evpn_bgp_peering" == "ipv6" ]]; then
+PEER_ROUTER_ID="2001::${PEER_ROUTER_ID//\./:}"
+fi
+echo "Adding ${PEER_TYPE} EVPN BGP peer $evpn_bgp_peering ${PEER_ROUTER_ID}..."
 $GNMIC set --update-path /network-instance[name=default]/protocols/bgp/neighbor[peer-address=$PEER_ROUTER_ID] --update-file $temp_file
 exitcode+=$?
 fi
