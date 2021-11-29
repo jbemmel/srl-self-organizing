@@ -682,12 +682,17 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
          return # Skip
      rr_ids = state.evpn_rr.split(',')
    elif state.evpn_rr in ["superspine","auto_top_nodes"]:
-     rr_ids = [ state._router_id_by_level( state.max_level, n )
+     use_v6 = state.evpn_bgp_peering=="ipv6"
+     def fix_ip(i):
+         return ("2001::" + i.replace('.',':')) if use_v6 else i
+
+     rr_ids = [ fix_ip(state._router_id_by_level( state.max_level, n ))
                 for n in range(1,state.top_count+1) ]
 
      if not first_time: # Undo previous config
-        prefix = ".".join( str(state.loopbacks_prefix.network_address).split('.')[0:2] )
-        deletes=[f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}.*]']
+        ip_digits = str(state.loopbacks_prefix.network_address).split('.')[0:2]
+        prefix = ("2001::" + ":".join( ip_digits )) if use_v6 else ".".join( ip_digits )
+        deletes=[f'/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}*]']
    else:
      return # 'spine' handled in gnmic-configure-interface.sh
 
