@@ -762,7 +762,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
        return False
 
    # Update lag id to the minimum port, TODO cleanup single lags for higher ports
-   _lag_id = lag_id( min(mc_lag.values() ) )
+   _lag_id = lag_id( min([ min(l) for l in mc_lag.values() ]) )
 
    peers = ",".join( map(str, sorted( mc_lag.items() )) ) # No '[' ']' chars
 
