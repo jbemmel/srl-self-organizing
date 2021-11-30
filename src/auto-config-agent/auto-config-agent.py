@@ -425,8 +425,8 @@ def lag_id(port):
 # Converts an ethernet interface to a lag, creating/joining a LAN mac-vrf, irb,
 # optional: bgp-evpn l2 vni, ethernet segment with ESI
 ##
-def Convert_to_lag(state,port,ip,peer_data,vrf):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} peer_data={peer_data} vrf={vrf}")
+def Convert_to_lag(state,port,ip,peer_data):
+   logging.info(f"Convert_to_lag :: port={port} ip={ip} peer_data={peer_data}")
 
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
@@ -438,10 +438,15 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    deletes = deletes_for_port(port)
 
+   # Support multiple port-to-service mappings, 0 = all ports in service 1
+   _svc_id = state.svc_id( port )
+
+   _vrf = "overlay" if state.is_spine() else f"overlay-l2-{_svc_id}"
+
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
    _lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
-   _vxlan_if = f"vxlan0.{port}"     # vxlan0.0 is routed in case of symmetric
+   _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag_id } ) ]
@@ -520,6 +525,8 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
         # CHANGEME to support spine clusters (up to 16 links)
         'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname:02x}",
+        'admin-key': state.id_from_hostname, # range 1..65535
+        'system-priority': state.id_from_hostname, # range 0..65535, lower wins
        }
 
    use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
@@ -570,11 +577,6 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    # EVPN VXLAN interface
    VNI_EVI = 4095 # Cannot use 0
-   vxlan_if = {
-      "type": "srl_nokia-interfaces:bridged",
-      "ingress": { "vni": VNI_EVI },
-      "egress": { "source-ip": "use-system-ipv4-address" }
-   }
 
    # Could configure MAC table size here
    vrf_inst = {
@@ -585,7 +587,7 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
-   updates += [ (f'/network-instance[name={vrf}]', vrf_inst) ]
+   updates += [ (f'/network-instance[name={_vrf}]', vrf_inst) ]
 
    use_evpn_vxlan = state.evpn != 'disabled' and not state.is_spine()
    if use_evpn_vxlan:
@@ -660,8 +662,13 @@ def Convert_to_lag(state,port,ip,peer_data,vrf):
 
    updates += [ (f'/interface[name={_lag_id}]',lag) ]
    if use_evpn_vxlan:
+       vxlan_if = {
+          "type": "srl_nokia-interfaces:bridged",
+          "ingress": { "vni": VNI_EVI },
+          "egress": { "source-ip": "use-system-ipv4-address" }
+       }
        updates += [
-         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={port}]', vxlan_if ),
+         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={_svc_id}]', vxlan_if ),
          # ('/routing-policy', export_policy)
        ]
 
@@ -797,6 +804,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
            'interval' : "SLOW", # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
+           'admin-key': mac_id,
+           'system-priority': mac_id # lower = higher priority
         }
        }
    updates += [ (f'/interface[name=lag{ _lag_id }]',lag) ]
@@ -974,6 +983,8 @@ def Handle_Notification(obj, state):
                     state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
                 if 'max_lag_links' in data:
                     state.max_lag_links = int( data['max_lag_links']['value'] )
+                if 'ports_per_service' in data:
+                    state.ports_per_service = int( data['ports_per_service']['value'] )
 
                 state.evpn_overlay_as = 0
                 state.evpn = state.evpn_auto_lags = 'disabled'
@@ -1282,9 +1293,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
           'type': peer_type,
           'port': lldp_peer_port
         }
-        # Only support 1 overlay service
-        vrf = "overlay" if state.is_spine() else "overlay-l2"
-        Convert_to_lag( state, lldp_my_port, _ip, peer_data, vrf=vrf ) # No EVPN MC-LAG yet
+        Convert_to_lag( state, lldp_my_port, _ip, peer_data ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
@@ -1325,6 +1334,7 @@ class State(object):
         self.max_leaves = None
         self.max_level = 0 # Maximum topology level, learnt through LLDP
         self.top_count = 1 # Number of nodes at top, learnt through LLDP
+        self.ports_per_service = 0 # By default, map all ports to service 1
 
         self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
@@ -1344,6 +1354,15 @@ class State(object):
         self.mc_lags = {}
         self.loopbacks_prefix = []
         self.evpn_rr = None
+
+    def svc_id(self,port):
+        """
+        Support various port-to-service mappings
+        """
+        if self.ports_per_service == 0:
+            return 1 # 0 -> all ports in service 1
+        else:
+            return (port % self.ports_per_service + 1) # 1,2,3...8
 
     # Use single, globally shared gNMI connection
     def connectGNMI(self):

@@ -101,6 +101,14 @@ module auto_config_agent {
                 type uint8;
                 default 4; // Too high -> out of peer link IP space
             }
+            leaf ports-per-service {
+                description "Controls how access ports are mapped to services, default 0 = all ports in 1 service.
+                             service-id = <port> modulo <ports-per-service>";
+                type uint8 { range "0 .. 8"; }
+                default 0; // all ports in 1 service
+            }
+
+
             container evpn {
              presence "EVPN settings";
              leaf model {
