@@ -733,19 +733,19 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
    logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port={peer_port}")
 
-   if port in state.mc_lags:
-      state.mc_lags[port].update( { peer_leaf : peer_port } )
+   # lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
+   _lag_id = lag_id( port )
+   if _lag_id in state.mc_lags:
+       mc_lag = state.mc_lags[_lag_id]
+       mc_lag.update( { peer_leaf : peer_port } )
    else:
-      state.mc_lags[port] = { peer_leaf : peer_port }
+       mc_lag = state.mc_lags[_lag_id] = { peer_leaf : peer_port }
 
-   if len( state.mc_lags[port] ) > 3:
+   if len( mc_lag ) > 3:
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
        return False
 
-   peers = ",".join( map(str, sorted( state.mc_lags[port].items() )) ) # No '[' ']' chars
-
-   lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
-   _lag_id = lag_id( lag_port )
+   peers = ",".join( map(str, sorted( mc_lag.items() )) ) # No '[' ']' chars
 
    # EVPN MC-LAG
    sys_bgp_evpn = {
@@ -803,7 +803,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
        leaf_pair_lag = port in state.leaf_pairs
        # Both members on the split side need same ID, also when spine facing
        mac_id = state.id_from_hostname # if leaf_pair_lag else 0
-       member_count = len( state.mc_lags[port] ) + 1
+       member_count = len( mc_lag ) + 1
        lag['lag'] = {
         'lag-type': 'lacp',
         'lacp': {
