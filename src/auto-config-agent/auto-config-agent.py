@@ -540,7 +540,7 @@ def Convert_to_lag(state,port,ip,peer_data):
     "admin-state": "enable",
     "subinterface": [
     {
-      "index": 0, # Port independent
+      "index": _svc_id, # Port independent, per service
       "admin-state": "enable",
       "ipv4": {
         "address": [
@@ -635,11 +635,11 @@ def Convert_to_lag(state,port,ip,peer_data):
       })
 
    if use_irb:
-      vrf_inst['interface'] += [ { "name" : "irb0.0" } ]
+      vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
       # XXX assumes 'overlay' ip-vrf created elsewhere
       updates += [
         (f'/interface[name=irb0]', irb_if),
-        (f'/network-instance[name=overlay]/interface[name=irb0.0]', {}),
+        (f'/network-instance[name=overlay]/interface[name=irb0.{_svc_id}]', {}),
       ]
 
       if state.evpn != 'disabled':
@@ -745,6 +745,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
        return False
 
+   # Update lag id to the minimum port, TODO cleanup single lags for higher ports
+   _lag_id = lag_id( min(mc_lag.values() ) )
+
    peers = ",".join( map(str, sorted( mc_lag.items() )) ) # No '[' ']' chars
 
    # EVPN MC-LAG
@@ -792,7 +795,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
      ('/system/network-instance/protocols', sys_bgp_evpn ),
    ]
    if state.evpn != "l2_only_leaves":
-       updates += [ (f'/interface[name=irb0]/subinterface[index={lag_port}]/ipv4/arp', arp) ]
+       updates += [ (f'/interface[name=irb0]/subinterface[index={_lag_id}]/ipv4/arp', arp) ]
 
    lag = {
     'description': f"Auto-discovered MC-LAG with {peers}"
