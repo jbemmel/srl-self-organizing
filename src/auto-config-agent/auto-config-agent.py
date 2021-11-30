@@ -480,11 +480,12 @@ def Convert_to_lag(state,port,ip,peer_data):
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
                  # mc_lag = True
-                 _lag_id = lag_id(pair['a'])
+                 _base_port = min(pair['a'],pair['b'])
+                 _lag_id = lag_id( _base_port )
                  _lag = f"lag{_lag_id}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag}" )
-                 deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
+                 deletes += deletes_for_port( pair['b' if _base_port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
                    { 'aggregate-id' : _lag, **state.reload_delay } ),
@@ -492,10 +493,10 @@ def Convert_to_lag(state,port,ip,peer_data):
                    { 'aggregate-id' : _lag, **state.reload_delay } ),
                  ]
 
-                 # Record port number for mc-lag conversion
+                 # Record port number for mc-lag conversion, if any
                  if not state.is_spine():
-                    state.leaf_pairs[ pair['a'] ] = pair['a']
-                    state.leaf_pairs[ pair['b'] ] = pair['a']
+                    state.leaf_pairs[ pair['a'] ] = _base_port
+                    state.leaf_pairs[ pair['b'] ] = _base_port
 
                     # Announce virtual port pair community, using both ports
                     Announce_LLDP_using_EVPN( state,
@@ -748,8 +749,8 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
    logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port_list={peer_port_list}")
 
-   # lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
-   _lag_id = lag_id( port )
+   # Check if port is member of a local leaf-pair group
+   _lag_id = lag_id( state.leaf_pairs[port] if port in state.leaf_pairs else port )
    entry = { peer_leaf: peer_port_list }
    if _lag_id in state.mc_lags:
        mc_lag = state.mc_lags[_lag_id]
@@ -761,10 +762,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
        return False
 
-   # Update lag id to the minimum port, TODO cleanup single lags for higher ports
-   _lag_id = lag_id( min([ min(l) for l in mc_lag.values() ]) )
-
-   peers = ",".join( map(str, sorted( mc_lag.items() )) ) # No '[' ']' chars
+   peers = ",".join( map(str, sorted( mc_lag.items() )) )
 
    # EVPN MC-LAG
    sys_bgp_evpn = {
@@ -781,7 +779,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
               "esi": f"02:{mac}:00:00:{min(peer_port_list+[_lag_id]):02x}",
-              "_annotate_esi": "EVPN MC-LAG with " + re.sub( '\[|\]','',peers),
+              "_annotate_esi": "EVPN MC-LAG with " + peers,
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
             }
@@ -814,7 +812,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
        updates += [ (f'/interface[name=irb0]/subinterface[index={_lag_id}]/ipv4/arp', arp) ]
 
    lag = {
-    'description': f"Auto-discovered MC-LAG with {peers}"
+    'description': "Auto-discovered MC-LAG with " + re.sub('\[|\]','',peers)
    }
 
    # Update LAG to use LACP if configured
@@ -825,6 +823,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
        member_count = len( mc_lag ) + 1
        lag['lag'] = {
         'lag-type': 'lacp',
+        'member-speed': "100G",
         'lacp': {
            'interval' : "SLOW", # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
@@ -833,10 +832,10 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
            'system-priority': mac_id # lower = higher priority
         }
        }
-   updates += [ (f'/interface[name=lag{ _lag_id }]',lag) ]
-   # Also configure reload-delay timer on corresponding ethernet port
-   if state.reload_delay_supported:
-       updates += [ (f'/interface[name=ethernet-1/{port}]/ethernet', state.reload_delay ) ]
+   updates += [ (f'/interface[name=lag{ _lag_id }]',lag),
+     (f'/interface[name=ethernet-1/{port}]/ethernet',
+      # Also configure reload-delay timer on corresponding ethernet port
+      { 'aggregate-id' : f"lag{_lag_id }", **state.reload_delay } ) ]
 
    logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
    state.gnmi.set( encoding='json_ietf', update=updates )
