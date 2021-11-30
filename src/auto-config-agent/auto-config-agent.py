@@ -485,7 +485,7 @@ def Convert_to_lag(state,port,ip,peer_data):
                  _lag = f"lag{_lag_id}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag}" )
-                 deletes += deletes_for_port( pair['b' if _base_port==pair['a'] else 'a'] )
+                 deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
                    { 'aggregate-id' : _lag, **state.reload_delay } ),
@@ -832,11 +832,14 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
            'system-priority': mac_id # lower = higher priority
         }
        }
+
    updates += [ (f'/interface[name=lag{ _lag_id }]',lag),
      (f'/interface[name=ethernet-1/{port}]/ethernet',
       # Also configure reload-delay timer on corresponding ethernet port
       { 'aggregate-id' : f"lag{_lag_id }", **state.reload_delay } ) ]
 
+   # should already be clear of subinterfaces
+   # deletes = [ f'/interface[name=ethernet-1/{port}]/subinterface[index=*]' ]
    logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
    state.gnmi.set( encoding='json_ietf', update=updates )
 
