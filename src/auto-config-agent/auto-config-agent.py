@@ -750,7 +750,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
 
    # lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
    _lag_id = lag_id( port )
-   entry = { peer_leaf: ",".join(map(str,peer_port_list)) }
+   entry = { peer_leaf: peer_port_list }
    if _lag_id in state.mc_lags:
        mc_lag = state.mc_lags[_lag_id]
        mc_lag.update( entry )
@@ -781,7 +781,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
               "esi": f"02:{mac}:00:00:{min(peer_port_list+[_lag_id]):02x}",
-              "_annotate_esi": f"EVPN MC-LAG with {peers}",
+              "_annotate_esi": "EVPN MC-LAG with " + re.sub( '\[\]','',peers),
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
             }
