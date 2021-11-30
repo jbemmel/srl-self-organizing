@@ -399,12 +399,20 @@ if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
 else
   TRANSPORT="2001::${ROUTER_ID//\./:}"
 fi
+
+if [[ "$evpn" == "l2_only_leaves" ]]; then
+  EVPN_EXPORT_POLICY="accept-all"
+else
+  # Filter routes from overlay internal links
+  EVPN_EXPORT_POLICY="reject-link-routes"
+fi
+
 IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
 {
   "group-name": "${EVPN_PEER_GROUPNAME}",
   "admin-state": "enable",
   "import-policy": "accept-all",
-  "export-policy": "reject-link-routes",
+  "export-policy": "${EVPN_EXPORT_POLICY}",
   "peer-as": ${evpn_overlay_as},
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
   "evpn": { "admin-state": "enable" },
