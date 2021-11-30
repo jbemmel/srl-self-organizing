@@ -146,7 +146,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
        value = { "member": [ f"{port}:" + lldp_community ] }
 
        # Save locally too, excluding port
-       state.local_lldp[ lldp_community ] = port
+       state.local_lldp[ lldp_community ] = (port,False)
 
        updates = [('/routing-policy/community-set[name=LLDP]',value)]
 
@@ -172,7 +172,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
                    "_annotate": f"for EVPN auto-lag discovery on {desc if desc else f'port {port}' }" } ] } ) ]
 
-       state.local_lldp[ chassis_mac ] = port # MAC uses CAPITALS
+       state.local_lldp[ chassis_mac ] = (port, False) # MAC uses CAPITALS
     else:
         if state.evpn_auto_lags!="disabled":
            logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
@@ -270,19 +270,21 @@ class EVPNRouteMonitoringThread(Thread):
                        parts = p.split(':')
                        key = parts[1] + ':' + parts[2] # 48-bit MAC in 2 parts
                        if key in self.state.local_lldp:
-                           lag_port = self.state.local_lldp[ key ]
-                           logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id}" )
-                           m = int(parts[1]) << 24 + int(parts[2])
-                           mac = []
-                           for i in range(0,6):
-                               mac += [ f'{(m&0xff):02X}' ]
-                               m >>= 8
-                           mac = ":".join(mac)
-                           try:
-                              # This repeatedly provisions the same thing...
-                              Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]) )
-                           except Exception as ex:
-                              logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
+                           lag_port, provisioned = self.state.local_lldp[ key ]
+                           logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id} provisioned={provisioned}" )
+                           if not provisioned:
+                             m = int(parts[1]) << 24 + int(parts[2])
+                             mac = []
+                             for i in range(0,6):
+                                 mac += [ f'{(m&0xff):02X}' ]
+                                 m >>= 8
+                             mac = ":".join(mac)
+                             try:
+                                Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]) )
+                                # Avoid repeated calls
+                                self.state.local_lldp[ key ] = (lag_port, True)
+                             except Exception as ex:
+                                logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
 
    def checkIPv6Routes(self,gnmiClient):
      """
@@ -304,15 +306,17 @@ class EVPNRouteMonitoringThread(Thread):
                                for i in [int(b,16) if b!='' else 0 ] ] )
              logging.info( f"Process {encoded_lldp} from {peer_id}: {mac}" )
              if mac in self.state.local_lldp:
-                 lag_port = self.state.local_lldp[ mac ]
-                 peer_router_id = encoded_parts[2:4] # 2 x 16 bits
-                 peer_port = int(encoded_parts[4])
-                 # TODO update ipv6 route (tag or community or IP) to reflect count of peers
-                 try:
-                    Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port )
-                 except Exception as ex:
-                    traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
-                    logging.error( f"checkIPv6Routes: {ex} ~ {traceback_str}" )
+                 lag_port, provisioned = self.state.local_lldp[ mac ]
+                 if not provisioned:
+                   peer_router_id = encoded_parts[2:4] # 2 x 16 bits
+                   peer_port = int(encoded_parts[4])
+                   # TODO update ipv6 route (tag or community or IP) to reflect count of peers
+                   try:
+                      Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port )
+                      self.state.local_lldp[ mac ] = (lag_port,True)
+                   except Exception as ex:
+                      traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
+                      logging.error( f"checkIPv6Routes: {ex} ~ {traceback_str}" )
 
 ############################################################
 ## Function to populate state of agent config
