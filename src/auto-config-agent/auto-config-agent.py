@@ -133,12 +133,13 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 #
 # Can also have LAGs to spines ( options: routed(default), static LAG, LACP )
 #
-def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
-    logging.info(f"Announce_LLDP_using_EVPN({state.evpn_auto_lags}) :: {port}={chassis_mac}")
+def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
+    logging.info(f"Announce_LLDP_using_EVPN({state.evpn_auto_lags}) :: {portlist}={chassis_mac}")
     bytes = chassis_mac.split(':')
 
     deletes = []
     if state.evpn_auto_lags == "large_communities":
+       port = min(portlist) # Only support 1 port for now
        c_b = ''.join( bytes[0:3] )
        c_c = ''.join( bytes[3:6] )
        # marker = "origin:65537:0" # Well-known LLDP event community, static. Needed?
@@ -168,11 +169,18 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,port,desc=None):
        # Set 'local' bit -> 0xfd
        _r = [ f'{int(i,16):02x}' for i in state.router_id.split('.') ]
        router_id = f'{_r[0]}{_r[1]}:{_r[2]}{_r[3]}'
-       encoded_ipv6 = f'fdad::{router_id}:{int(port):02x}:{":".join(pairs)}/128'
-       updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
-                   "_annotate": f"for EVPN auto-lag discovery on {desc if desc else f'port {port}' }" } ] } ) ]
 
-       state.local_lldp[ chassis_mac ] = (port, False) # MAC uses CAPITALS
+       enc_port = base_port = min(portlist)
+       if len(portlist)>1:
+           for p in portlist:
+               if p!=base_port:
+                   enc_port |= (1<<(8+p-base_port))
+
+       encoded_ipv6 = f'fdad::{router_id}:{enc_port:04x}:{":".join(pairs)}/128'
+       updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
+                   "_annotate": f"for EVPN auto-lag discovery on {portlist}" } ] } ) ]
+
+       state.local_lldp[ chassis_mac ] = (base_port, False) # MAC uses CAPITALS
     else:
         if state.evpn_auto_lags!="disabled":
            logging.error( f"Unsupported EVPN auto-lag value: {state.evpn_auto_lags}")
@@ -280,7 +288,8 @@ class EVPNRouteMonitoringThread(Thread):
                                  m >>= 8
                              mac = ":".join(mac)
                              try:
-                                Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, int(parts[0]) )
+                                # XXX only supports single port
+                                Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, [ int(parts[0],16) ] )
                                 # Avoid repeated calls
                                 self.state.local_lldp[ key ] = (lag_port, True)
                              except Exception as ex:
@@ -309,10 +318,17 @@ class EVPNRouteMonitoringThread(Thread):
                  lag_port, provisioned = self.state.local_lldp[ mac ]
                  if not provisioned:
                    peer_router_id = encoded_parts[2:4] # 2 x 16 bits
-                   peer_port = int(encoded_parts[4])
+                   peer_port = int(encoded_parts[4],16) # 16 bits, can be multiple ports
+
+                   peer_ports = [ peer_port & 0xff ] # Lower 8 bits = min base port
+                   other_ports = peer_port>>8
+                   if other_ports!=0:
+                       for bit in range(0,8): # base port + [1..9]
+                           if other_ports&(1<<bit):
+                              peer_ports += [ peer_ports[0] + (bit+1) ]
                    # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                    try:
-                      Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_port )
+                      Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_ports )
                       self.state.local_lldp[ mac ] = (lag_port,True)
                    except Exception as ex:
                       traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
@@ -481,10 +497,9 @@ def Convert_to_lag(state,port,ip,peer_data):
                     state.leaf_pairs[ pair['a'] ] = pair['a']
                     state.leaf_pairs[ pair['b'] ] = pair['a']
 
-                    # Announce virtual port pair community, using combined ports
-                    pair_port = (pair['a'] << 4)&0xf0 + (pair['b'] & 0x0f)
-                    Announce_LLDP_using_EVPN( state, f"00:00:00:00:00:{int(_pk):02X}",
-                      pair_port, desc=f"leaf-pair ports {pair['a']}+{pair['b']}" )
+                    # Announce virtual port pair community, using both ports
+                    Announce_LLDP_using_EVPN( state,
+                      f"00:00:00:00:00:{int(_pk):02X}", [ pair['a'], pair['b'] ] )
                  else:
                     spine_mc_lag = True # Only on spine, don't configure system-id twice differently
              else:
@@ -730,16 +745,16 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 # Called when an EVPN community match is discovered
 # Assumes lag is already created
 #
-def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
-   logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port={peer_port}")
+def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
+   logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port_list={peer_port_list}")
 
    # lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
    _lag_id = lag_id( port )
    if _lag_id in state.mc_lags:
        mc_lag = state.mc_lags[_lag_id]
-       mc_lag.update( { peer_leaf : peer_port } )
+       mc_lag.update( { peer_leaf : ",".join(peer_port_list) } )
    else:
-       mc_lag = state.mc_lags[_lag_id] = { peer_leaf : peer_port }
+       mc_lag = state.mc_lags[_lag_id] = { peer_leaf : ",".join(peer_port_list) }
 
    if len( mc_lag ) > 3:
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
@@ -764,7 +779,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
-              "esi": f"02:{mac}:00:00:{min(int(port),peer_port):02x}",
+              "esi": f"02:{mac}:00:00:{min(peer_port_list+[_lag_id]):02x}",
               "_annotate_esi": f"EVPN MC-LAG with {peers}",
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
@@ -1121,7 +1136,7 @@ def Handle_Notification(obj, state):
 
           # Could also announce communities for spines
           if state.get_role() == "leaf":
-             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, int(my_port_id) )
+             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
           else:
              logging.info( f"Not creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
