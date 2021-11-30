@@ -750,11 +750,12 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
 
    # lag_port = state.leaf_pairs[port] if port in state.leaf_pairs else port
    _lag_id = lag_id( port )
+   entry = { peer_leaf: ",".join(map(str,peer_port_list)) }
    if _lag_id in state.mc_lags:
        mc_lag = state.mc_lags[_lag_id]
-       mc_lag.update( { peer_leaf : ",".join(peer_port_list) } )
+       mc_lag.update( entry )
    else:
-       mc_lag = state.mc_lags[_lag_id] = { peer_leaf : ",".join(peer_port_list) }
+       mc_lag = state.mc_lags[_lag_id] = entry
 
    if len( mc_lag ) > 3:
        logging.error( "Platform does not support MC-LAG with more than 4 members" )
