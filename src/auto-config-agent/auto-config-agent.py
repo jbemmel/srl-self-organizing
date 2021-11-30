@@ -445,11 +445,12 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
-   _lag_id = f"lag{ lag_id(port) }" # Maximum lag ID is 32, max 100G port is 56
+   _lag_id = lag_id(port)
+   _lag = f"lag{ _lag_id  }" # Maximum lag ID is 32, max 100G port is 56
    _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
    lag_desc = f"Single link ethernet-1/{port}"
-   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag_id } ) ]
+   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag } ) ]
    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
       pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
@@ -459,15 +460,16 @@ def Convert_to_lag(state,port,ip,peer_data):
              pair[ _ab ] = port # peer_data['port']
              if len(pair)==2: # XXX Could have up to 4 ports
                  # mc_lag = True
-                 _lag_id = f"lag{ lag_id(pair['a']) }" # Take 'a' port as lag ID
+                 _lag_id = lag_id(pair['a'])
+                 _lag = f"lag{_lag_id}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
-                 logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag_id}" )
+                 logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag}" )
                  deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
                  updates = [
                   (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
-                   { 'aggregate-id' : _lag_id, **state.reload_delay } ),
+                   { 'aggregate-id' : _lag, **state.reload_delay } ),
                   (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',
-                   { 'aggregate-id' : _lag_id, **state.reload_delay } ),
+                   { 'aggregate-id' : _lag, **state.reload_delay } ),
                  ]
 
                  # Record port number for mc-lag conversion
@@ -525,7 +527,7 @@ def Convert_to_lag(state,port,ip,peer_data):
 
         # CHANGEME to support spine clusters (up to 16 links)
         'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname:02x}",
-        'admin-key': state.id_from_hostname, # range 1..65535
+        'admin-key': _lag_id, # range 1..65535, must be unique across all lags
         'system-priority': state.id_from_hostname, # range 0..65535, lower wins
        }
 
@@ -583,7 +585,7 @@ def Convert_to_lag(state,port,ip,peer_data):
      "type": "ip-vrf" if is_routed else "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
-     "interface": [ { "name": f"{_lag_id}.0" } ],
+     "interface": [ { "name": f"{_lag}.0" } ],
 
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
@@ -660,7 +662,7 @@ def Convert_to_lag(state,port,ip,peer_data):
             '_annotate_stale-time': ANNOTATION
           }
 
-   updates += [ (f'/interface[name={_lag_id}]',lag) ]
+   updates += [ (f'/interface[name={_lag}]',lag) ]
    if use_evpn_vxlan:
        vxlan_if = {
           "type": "srl_nokia-interfaces:bridged",
@@ -804,7 +806,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port):
            'interval' : "SLOW", # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
-           'admin-key': mac_id,
+           'admin-key': _lag_id, # Must be unique across all lags
            'system-priority': mac_id # lower = higher priority
         }
        }
