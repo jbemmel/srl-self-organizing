@@ -779,7 +779,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
               "esi": f"02:{mac}:00:00:{min(peer_port_list+[_lag_id]):02x}",
-              "_annotate_esi": "EVPN MC-LAG with " + peers,
+              "_annotate_esi": "EVPN MC-LAG with " + peers + ", bytes 2-7 form auto-derived route target see RFC7432 7.6",
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
             }
@@ -1111,12 +1111,14 @@ def Handle_Notification(obj, state):
           # Update max level in topology, for EVPN RR ID calculation
           level_updated = state.update_max_level( peer_sys_name )
 
+          desc = obj.lldp_neighbor.data.system_description if obj.lldp_neighbor.data.HasField('system_description') else "?"
+
           # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
              node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
              if node_id == 0:
                 state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
-                  peer_sys_name, obj.lldp_neighbor.data.system_description )
+                  peer_sys_name, obj.lldp_neighbor.key.chassis_id, desc )
                 return False; # Unable to continue configuration
              state._determine_local_as(node_id) # XXX todo reorganize
 
@@ -1135,24 +1137,27 @@ def Handle_Notification(obj, state):
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
-            peer_sys_name, obj.lldp_neighbor.data.system_description if m else 'host', router_id_changed )
-
-          # Could also announce communities for spines
-          if state.get_role() == "leaf":
-             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
-          else:
-             logging.info( f"Not creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
+            peer_sys_name, desc if m else 'host', router_id_changed )
 
           if router_id_changed:
              for intf in state.pending_peers:
-                 _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc = state.pending_peers[intf]
+                 _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
                  configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+                 if state.get_role() == "leaf":
+                     Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
 
              if state.get_role()=="leaf":
                 Update_EVPN_RR_Neighbors( state, first_time=True )
                 if state.evpn_auto_lags != "disabled":
                    # XXX assumes router_id wont change after this point
                    EVPNRouteMonitoringThread(state).start()
+
+          # Could also announce communities for spines
+          if state.get_role() == "leaf" and hasattr(state,"router_id"):
+             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
+          else:
+             logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
+
 
     else:
         logging.info(f"Unexpected notification : {obj}")
@@ -1298,7 +1303,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      logging.info(f"Configuring link {link_name} local_port={lldp_my_port} peer_port={lldp_peer_port} ip={_ip} peer={_peer}")
      script_update_interface(
          state,
-         intf_name,
+         intf_name, # Name of the interface being provisioned
          _ip,
          lldp_peer_desc,
          _peer if ((peer_type=='spine' and _r==1 and state.evpn!="l2_only_leaves")

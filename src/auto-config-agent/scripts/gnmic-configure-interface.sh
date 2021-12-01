@@ -493,6 +493,10 @@ if [[ "$SPINES_GROUP" != "" ]] && [[ "$EVPN_PEER_GROUP" != "" ]]; then
 EVPN_PEER_GROUP=",$EVPN_PEER_GROUP"
 fi
 
+if [[ "$evpn" != "l2_only_leaves" ]]; then
+IBGP_PREFERENCE='"preference": { "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },'
+fi
+
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "evpn": {
   "rapid-update": true,
@@ -500,8 +504,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
   "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
 },
 "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
-"preference": {
- "ibgp": 171, "_annotate_ibgp": "Lower than BGP routes received from hosts" },
+${IBGP_PREFERENCE}
 $DEFAULT_DYNAMIC_HOST_PEERING
 "group": [
     $DEFAULT_HOSTS_GROUP
