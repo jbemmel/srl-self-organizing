@@ -695,13 +695,11 @@ def Convert_to_lag(state,port,ip,peer_data):
        ]
 
    logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                     username="admin",password="admin",insecure=True) as c:
-      try:
-         c.set( encoding='json_ietf', delete=deletes, update=updates )
-      except Exception as ex:
-         # Dont quit agent. Usually means 'overlay' didn't get created
-         logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
+   try:
+       state.gnmi.set( encoding='json_ietf', delete=deletes, update=updates )
+   except Exception as ex:
+       # Dont quit agent. Usually means 'overlay' didn't get created
+       logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
 
 def Update_EVPN_RR_Neighbors(state,first_time=False):
 
@@ -734,13 +732,11 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
       }
       updates.append( (_p, _v) )
 
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                   username="admin",password="admin",insecure=True) as c:
-     try:
-        c.set( encoding='json_ietf', delete=deletes, update=updates )
-     except Exception as ex:
-        # Dont quit agent. Usually means 'overlay' didn't get created
-        logging.error( f"Exception in Update_EVPN_RR_Neighbors gNMI set: {ex} state={state}" )
+   try:
+       state.gnmi.set( encoding='json_ietf', delete=deletes, update=updates )
+   except Exception as ex:
+       # Dont quit agent. Usually means 'overlay' didn't get created
+       logging.error( f"Exception in Update_EVPN_RR_Neighbors gNMI set: {ex} state={state}" )
 
 #
 # Called when an EVPN community match is discovered
@@ -847,15 +843,15 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list):
 # Configures the default network instance to use BGP unnumbered between
 # spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
 ##
-def Configure_BGP_unnumbered(router_id,local_as,port):
+def Configure_BGP_unnumbered(state,port):
    logging.info(f"Configure_BGP_unnumbered :: port={port}")
    eth = f'name=ethernet-1/{port}'
 
    # This gets updated every time an interface is added
    frr = {
     "admin-state": "enable",
-    "router-id" : router_id,
-    "autonomous-system" : local_as,
+    "router-id" : state.router_id,
+    "autonomous-system" : state.local_as,
     "bgp" : {
      "admin-state": "enable",
     }
@@ -869,9 +865,7 @@ def Configure_BGP_unnumbered(router_id,local_as,port):
              (f'/network-instance[name=default]/interface[{eth}.0]', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                     username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', update=updates )
+   state.gnmi.set( encoding='json_ietf', update=updates )
 
 #
 # Creates a special IP-VRF to announce a loopback RT5 route with extended
@@ -1332,7 +1326,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      if state.use_bgp_unnumbered:
          if (peer_type!='host' and state.get_role() != 'endpoint'):
-             Configure_BGP_unnumbered( state.router_id, state.local_as, lldp_my_port )
+             Configure_BGP_unnumbered( state, lldp_my_port )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
