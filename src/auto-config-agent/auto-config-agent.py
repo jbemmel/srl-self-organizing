@@ -1111,7 +1111,8 @@ def Handle_Notification(obj, state):
           # Update max level in topology, for EVPN RR ID calculation
           level_updated = state.update_max_level( peer_sys_name )
 
-          desc = obj.lldp_neighbor.data.system_description if obj.lldp_neighbor.data.HasField('system_description') else "?"
+          desc = obj.lldp_neighbor.data.system_description or "?"
+          logging.info( f"LLDP system desc: {desc}" )
 
           # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
