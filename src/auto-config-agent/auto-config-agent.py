@@ -46,7 +46,7 @@ stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
 # Requires Unix socket to be enabled in config
 gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                  username="admin",password="admin",insecure=True,debug=True)
+                  username="admin",password="admin",insecure=True,use_lock=True)
 gnmiConnected = False
 
 def gnmiConnection( callback ):
@@ -211,7 +211,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
         return False
 
     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
-    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates, delete=deletes, use_lock=True ) )
+    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates, delete=deletes ) )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
 from threading import Thread
@@ -979,7 +979,7 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
       ip_vrf['protocols']['bgp-vpn']['bgp-instance'][0]['route-target']['export-rt'] = lldp_rt
 
    logging.info(f"gNMI SET updates={updates}" )
-   gnmiclient.set( encoding='json_ietf', update=updates, use_lock=True )
+   gnmiclient.set( encoding='json_ietf', update=updates )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
