@@ -7,7 +7,8 @@ auto_config_agent:
    failure-threshold: 100
    failure-action: wait=forever
    author: 'Nokia'
-   version-command: ' cat build_version'
+   # Needs to be an absolute path, not every context runs in the correct path
+   version-command: ' cat /opt/demo-agents/auto-config-agent/build_version'
    yang-modules:
        names:
            - "auto-config-agent"
