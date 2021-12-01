@@ -45,23 +45,30 @@ metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
 # Requires Unix socket to be enabled in config
-# gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-#                  username="admin",password="admin",insecure=True)
-
-from threading import Lock
-gnmiLock = Lock()
+gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                  username="admin",password="admin",insecure=True)
 
 def gnmiConnection( callback ):
-  logging.info( "Opening new gNMI connection..." )
-  with gnmiLock:
-    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                  username="admin",password="admin",insecure=True) as c:
-      callback(c)
-    # connection gets closed upon exit
-    logging.info( "...gNMI connection closed..." )
-  logging.info( "...gNMI lock released" )
+  global gnmi
+  if not hasattr(gnmi,'__channel'):
+      logging.info( "Connecting global gNMI connection..." )
+      gnmi.connect()
+      logging.info( "global gNMI connection CONNECTED(?)" )
+  logging.info( "Returning global gNMI connection..." )
+  callback( gnmi )
 
+# from threading import Lock
+# gnmiLock = Lock() # Results in deadlock from subscription
 
+# def gnmiConnection( callback ):
+#   logging.info( "Opening new gNMI connection..." )
+#   with gnmiLock:
+#     with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+#                   username="admin",password="admin",insecure=True) as c:
+#       callback(c)
+#     # connection gets closed upon exit
+#     logging.info( "...gNMI connection closed..." )
+#   logging.info( "...gNMI lock released" )
 
 ############################################################
 ## Subscribe to required event
