@@ -48,11 +48,18 @@ stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 # gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
 #                  username="admin",password="admin",insecure=True)
 
+from threading import Lock
+gnmiLock = Lock()
+
 def gnmiConnection( callback ):
-  with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+  logging.info( "Opening new gNMI connection..." )
+  with gnmiLock:
+    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                   username="admin",password="admin",insecure=True) as c:
-    callback(c)
-  # connection gets closed upon exit
+      callback(c)
+    # connection gets closed upon exit
+    logging.info( "...gNMI connection closed..." )
+  logging.info( "...gNMI lock released" )
 
 
 
@@ -1606,7 +1613,7 @@ if __name__ == '__main__':
     log_filename = '{}/auto_config_agent.log'.format(stdout_dir)
     logging.basicConfig(
       handlers=[RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)],
-      format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
+      format='%(asctime)s,%(msecs)03d %(name)s %(threadName)s %(levelname)s %(message)s',
       datefmt='%H:%M:%S', level=logging.INFO)
 
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
