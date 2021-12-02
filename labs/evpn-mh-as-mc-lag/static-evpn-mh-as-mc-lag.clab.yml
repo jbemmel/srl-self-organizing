@@ -1,0 +1,42 @@
+#
+# Based on Fig 13 in https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE17581AAAA01_V1_SR%20Linux%20R21.6%20EVPN-VXLAN%20User%20Guide.pdf
+#
+
+name: static-evpn-mh-as-mc-lag
+
+topology:
+  kinds:
+    srl:
+      image: ghcr.io/nokia/srlinux
+    linux:
+      # image: ghcr.io/hellt/network-multitool
+      image: alpine-with-lldp:latest # Custom built image with lldpad
+
+  nodes:
+    # ---- Leaf pair 2a/2b ----
+    leaf1a:
+      kind: srl
+      group: leaves
+      type: ixrd2
+      startup-config: leaf1a_config.json
+    leaf1b:
+      kind: srl
+      group: leaves
+      type: ixrd2
+      startup-config: leaf1b_config.json
+
+
+    server3:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.server3:/etc/network/interfaces
+
+  links:
+    # Leaf interconnects for EVPN MC-LAG sync, 25G ports
+    - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
+
+    # Server3 is dual connected
+    - endpoints: ["server3:eth1", "leaf1a:e1-2"]
+    - endpoints: ["server3:eth2", "leaf1b:e1-2"]
