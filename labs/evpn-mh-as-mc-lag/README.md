@@ -16,4 +16,6 @@ An EVPN Instance is a 16-bit value used to identify unique EVPN services inside 
 1. 1:1 Single broadcast domain (e.g. subnet) <-> unique EVI
 2. n:1 Multiple broadcast domains -> single EVI
 
-In the former case, it is possible to [auto-derive](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2.1) EVPN RD and RT values as \<router-id\>:VNI and 2-byte-AS:VNI respectively.
+In the former case, it is possible to [auto-derive](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2.1) EVPN RD and RT values as \<router-id\>:VNI and \<2-byte-AS\>:VNI respectively.
+
+In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assume the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI.
