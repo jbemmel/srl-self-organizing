@@ -30,12 +30,16 @@ topology:
       group: leaves
       # type: ixrd2
       binds:
-        # - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
-        - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
-        # - cumulus1_leaf1a_interfaces:/etc/network/interfaces.d/host-mounts
-        # - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
-        - cumulus_enable_nvue.firstboot:/usr/lib/cumulus/firstboot-after-networking
-        - cumulus_leaf1a_nvue_startup.yaml:/etc/nvue.d/startup.yaml
+      - /lib/modules:/lib/modules:ro # for ebtables module
+      # - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+      - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
+      # - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
+      # Tried this way - has several issues
+      # - cumulus_enable_nvue.firstboot:/usr/lib/cumulus/firstboot-after-networking
+      # - cumulus_leaf1a_nvue_startup.yaml:/etc/nvue.d/startup.yaml
+      - cumulus_leaf1a_interfaces:/etc/network/interfaces.d/host-mounts
+      - cumulus_leaf1a_frr_daemons:/etc/frr/daemons
+      - cumulus_leaf1a_frr.conf:/etc/frr/frr.conf
 
     leaf1b:
       kind: srl

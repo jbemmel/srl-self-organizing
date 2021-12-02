@@ -1,0 +1,97 @@
+# See https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Network-Virtualization/Ethernet-Virtual-Private-Network-EVPN/EVPN-Multihoming/
+#
+# Not currently used, generated using NVUE instead
+
+auto lo
+iface lo inet loopback
+  address 1.1.0.1/32
+  address 2001::1:1:0:1/128
+  vxlan-local-tunnelip 1.1.0.1
+
+# To Leaf1b
+auto sw3
+iface sw3
+    address 192.168.127.4/31
+    # Static route for peer loopback
+    post-up ip route add 1.1.0.2/32 via 192.168.127.5
+
+auto sw1 # To Server1
+iface sw1
+    # Native VLAN 1 untagged, untagged frames mapped to local VLAN 10
+    bridge-access 10
+
+auto sw2 # To Server2, mc-lag
+iface sw2
+    # Native VLAN 1 untagged, untagged frames mapped to local VLAN 10
+    bridge-access 10
+
+# Server2 bond
+auto bond1
+iface bond1
+    mtu 9000
+    es-sys-mac 44:38:39:BE:EF:AA
+    bond-slaves sw2
+    bond-mode 802.3ad
+    bond-lacp-bypass-allow yes
+    bridge-access 10
+
+# To leaf2a
+auto sw50
+iface sw50
+    bridge-access 10
+
+# To leaf2b
+auto sw51
+iface sw51
+    bridge-access 10
+
+# Bond towards leaf2a/leaf2b
+auto bond2
+iface bond2
+    mtu 9000
+    es-sys-mac 44:38:39:BE:EF:AA
+    bond-slaves sw50 sw51
+    bond-mode 802.3ad
+    bond-lacp-bypass-allow yes
+    bridge-access 10
+
+# Bridge for VXLAN with leaf1b, untagged
+# auto evpn-mh-bridge
+# iface evpn-mh-bridge
+#   # Stop STP from going across VXLAN
+#   mstpctl-portbpdufilter e1-3=yes vni-4095=yes
+#   bridge-stp off
+#
+#   bridge-ports e1-3 vni-4095
+#   bridge-vids 1
+#   # Primary VLAN Identifer (PVID), default setting, inherited
+#   bridge-pvid 1
+#   bridge-vlan-aware yes
+
+# Use VLAN 10 for VXLAN overlay, just between leaf1a and leaf1b
+# auto vni-4095
+# iface vni-4095
+#     bridge-access 10
+#     mstpctl-bpduguard yes
+#     mstpctl-portbpdufilter yes
+#     vxlan-id 4095
+#     # Leaf1b (SRL)
+#     vxlan-remoteip 1.1.0.2
+#     # bridge-learning on # Cumulus complains about conflict with EVPN?
+
+# Bridge for server traffic, VXLAN only between leaf1a/1b
+auto br_default
+iface br_default
+    bridge-ports bond1 bond2 vxlan0
+    hwaddress 44:38:39:22:01:b1
+    bridge-vlan-aware yes
+    bridge-vids 10
+    bridge-pvid 1
+
+auto vxlan0
+iface vxlan0
+    bridge-vlan-vni-map 10=4095
+    bridge-vids 10
+    bridge-learning off
+    bridge-arp-nd-suppress off
+    # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static
