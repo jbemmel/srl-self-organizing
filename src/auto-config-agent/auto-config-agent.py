@@ -321,7 +321,7 @@ class EVPNRouteMonitoringThread(Thread):
      """
      Check for updated IPv6 encoded LLDP in the BGP RIB, and update MC-LAG configs
      """
-     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=128][route-distinguisher=*:0]/vni"
+     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=128][route-distinguisher=*:65535]/vni"
      data = gnmi_client.get(path=[p], encoding='json_ietf')
      logging.info( f"IPv6 routes: {data}" )
      for n in data['notification']:
@@ -796,7 +796,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
               # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
-              "esi": f"02:{mac}:00:00:{min(peer_port_list+[_lag_id]):02x}",
+              # Need to use LOWER case (SRL issue)
+              "esi": f"02:{mac.lower()}:00:00:{min(peer_port_list+[_lag_id]):02x}",
               "_annotate_esi": "EVPN MC-LAG with " + peers + ", bytes 2-7 form auto-derived route target see RFC7432 7.6",
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
@@ -918,7 +919,8 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
    }
 
    # Could scope the community to the spine AS, smaller than the base AS
-   lldp_rt = f"target:{state.base_as}:0" # RT for the cluster AS, EVI 0 doesnt exist
+   # YANG model should disallow provisioning
+   lldp_rt = f"target:{state.base_as}:65535" # RT for the cluster AS, EVI 0 doesnt exist
 
    # For VXLAN interface, avoid any possible overlap with ports
    ip_vrf = {
@@ -948,7 +950,9 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
              "import-rt": lldp_rt
            },
            # Use router_id here (not AS) such that RD identifies leaf nexthop
-           "route-distinguisher": { "rd": f"{state.router_id}:0" }
+           # :0 causes conflicts with ethernet segment discovery
+           # YANG model should not allow it
+           "route-distinguisher": { "rd": f"{state.router_id}:65535" }
         }
         ]
       }
