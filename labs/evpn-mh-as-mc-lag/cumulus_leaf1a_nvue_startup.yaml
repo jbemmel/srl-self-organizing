@@ -7,15 +7,15 @@
             1.1.0.1/32: {}
             2001::1:1:0:1/128: {}
         type: loopback
-      e1-1:
+      swp1: # Apply Issues: (Parse error at startup.yaml, line 4, col 7: 'e1-1' is not a 'interface-name')
         type: swp
         bridge:
           domain:
             br_default:
               access: 10
-      e1-2:
+      swp2:
         type: swp
-      e1-3: # Peer link to leaf1b
+      swp3: # Peer link to leaf1b
         type: swp
         ip:
           address:
@@ -23,15 +23,15 @@
         evpn:
           multihoming:
             uplink: on
-      e1-50:
+      swp50:
         type: swp
-      e1-51:
+      swp51:
         type: swp
 
       bond1:
         bond:
           member:
-            e1-2: {}       # Server2, mc-lag
+            swp2: {}       # Server2, mc-lag
           lacp-bypass: on
         type: bond
         link:
@@ -50,8 +50,8 @@
       bond2:
         bond:
           member:
-            e1-50: {}
-            e1-51: {}
+            swp50: {}
+            swp51: {}
           lacp-bypass: on
         type: bond
         link:
