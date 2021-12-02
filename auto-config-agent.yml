@@ -4,11 +4,12 @@ auto_config_agent:
    launch-command: scripts/auto-config-agent.sh
    search-command: python3 /opt/demo-agents/auto-config-agent/auto-config-agent.py
    wait-for-config: Yes
-   failure-threshold: 100
+   failure-threshold: 5
    failure-action: wait=forever
    author: 'Nokia'
-   # Needs to be an absolute path, not every context runs in the correct path
-   version-command: ' cat /opt/demo-agents/auto-config-agent/build_version'
+   # Seems to have filesystem access issues during boot -> block boot
+   version-command: ' cat build_version'
+   # version-command: ' echo `whoami` >> /tmp/debug_version_command '
    yang-modules:
        names:
            - "auto-config-agent"

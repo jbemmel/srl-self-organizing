@@ -1227,7 +1227,7 @@
       "description": "auto-config to SRLinux-v21.6.4-6-g2af29f4aa4 leaf-2a-1.1.0.3 5.11.0-40-generic #44-Ubuntu SMP Wed Oct 20 16:16:42 UTC 2021",
       "admin-state": "enable",
       "ethernet": {
-        "aggregate-id": "lag2",
+        "aggregate-id": "lag26",
         "reload-delay": 20
       }
     },
@@ -1236,7 +1236,7 @@
       "description": "auto-config to SRLinux-v21.6.4-6-g2af29f4aa4 leaf2b 5.11.0-40-generic #44-Ubuntu SMP Wed Oct 20 16:16:42 UTC 2021",
       "admin-state": "enable",
       "ethernet": {
-        "aggregate-id": "lag2",
+        "aggregate-id": "lag26",
         "reload-delay": 20
       }
     },
@@ -1263,7 +1263,7 @@
       }
     },
     {
-      "name": "lag2",
+      "name": "lag26",
       "description": "Auto-discovered MC-LAG with ('1.1.0.1', 2)",
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": true,
@@ -1291,8 +1291,6 @@
           "system-priority": 1
         }
       }
-    }
-      ]
     },
     {
       "name": "mgmt0",
@@ -1560,16 +1558,20 @@
                 "id": 1,
                 "ethernet-segment": [
                   {
-                    "name": "ES-leaf1-leaf2.CE1",
+                    "name": "mc-lag1",
                     "admin-state": "enable",
-                    "esi": "00:12:12:12:12:12:12:00:00:01",
-                    "interface": "lag1"
+                    "esi": "00:02:85:6e:ff:00:00:00:00:01",
+                    "_annotate_esi": "EVPN MC-LAG with ('1.1.0.4', [49]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
+                    "interface": "lag1",
+                    "multi-homing-mode": "all-active"
                   },
                   {
-                    "name": "ES-leaf1-leaf2.Spines",
+                    "name": "mc-lag26",
                     "admin-state": "enable",
-                    "esi": "00:12:12:12:12:12:12:00:00:02",
-                    "interface": "lag2"
+                    "esi": "02:02:AC:14:FF:00:00:00:00:1a",
+                    "_annotate_esi": "EVPN MC-LAG with ('1.1.0.4', [51]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
+                    "interface": "lag26",
+                    "multi-homing-mode": "all-active"
                   }
                 ]
               }
@@ -1727,7 +1729,7 @@
           "name": "lag1.0"
         },
         {
-          "name": "lag2.0"
+          "name": "lag26.0"
         }
       ],
       "vxlan-interface": [

@@ -25,8 +25,26 @@ topology:
       type: ixrd2
       startup-config: leaf1b_config.json
 
+    leaf1a-bad:
+      kind: srl
+      group: leaves
+      type: ixrd2
+      startup-config: leaf1a_config_no_peer.json
+    leaf1b-bad:
+      kind: srl
+      group: leaves
+      type: ixrd2
+      startup-config: leaf1b_config_no_peer.json
+
 
     server3:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.server3:/etc/network/interfaces
+
+    server3-bad:
       kind: linux
       group: hosts
       binds:
@@ -36,7 +54,13 @@ topology:
   links:
     # Leaf interconnects for EVPN MC-LAG sync, 25G ports
     - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
+    - endpoints: ["leaf1a-bad:e1-3", "leaf1b-bad:e1-3"]
+
 
     # Server3 is dual connected
     - endpoints: ["server3:eth1", "leaf1a:e1-2"]
     - endpoints: ["server3:eth2", "leaf1b:e1-2"]
+
+    # Broken leaves
+    - endpoints: ["server3-bad:eth1", "leaf1a-bad:e1-2"]
+    - endpoints: ["server3-bad:eth2", "leaf1b-bad:e1-2"]
