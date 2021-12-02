@@ -1560,13 +1560,13 @@
                   {
                     "name": "ES-leaf1-leaf2.CE1",
                     "admin-state": "enable",
-                    "esi": "00:12:12:12:12:12:12:00:00:01",
+                    "esi": "03:44:38:39:be:ef:aa:00:00:01",
                     "interface": "lag1"
                   },
                   {
                     "name": "ES-leaf1-leaf2.Spines",
                     "admin-state": "enable",
-                    "esi": "00:12:12:12:12:12:12:00:00:02",
+                    "esi": "03:44:38:39:be:ef:aa:00:00:02",
                     "interface": "lag2"
                   }
                 ]

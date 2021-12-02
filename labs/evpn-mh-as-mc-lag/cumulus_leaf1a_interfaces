@@ -90,7 +90,7 @@ iface br_default
 
 auto vxlan0
 iface vxlan0
-    bridge-vlan-vni-map 10=4095
+    bridge-vlan-vni-map 10=10
     bridge-vids 10
     bridge-learning off
     bridge-arp-nd-suppress off

@@ -11,7 +11,7 @@ topology:
       # image: ghcr.io/nokia/srlinux
       image: srl/auto-config-v2:latest
       # startup-config: delta-auto-config.cmd
-      delta-config: delta-auto-config.cmd
+      # delta-config: delta-auto-config.cmd
       extras:
         srl-agents: [ ../../auto-config-agent.yml ]
 
@@ -45,15 +45,20 @@ topology:
       kind: srl
       group: leaves
       type: ixrd2
+      startup-config: leaf1b_config.json # Use static config, no auto-lags
+
     # ---- Leaf pair 3a/3b ----
     leaf2a:
       kind: srl
       group: leaves
       type: ixrd2
+      delta-config: delta-auto-config.cmd
+
     leaf2b:
       kind: srl
       group: leaves
       type: ixrd2
+      delta-config: delta-auto-config.cmd
 
     spine1:
       kind: srl
