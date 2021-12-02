@@ -16,4 +16,4 @@ An EVPN Instance is a 16-bit value used to identify unique EVPN services inside 
 1. 1:1 Single broadcast domain (e.g. subnet) <-> unique EVI
 2. n:1 Multiple broadcast domains -> single EVI
 
-In the former case, it is possible to auto-derive EVPN RD and RT values as follows:
+In the former case, it is possible to [auto-derive](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2.1) EVPN RD and RT values as \<router-id\>:VNI and 2-byte-AS:VNI respectively.
