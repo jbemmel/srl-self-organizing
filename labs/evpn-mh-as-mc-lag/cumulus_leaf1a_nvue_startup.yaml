@@ -1,0 +1,123 @@
+# To be mapped to /etc/nvue.d/startup.yaml
+- set:
+    interface:
+      lo:
+        ip:
+          address:
+            1.1.0.1/32: {}
+            2001::1:1:0:1/128: {}
+        type: loopback
+      e1-1:
+        type: swp
+        bridge:
+          domain:
+            br_default:
+              access: 10
+      e1-2:
+        type: swp
+      e1-3: # Peer link to leaf1b
+        type: swp
+        ip:
+          address:
+            192.168.127.4/31: {}
+        evpn:
+          multihoming:
+            uplink: on
+      e1-50:
+        type: swp
+      e1-51:
+        type: swp
+
+      bond1:
+        bond:
+          member:
+            e1-2: {}       # Server2, mc-lag
+          lacp-bypass: on
+        type: bond
+        link:
+          mtu: 9000
+        bridge:
+          domain:
+            br_default:
+              access: 10
+        evpn:
+          multihoming:
+            segment:
+              local-id: 1
+              enable: on
+              mac-address: 44:38:39:BE:EF:AA
+              df-preference: 50000
+      bond2:
+        bond:
+          member:
+            e1-50: {}
+            e1-51: {}
+          lacp-bypass: on
+        type: bond
+        link:
+          mtu: 9000
+        bridge:
+          domain:
+            br_default:
+              access: 10
+        evpn:
+          multihoming:
+            segment:
+              local-id: 2
+              enable: on
+              mac-address: 44:38:39:BE:EF:AA
+              df-preference: 50000
+
+    bridge:
+      domain:
+        br_default:
+          vlan:
+            '10':
+              vni:
+                '4095': {} # Only used between leaf1a and leaf1b
+    vrf:
+      default:
+        router:
+          bgp:
+            peer-group:
+              underlay:
+                local-as: 4200000002
+                remote-as: 4200000003 # eBGP for exchanging loopback routes
+                address-family:
+                  ipv4-unicast:
+                    redistribute:
+                      connected:
+                        enable: on
+                    enable: on
+              overlay:
+                remote-as: internal # not external, iBGP for EVPN
+                address-family:
+                  l2vpn-evpn:
+                    enable: on
+
+            enable: on
+            peer:
+              192.168.127.5: # leaf1b, underlay
+                peer-group: underlay
+                type: numbered # unnumbered
+              1.1.0.2: # leaf1b, EVPN overlay for multi-homing
+                peer-group: overlay
+                type: numbered # unnumbered
+
+    nve:
+      vxlan:
+        enable: on
+        source:
+          address: 1.1.0.1
+        arp-nd-suppress: off
+    evpn:
+      enable: on
+      multihoming:
+        enable: on
+    router:
+      bgp:
+        enable: on
+        autonomous-system: 65000
+        router-id: 1.1.0.1
+      # TODO static:
+      #    1.1.0.2/32: 192.168.0.5

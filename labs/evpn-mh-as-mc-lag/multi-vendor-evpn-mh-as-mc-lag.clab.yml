@@ -1,0 +1,100 @@
+#
+# Based on Fig 13 in https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE17581AAAA01_V1_SR%20Linux%20R21.6%20EVPN-VXLAN%20User%20Guide.pdf
+# replacing 1 leaf node with Cumulus CVX
+#
+
+name: multi-vendor-evpn-mh-as-mc-lag
+
+topology:
+  kinds:
+    srl:
+      # image: ghcr.io/nokia/srlinux
+      image: srl/auto-config-v2:latest
+      # startup-config: delta-auto-config.cmd
+      delta-config: delta-auto-config.cmd
+      extras:
+        srl-agents: [ ../../auto-config-agent.yml ]
+
+    # This is a Cumulus(NVidia) node
+    cvx:
+      image: networkop/cx:4.4.0
+
+    linux:
+      # image: ghcr.io/hellt/network-multitool
+      image: alpine-with-lldp:latest # Custom built image with lldpad
+  nodes:
+    # ---- Leaf pair 2a/2b ----
+    leaf1a:
+      kind: cvx # was: srl
+      group: leaves
+      # type: ixrd2
+      binds:
+        # - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+        - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
+        # - cumulus1_leaf1a_interfaces:/etc/network/interfaces.d/host-mounts
+        # - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
+        - cumulus_enable_nvue.firstboot:/usr/lib/cumulus/firstboot-after-networking
+        - cumulus_leaf1a_nvue_startup.yaml:/etc/nvue.d/startup.yaml
+
+    leaf1b:
+      kind: srl
+      group: leaves
+      type: ixrd2
+    # ---- Leaf pair 3a/3b ----
+    leaf2a:
+      kind: srl
+      group: leaves
+      type: ixrd2
+    leaf2b:
+      kind: srl
+      group: leaves
+      type: ixrd2
+
+    spine1:
+      kind: srl
+      group: spines
+      type: ixr6
+
+    server1:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro # for bonding module
+      - interfaces.server1:/etc/network/interfaces
+    server2:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.server2:/etc/network/interfaces
+    server3:
+      kind: linux
+      group: hosts
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.server3:/etc/network/interfaces
+
+  links:
+    # Leaf interconnects for EVPN MC-LAG sync, 25G ports
+    - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
+    - endpoints: ["leaf2a:e1-3", "leaf2b:e1-3"]
+
+    # Leaf 3a/b to single spine, using 100G links
+    - endpoints: ["leaf2a:e1-49", "spine1:e1-1"]
+    - endpoints: ["leaf2b:e1-49", "spine1:e1-2"]
+
+    # Leaf 3a/b cross connect to leaf 2a/b, 100G
+    - endpoints: ["leaf2a:e1-50", "leaf1a:e1-50"]
+    - endpoints: ["leaf2a:e1-51", "leaf1b:e1-50"]
+    - endpoints: ["leaf2b:e1-50", "leaf1a:e1-51"]
+    - endpoints: ["leaf2b:e1-51", "leaf1b:e1-51"]
+
+    # Server1 is single connected
+    - endpoints: ["server1:eth1", "leaf1a:e1-1"]
+
+    # Server2 is single connected
+    - endpoints: ["server2:eth1", "leaf1b:e1-1"]
+
+    # Server3 is dual connected
+    - endpoints: ["server3:eth1", "leaf1a:e1-2"]
+    - endpoints: ["server3:eth2", "leaf1b:e1-2"]

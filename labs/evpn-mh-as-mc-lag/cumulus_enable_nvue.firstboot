@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# To be mapped to /usr/lib/cumulus/firstboot-after-networking (replacing it)
+# The original has errors with the mgmt VRF not existing...
+
+# See https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/System-Configuration/NVIDIA-User-Experience-NVUE/
+# Enable and start NVUE startup, so it reads /etc/nvue.d/startup.yaml on boot
+/bin/systemctl enable nvue-startup.service && /bin/systemctl start nvue-startup.service
+
+# Could also enable and start REST API service
+# /bin/systemctl enable restserver && /bin/systemctl start restserver
+
+exit 0
