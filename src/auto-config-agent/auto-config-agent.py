@@ -646,7 +646,8 @@ def Convert_to_lag(state,port,ip,peer_data):
              "admin-state": "enable",
              "vxlan-interface": _vxlan_if,
              "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
-             "ecmp": 8,
+             "_annotate_evi": "Note: Affects DF election in case of multi-homing",
+             "ecmp": 1 if state.evpn=="l2_only_leaves" else 8,
              #"routes": {
              # "bridge-table": {
              #    "mac-ip": {

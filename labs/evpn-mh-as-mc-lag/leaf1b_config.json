@@ -1205,6 +1205,7 @@
       "name": "ethernet-1/2",
       "admin-state": "enable",
       "ethernet": {
+        "lacp-port-priority": 255,
         "aggregate-id": "lag1",
         "reload-delay": 20
       }
