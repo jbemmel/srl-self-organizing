@@ -858,10 +858,10 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
       # Also configure reload-delay timer on corresponding ethernet port
       { 'aggregate-id' : f"lag{_lag_id }", **state.reload_delay } ) ]
 
-   # should already be clear of subinterfaces
-   # deletes = [ f'/interface[name=ethernet-1/{port}]/subinterface[index=*]' ]
+   # should already be clear of subinterfaces? Nope
+   deletes = [ f'/interface[name=ethernet-1/{port}]/subinterface[index=*]' ]
    logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
-   gnmi_client.set( encoding='json_ietf', update=updates )
+   gnmi_client.set( encoding='json_ietf', delete=deletes, update=updates )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
