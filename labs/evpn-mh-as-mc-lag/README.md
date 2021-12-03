@@ -1,4 +1,4 @@
-![plot](Fig13_evpn_mh.PNG)
+![plot](SRL_evpn_mh.png)
 
 # VNI versus EVI
 
