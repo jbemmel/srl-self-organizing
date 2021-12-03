@@ -64,6 +64,7 @@ topology:
       kind: srl
       group: spines
       type: ixr6
+      delta-config: delta-auto-config.cmd
 
     server1:
       kind: linux
