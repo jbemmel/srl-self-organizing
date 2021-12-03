@@ -1186,7 +1186,20 @@
     {
       "name": "ethernet-1/1",
       "description": "auto-config to host",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "srl_nokia-interfaces-vlans:vlan-tagging": true,
+      "subinterface": [
+        {
+          "index": 0,
+          "type": "srl_nokia-interfaces:bridged",
+          "admin-state": "enable",
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "untagged": { }
+            }
+          }
+        }
+      ]
     },
     {
       "name": "ethernet-1/2",
@@ -1242,7 +1255,7 @@
     },
     {
       "name": "lag1",
-      "description": "Single link ethernet-1/1",
+      "description": "Server3 MC-LAG",
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": true,
       "subinterface": [
@@ -1258,8 +1271,15 @@
         }
       ],
       "srl_nokia-interfaces-lag:lag": {
-        "lag-type": "static",
-        "member-speed": "100G"
+        "lag-type": "lacp",
+        "member-speed": "100G",
+        "srl_nokia-lacp:lacp": {
+          "interval": "SLOW",
+          "lacp-mode": "ACTIVE",
+          "admin-key": 1,
+          "system-id-mac": "44:38:39:BE:EF:AA",
+          "system-priority": 1
+        }
       }
     },
     {
@@ -1721,6 +1741,9 @@
       "type": "srl_nokia-network-instance:mac-vrf",
       "admin-state": "enable",
       "interface": [
+        {
+          "name": "ethernet-1/1.0"
+        },
         {
           "name": "lag1.0"
         },
