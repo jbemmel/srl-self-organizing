@@ -20,6 +20,58 @@ In the former case, it is possible to [auto-derive](https://datatracker.ietf.org
 
 In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assume the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI.
 
+# Bonding with Link Aggregation Control Protocol (LACP)
+All network operating systems support bonding (LAGs) with LACP, but they vary in the degree to which parameters can be configured.
+
+## SR Linux
+In SRL, a sample LACP configuration looks like this:
+```
+lag {
+        lag-type lacp
+        member-speed 100G
+        lacp {
+            interval SLOW
+            lacp-mode ACTIVE
+            admin-key 15
+            system-id-mac 44:38:39:be:ef:aa
+            system-priority 65535
+        }
+    }
+```
+
+On the wire, a partner device receives it like this:
+```
+14:40:38.899850 eth2  M   ifindex 2259 02:12:b4:ff:00:02 ethertype Slow Protocols (0x8809), length 130: LACPv1, length 110
+	Actor Information TLV (0x01), length 20
+	  System 44:38:39:be:ef:aa, System Priority 65535, Key 15, Port 1, Port Priority 32768
+	  State Flags [Activity, Aggregation, Synchronization, Collecting, Distributing]
+	Partner Information TLV (0x02), length 20
+	  System aa:c1:ab:94:82:62, System Priority 65535, Key 15, Port 2, Port Priority 255
+	  State Flags [Activity, Aggregation, Synchronization, Collecting, Distributing]
+	Collector Information TLV (0x03), length 16
+	  Max Delay 0
+	Terminator TLV (0x00), length 0
+```
+Fairly straightforward, one thing to note is that the "port priority" has a default value of 32768 and it cannot be configured differently.
+
+## Cumulus CVX
+On Cumulus, a bond configuration with LACP enabled looks like this:
+```
+# Bond towards leaf2a/leaf2b
+auto bond2
+iface bond2
+    mtu 9000
+    es-sys-mac 44:38:39:BE:EF:AA
+    bond-slaves sw50 sw51
+    bond-mode 802.3ad
+    bond-lacp-rate slow
+    bond-lacp-bypass-allow yes
+    bridge-access 4094
+```
+One can configure 'lacp bypass' (SRL calls this "LACP fallback mode") and the rate (fast meaning once per second, or slow every 30s), but not the 'admin-key', 'system-priority' or 'port-priority'. Based on tcpdump output, those priorities appear to be fixed (for all bonds) at 65535 and 255 respectively. It is unclear how the admin-key is determined (in this setup we get 15), but it is *the same across both bonds*. That results in a catch 22: SRL requires unique admin keys across lags (given that per IEEE 802.3ad standards, links with the same system ID and admin key can potentially aggregate) while CVX sets them identical. One cannot match LACP settings on multiple bonds in a multi-vendor MC-LAG setting that includes Cumulus switches.
+
+As a workaround, we can simply use static lags on the network facing side instead.
+
 # Verification
 
 ## Leaf1a (CVX)
