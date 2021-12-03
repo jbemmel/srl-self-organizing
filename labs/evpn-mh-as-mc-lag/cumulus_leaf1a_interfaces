@@ -32,6 +32,7 @@ iface bond1
     es-sys-mac 44:38:39:BE:EF:AA
     bond-slaves sw2
     bond-mode 802.3ad
+    bond-lacp-rate slow
     bond-lacp-bypass-allow yes
     bridge-access 10
 
@@ -52,6 +53,7 @@ iface bond2
     es-sys-mac 44:38:39:BE:EF:AA
     bond-slaves sw50 sw51
     bond-mode 802.3ad
+    bond-lacp-rate slow
     bond-lacp-bypass-allow yes
     bridge-access 10
 

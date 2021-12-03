@@ -1255,7 +1255,7 @@
     },
     {
       "name": "lag1",
-      "description": "Server3 MC-LAG",
+      "description": "Server3 MC-LAG, with cvx - match LACP settings",
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": true,
       "subinterface": [
@@ -1276,9 +1276,9 @@
         "srl_nokia-lacp:lacp": {
           "interval": "SLOW",
           "lacp-mode": "ACTIVE",
-          "admin-key": 1,
+          "admin-key": 15,
           "system-id-mac": "44:38:39:BE:EF:AA",
-          "system-priority": 1
+          "system-priority": 65535
         }
       }
     },
