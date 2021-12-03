@@ -36,7 +36,14 @@ lag {
             system-id-mac 44:38:39:be:ef:aa
             system-priority 65535
         }
-    }
+   }
+
+and optionally under /interface {
+  ethernet {
+    lacp-port-priority 32768
+  }
+}
+
 ```
 
 On the wire, a partner device receives it like this:
@@ -52,7 +59,7 @@ On the wire, a partner device receives it like this:
 	  Max Delay 0
 	Terminator TLV (0x00), length 0
 ```
-Fairly straightforward, one thing to note is that the "port priority" has a default value of 32768 and it cannot be configured differently.
+Fairly straightforward, and fully configurable.
 
 ## Cumulus CVX
 On Cumulus, a bond configuration with LACP enabled looks like this:
