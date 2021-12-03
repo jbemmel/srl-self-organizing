@@ -1306,9 +1306,9 @@
         "srl_nokia-lacp:lacp": {
           "interval": "SLOW",
           "lacp-mode": "ACTIVE",
-          "admin-key": 2,
+          "admin-key": 15,
           "system-id-mac": "44:38:39:BE:EF:AA",
-          "system-priority": 1
+          "system-priority": 65535
         }
       }
     },

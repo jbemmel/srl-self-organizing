@@ -39,12 +39,12 @@ iface bond1
 # To leaf2a
 auto sw50
 iface sw50
-    bridge-access 10
+    bridge-access 4094
 
 # To leaf2b
 auto sw51
 iface sw51
-    bridge-access 10
+    bridge-access 4094
 
 # Bond towards leaf2a/leaf2b
 auto bond2
@@ -55,7 +55,7 @@ iface bond2
     bond-mode 802.3ad
     bond-lacp-rate slow
     bond-lacp-bypass-allow yes
-    bridge-access 10
+    bridge-access 4094
 
 # Bridge for VXLAN with leaf1b, untagged
 # auto evpn-mh-bridge
@@ -89,13 +89,13 @@ iface br_default
     bridge-ports bond1 bond2 vxlan0
     hwaddress 44:38:39:22:01:b1
     bridge-vlan-aware yes
-    bridge-vids 10
+    bridge-vids 10 4094
     bridge-pvid 1
 
 auto vxlan0
 iface vxlan0
-    bridge-vlan-vni-map 10=10
-    bridge-vids 10
+    bridge-vlan-vni-map 10=10 4094=10
+    bridge-vids 10 4094
     bridge-learning off
     bridge-arp-nd-suppress off
     # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static
