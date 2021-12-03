@@ -795,9 +795,10 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
               "name": f"mc-lag{ _lag_id }",
               "admin-state": "enable",
               # See https://datatracker.ietf.org/doc/html/rfc7432#section-5
-              # Type 2 MAC-based ESI with 3-byte local distinguisher (==EVI)
+              # Type 3 MAC-based ESI with 3-byte local distinguisher
+              # Compatible with Cumulus too
               # Need to use LOWER case (SRL issue)
-              "esi": f"02:{mac.lower()}:00:00:{min(peer_port_list+[_lag_id]):02x}",
+              "esi": f"03:{mac.lower()}:00:00:{min(peer_port_list+[_lag_id]):02x}",
               "_annotate_esi": "EVPN MC-LAG with " + peers + ", bytes 2-7 form auto-derived route target see RFC7432 7.6",
               "interface": f"lag{ _lag_id }",
               "multi-homing-mode": "all-active" # default
