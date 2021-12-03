@@ -1287,7 +1287,7 @@
           "interval": "SLOW",
           "lacp-mode": "ACTIVE",
           "admin-key": 2,
-          "system-id-mac": "02:00:00:00:02:01",
+          "system-id-mac": "44:38:39:BE:EF:AA",
           "system-priority": 1
         }
       }
