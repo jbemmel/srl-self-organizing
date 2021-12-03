@@ -3,6 +3,7 @@ iface lo inet loopback
 
 auto bond0
 iface bond0 inet static
+  hwaddress ether 00:11:22:33:44:03
   address 10.0.0.103
   netmask 255.255.255.0
   gateway 10.0.0.1
