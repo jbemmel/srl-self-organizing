@@ -276,7 +276,7 @@ class EVPNRouteMonitoringThread(Thread):
      """
      Check for updated Large Communities in the BGP RIB, and update MC-LAG configs
      """
-     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:0]/attr-id"
+     p = "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-post/ip-prefix-routes[ip-prefix-length=32][route-distinguisher=*:65535]/attr-id"
      data = gnmi_client.get(path=[p], encoding='json_ietf')
      logging.info( f"Attribute set IDs: {data}" )
      for n in data['notification']:

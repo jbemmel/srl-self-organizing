@@ -1301,15 +1301,8 @@
         }
       ],
       "srl_nokia-interfaces-lag:lag": {
-        "lag-type": "lacp",
-        "member-speed": "100G",
-        "srl_nokia-lacp:lacp": {
-          "interval": "SLOW",
-          "lacp-mode": "ACTIVE",
-          "admin-key": 15,
-          "system-id-mac": "44:38:39:BE:EF:AA",
-          "system-priority": 65535
-        }
+        "lag-type": "static",
+        "member-speed": "100G"
       }
     },
     {
