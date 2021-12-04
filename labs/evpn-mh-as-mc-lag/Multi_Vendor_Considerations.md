@@ -419,7 +419,7 @@ git clone https://github.com/jbemmel/srl-self-organizing.git --recursive
 cd srl-self-organizing
 git submodule foreach --recursive git checkout main
 make -C./Docker all
-cd srl-self-organizing/labs/evpn-mh-as-mc-lag
+cd labs/evpn-mh-as-mc-lag
 sudo custom_built_containerlab deploy -t ./multi-vendor-evpn-mh-as-mc-lag.clab.yml --reconfigure
 ```
 Note that this lab config uses a [custom containerlab extension for delta-config](https://github.com/jbemmel/containerlab/tree/delta-config); at the time of writing the feature is released, but not 100% compatible with the approach taken here.
