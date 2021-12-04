@@ -1004,6 +1004,9 @@ def Handle_Notification(obj, state):
                 #    Update_Result(file_name, action='delete')
                 response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
                 logging.info('Handle_Config: Unregister response:: {}'.format(response))
+            elif obj.config.key.js_path==".auto_config_agent.service":
+                # TODO handle service config
+                logging.info( "TODO: Process service config" )
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
@@ -1088,7 +1091,7 @@ def Handle_Notification(obj, state):
                 logging.info( f"Platform supports bridging/mac-vrfs/irb: {state.bridging_supported}" )
 
                 state.reload_delay_supported = 'reload_delay_supported' in data and data['reload_delay_supported']['value']
-                reload_delay = int( data['reload_delay_secs']['value'] )
+                reload_delay = int( data['reload_delay_secs']['value'] ) if 'reload_delay_secs' in data else 0
                 state.reload_delay = { 'reload-delay': reload_delay } if state.reload_delay_supported and reload_delay>0 else {}
                 logging.info( f"Platform supports reload-delay: {state.reload_delay_supported} secs={reload_delay}" )
 

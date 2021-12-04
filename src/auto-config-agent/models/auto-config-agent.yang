@@ -295,7 +295,7 @@ module auto_config_agent {
                 }
 
                 leaf gateway-ipv4 { type srl_nokia-comm:ipv4-prefix-with-host-bits; }
-                leaf gateway-ipv6 { type srl_nokia-comm:ipv6-address; }
+                leaf gateway-ipv6 { type srl_nokia-comm:ipv6-prefix; }
               }
             }
 
