@@ -1,6 +1,6 @@
 module auto_config_agent {
 
-    yang-version "1";
+    yang-version 1.1; // for require-instance in leafref
 
     // namespace
     namespace "urn:srl_test/auto-config-agent";
@@ -17,6 +17,8 @@ module auto_config_agent {
     }
 
     import srl_nokia-features {prefix srl_feat; }
+
+    import srl_nokia-interfaces { prefix srl_nokia-if; }
 
     revision "2021-04-11" {
         description "Initial revision";
@@ -274,14 +276,24 @@ module auto_config_agent {
                 description "EVPN Instance for this service";
                 type uint16 { range "1..65535"; } // or SRL:evi-type
               }
+              leaf name {
+                description "Optional name for the service, default generated based on EVI";
+                type string;
+              }
               leaf vni {
                 description "VxLAN Virtual Network Identifier for this service, set equal to EVI if not specified";
                 type uint32 { range "1..16777215"; }
               }
               leaf vlan {
-                description "VLAN to use, default 0=untagged";
+                description "VLAN to use, 0=untagged. Default 0 for lowest EVI service, then equal to EVI";
                 type uint16 { range "0..4094"; }
-                default 0;
+              }
+              leaf-list only-on-ports {
+                description "Optional list of ports to provide the service on, default empty=all";
+                type leafref {
+                  path "/srl_nokia-if:interface/srl_nokia-if:name";
+                  require-instance "true";
+                }
               }
               container l3 {
                 description "L3 properties of the service";
