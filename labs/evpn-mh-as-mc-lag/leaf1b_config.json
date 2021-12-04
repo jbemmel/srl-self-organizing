@@ -1322,44 +1322,6 @@
       }
     },
     {
-      "name": "lo0",
-      "admin-state": "enable",
-      "subinterface": [
-        {
-          "index": 1,
-          "admin-state": "enable",
-          "ipv6": {
-            "address": [
-              {
-                "ip-prefix": "fdad:0:101:2:1:aac1:ab00:200/128",
-                "_annotate": "for EVPN auto-lag discovery on [1]"
-              },
-              {
-                "ip-prefix": "fdad:0:101:2:2:aac1:ab00:300/128",
-                "_annotate": "for EVPN auto-lag discovery on [2]"
-              },
-              {
-                "ip-prefix": "fdad:0:101:2:3:1ab0:ff:0/128",
-                "_annotate": "for EVPN auto-lag discovery on [3]"
-              },
-              {
-                "ip-prefix": "fdad:0:101:2:32:1ab0:2ff:0/128",
-                "_annotate": "for EVPN auto-lag discovery on [50]"
-              },
-              {
-                "ip-prefix": "fdad:0:101:2:33:1ab0:3ff:0/128",
-                "_annotate": "for EVPN auto-lag discovery on [51]"
-              },
-              {
-                "ip-prefix": "fdad:0:101:2:232::2/128",
-                "_annotate": "for EVPN auto-lag discovery on [50, 51]"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "mgmt0",
       "admin-state": "enable",
       "subinterface": [
@@ -1638,7 +1600,15 @@
                     "esi": "03:1a:b0:03:ff:00:00:00:00:1a",
                     "_annotate_esi": "EVPN MC-LAG with ('1.1.0.1', [51]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
                     "interface": "lag26",
-                    "multi-homing-mode": "all-active"
+                    "multi-homing-mode": "all-active",
+                    "df-election": {
+                     "algorithm": {
+                       "type": "preference",
+                       "preference-alg": {
+                         "preference-value": 49999
+                       }
+                     }
+                   }
                   }
                 ]
               }
@@ -1766,49 +1736,6 @@
           "route-advertisement": {
             "rapid-withdrawal": true
           }
-        }
-      }
-    },
-    {
-      "name": "evpn-lag-discovery",
-      "type": "srl_nokia-network-instance:ip-vrf",
-      "admin-state": "enable",
-      "interface": [
-        {
-          "name": "lo0.1"
-        }
-      ],
-      "vxlan-interface": [
-        {
-          "name": "vxlan0.65535"
-        }
-      ],
-      "protocols": {
-        "bgp-evpn": {
-          "srl_nokia-bgp-evpn:bgp-instance": [
-            {
-              "id": 1,
-              "admin-state": "enable",
-              "vxlan-interface": "vxlan0.65535",
-              "evi": 65535,
-              "ecmp": 8
-            }
-          ]
-        },
-        "srl_nokia-bgp-vpn:bgp-vpn": {
-          "bgp-instance": [
-            {
-              "id": 1,
-              "route-distinguisher": {
-                "rd": "1.1.0.2:65535"
-              },
-              "route-target": {
-                "_annotate": "Special RT/RD for EVPN LAG coordination",
-                "export-rt": "target:4200000000:65535",
-                "import-rt": "target:4200000000:65535"
-              }
-            }
-          ]
         }
       }
     },
@@ -1996,16 +1923,6 @@
           "type": "srl_nokia-interfaces:bridged",
           "ingress": {
             "vni": 4094
-          },
-          "egress": {
-            "source-ip": "use-system-ipv4-address"
-          }
-        },
-        {
-          "index": 65535,
-          "type": "srl_nokia-interfaces:routed",
-          "ingress": {
-            "vni": 65535
           },
           "egress": {
             "source-ip": "use-system-ipv4-address"
