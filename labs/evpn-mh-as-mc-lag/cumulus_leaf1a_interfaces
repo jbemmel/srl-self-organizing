@@ -29,31 +29,39 @@ iface sw2
 auto bond1
 iface bond1
     mtu 9000
-    es-sys-mac 44:38:39:BE:EF:AA
+    es-sys-mac aa:c1:ab:00:03:00
     bond-slaves sw2
     bond-mode 802.3ad
     bond-lacp-rate slow
     bond-lacp-bypass-allow yes
-    # bridge-access 4094
+    mstpctl-bpduguard yes
+    mstpctl-portadminedge yes
+    bridge-access 4094
 
 # To leaf2a
 auto sw50
 iface sw50
-    # trunk port
+    # trunk port ideally
+    bridge-access 4094
 
 # To leaf2b
 auto sw51
 iface sw51
-    # trunk port
+    # trunk port ideally
+    bridge-access 4094
 
 # Bond towards leaf2a/leaf2b, cannot use LACP because Cumulus uses same admin
 # key for all bonds
 auto bond2
 iface bond2
     mtu 9000
-    es-sys-mac 44:38:39:BE:EF:AA
+    es-sys-mac aa:c1:ab:00:03:00
     bond-slaves sw50 sw51
     bond-mode balance-xor
+    mstpctl-bpduguard yes
+    mstpctl-portadminedge yes
+    # trunk port, potentially multiple VLANs
+    # bridge-access 4094
 
 # Bridge for VXLAN with leaf1b, untagged
 # auto evpn-mh-bridge
@@ -80,22 +88,22 @@ iface bond2
 #     # bridge-learning on # Cumulus complains about conflict with EVPN?
 
 # Bridge for server traffic, VXLAN only between leaf1a/1b
-auto br_default
-iface br_default
-    mstpctl-portbpdufilter bond1=yes bond2=yes vxlan0=yes
+auto bridge
+iface bridge
+    mstpctl-portbpdufilter bond1=yes bond2.4094=yes vxlan0=yes
     bridge-stp off
-    bridge-ports bond1 bond2 vxlan0
+    bridge-ports bond1 bond2.4094 vxlan0
     hwaddress 44:38:39:22:01:b1
     # can either use VLAN subinterfaces or a vlan-aware bridge, but not both
-    bridge-vlan-aware yes
-    bridge-vids 4094
-    bridge-pvid 1
+    bridge-vlan-aware no
+    # bridge-vids 4094
+    # bridge-pvid 1
 
 auto vxlan0
 iface vxlan0
-    # XXX VLAN 10 coming in mapping to VLAN 4094 -> likely fails. Only use 4094
-    bridge-vlan-vni-map 4094=10
-    bridge-vids 4094
-    bridge-learning off
-    bridge-arp-nd-suppress off
-    # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static
+   # XXX VLAN 10 coming in mapping to VLAN 4094 -> likely fails. Only use 4094
+   bridge-vlan-vni-map 4094=4095
+   bridge-vids 4094
+   bridge-learning off
+   bridge-arp-nd-suppress off
+   # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static

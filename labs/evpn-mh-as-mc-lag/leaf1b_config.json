@@ -1187,27 +1187,18 @@
       "name": "ethernet-1/1",
       "description": "auto-config to host",
       "admin-state": "enable",
-      "srl_nokia-interfaces-vlans:vlan-tagging": true,
-      "subinterface": [
-        {
-          "index": 0,
-          "type": "srl_nokia-interfaces:bridged",
-          "admin-state": "enable",
-          "srl_nokia-interfaces-vlans:vlan": {
-            "encap": {
-              "untagged": { }
-            }
-          }
-        }
-      ]
+      "ethernet": {
+        "aggregate-id": "lag1"
+      }
     },
     {
       "name": "ethernet-1/2",
+      "description": "auto-config to host",
       "admin-state": "enable",
       "ethernet": {
-        "lacp-port-priority": 255,
-        "aggregate-id": "lag1",
-        "reload-delay": 20
+        "aggregate-id": "lag2",
+        "reload-delay": 20,
+        "lacp-port-priority": 255
       }
     },
     {
@@ -1238,10 +1229,10 @@
     },
     {
       "name": "ethernet-1/50",
-      "description": "auto-config to SRLinux-v21.6.4-6-g2af29f4aa4 leaf-2a-1.1.0.3 5.11.0-40-generic #44-Ubuntu SMP Wed Oct 20 16:16:42 UTC 2021",
+      "description": "auto-config to SRLinux-v21.6.4-6-g2af29f4aa4 leaf2a 5.11.0-40-generic #44-Ubuntu SMP Wed Oct 20 16:16:42 UTC 2021",
       "admin-state": "enable",
       "ethernet": {
-        "aggregate-id": "lag2",
+        "aggregate-id": "lag26",
         "reload-delay": 20
       }
     },
@@ -1250,13 +1241,13 @@
       "description": "auto-config to SRLinux-v21.6.4-6-g2af29f4aa4 leaf2b 5.11.0-40-generic #44-Ubuntu SMP Wed Oct 20 16:16:42 UTC 2021",
       "admin-state": "enable",
       "ethernet": {
-        "aggregate-id": "lag2",
+        "aggregate-id": "lag26",
         "reload-delay": 20
       }
     },
     {
       "name": "lag1",
-      "description": "Server3 MC-LAG, with cvx - match LACP settings",
+      "description": "Single link ethernet-1/1",
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": true,
       "subinterface": [
@@ -1266,21 +1257,15 @@
           "srl_nokia-interfaces-vlans:vlan": {
             "encap": {
               "untagged": {
+
               }
             }
           }
         }
       ],
       "srl_nokia-interfaces-lag:lag": {
-        "lag-type": "lacp",
-        "member-speed": "100G",
-        "srl_nokia-lacp:lacp": {
-          "interval": "SLOW",
-          "lacp-mode": "ACTIVE",
-          "admin-key": 15,
-          "system-id-mac": "44:38:39:BE:EF:AA",
-          "system-priority": 65535
-        }
+        "lag-type": "static",
+        "member-speed": "100G"
       }
     },
     {
@@ -1302,9 +1287,77 @@
         }
       ],
       "srl_nokia-interfaces-lag:lag": {
+        "lag-type": "lacp",
+        "member-speed": "100G",
+        "srl_nokia-lacp:lacp": {
+          "interval": "SLOW",
+          "lacp-mode": "ACTIVE",
+          "admin-key": 15,
+          "system-id-mac": "aa:c1:ab:00:03:00",
+          "system-priority": 65535
+        }
+      }
+    },
+    {
+      "name": "lag26",
+      "description": "Auto-discovered MC-LAG with ('1.1.0.1', 51)",
+      "admin-state": "enable",
+      "srl_nokia-interfaces-vlans:vlan-tagging": true,
+      "subinterface": [
+        {
+          "index": 0,
+          "type": "srl_nokia-interfaces:bridged",
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "single-tagged": {
+                "vlan-id": 4094
+              }
+            }
+          }
+        }
+      ],
+      "srl_nokia-interfaces-lag:lag": {
         "lag-type": "static",
         "member-speed": "100G"
       }
+    },
+    {
+      "name": "lo0",
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 1,
+          "admin-state": "enable",
+          "ipv6": {
+            "address": [
+              {
+                "ip-prefix": "fdad:0:101:2:1:aac1:ab00:200/128",
+                "_annotate": "for EVPN auto-lag discovery on [1]"
+              },
+              {
+                "ip-prefix": "fdad:0:101:2:2:aac1:ab00:300/128",
+                "_annotate": "for EVPN auto-lag discovery on [2]"
+              },
+              {
+                "ip-prefix": "fdad:0:101:2:3:1ab0:ff:0/128",
+                "_annotate": "for EVPN auto-lag discovery on [3]"
+              },
+              {
+                "ip-prefix": "fdad:0:101:2:32:1ab0:2ff:0/128",
+                "_annotate": "for EVPN auto-lag discovery on [50]"
+              },
+              {
+                "ip-prefix": "fdad:0:101:2:33:1ab0:3ff:0/128",
+                "_annotate": "for EVPN auto-lag discovery on [51]"
+              },
+              {
+                "ip-prefix": "fdad:0:101:2:232::2/128",
+                "_annotate": "for EVPN auto-lag discovery on [50, 51]"
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "mgmt0",
@@ -1386,8 +1439,8 @@
       "server-profile": [
         {
           "name": "clab-profile",
-          "key": "$aes$feLYVmxgesmI=$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",
-          "certificate": "-----BEGIN CERTIFICATE-----\nMIIENzCCAx+gAwIBAgIUDsoNk23SuN2pyLKBKuluuZ4IktIwDQYJKoZIhvcNAQEL\nBQAwazELMAkGA1UEBhMCQkUxEDAOBgNVBAcTB0FudHdlcnAxDjAMBgNVBAoTBU5v\na2lhMRYwFAYDVQQLEw1Db250YWluZXIgbGFiMSIwIAYDVQQDExlldnBuLW1oLWFz\nLW1jLWxhZyBSb290IENBMB4XDTIxMTIwMTE4NTMwMFoXDTIyMTIwMTE4NTMwMFow\nbTELMAkGA1UEBhMCQkUxEDAOBgNVBAcTB0FudHdlcnAxDjAMBgNVBAoTBU5va2lh\nMRYwFAYDVQQLEw1Db250YWluZXIgbGFiMSQwIgYDVQQDExtsZWFmMWIuZXZwbi1t\naC1hcy1tYy1sYWcuaW8wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDL\nb1XMNNzhU5Howi3/vksUeDDUmRpjYGXOyaaz56mqKUyPgTtOkMMueXYuuUZ2HFGN\nyX3mZjanJHlYpVvygWRSCoubWhH7MdDL12tqrKgqILndP1NSxt87kvzqfPNdxJyS\n0a0G6L0oLFnpR3080EkvHRAnVOphROEeIKgowP5AMFOfqEVlzG3xpFxsQaWRQqD6\nTgwzvJHHZ8jUx9CEHtgPAo8WidHBJ1Sp75YLKiwWnFyJZDuTYyAIpuIvkxM3fDQs\nXbJYXs1U8j4if5Ks1zofXI6haT5U5uqdgkiz0R1ecVuSlB6Uv1qqstkurYYZm8uB\n4ofktgbmml5ycmEiyiFxAgMBAAGjgdAwgc0wDgYDVR0PAQH/BAQDAgWgMB0GA1Ud\nJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\nBBQdIm4M6AuLZ2LZQs3WxXFVmYEULjAfBgNVHSMEGDAWgBTATxHYiRGpY/TZ2tqx\nRVDpyKIxBTBOBgNVHREERzBFggZsZWFmMWKCHWNsYWItZXZwbi1taC1hcy1tYy1s\nYWctbGVhZjFighxsZWFmMWIuZXZwbi1taC1hcy1tYy1sYWcuLmlvMA0GCSqGSIb3\nDQEBCwUAA4IBAQArruXh5KIspxFKalx3kG3WcZ0F3kcURts5iQJ02GhIqVpRgM5d\nRA8wjWeh+JMq3xiz7d73z/HkZdmHhXmx3uKfAEHG5qpg+HQQ1y1doUXhBsXuJhJl\naYox1W6BnTqBM6fTfn52TmSGnthvju7ByNrxaw0Voyw9og6cPT5sJTywOEPaYhCi\nE8iL+jHAQ02n0qUPz90I87FtGy3EG4fGSGk2qJpjXnFL3ENhFdZnQ663tHcVeWUp\nZ7R+UIhm17o0Ll/SM1c6DnXz+FX1gRjI9Xma4FYT0QBVRn/O5MQHGAki4nbIcsD/\negprwpOGSi/GJU6Up8evPC3Cyp7HQmDsxc1T\n-----END CERTIFICATE-----\n",
+          "key": "$aes$bEA8vajzV11w=$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",
+          "certificate": "-----BEGIN CERTIFICATE-----\nMIIENzCCAx+gAwIBAgIUa4myA3hO2IgiQjuZGGbxMninBsgwDQYJKoZIhvcNAQEL\nBQAwazELMAkGA1UEBhMCQkUxEDAOBgNVBAcTB0FudHdlcnAxDjAMBgNVBAoTBU5v\na2lhMRYwFAYDVQQLEw1Db250YWluZXIgbGFiMSIwIAYDVQQDExlldnBuLW1oLWFz\nLW1jLWxhZyBSb290IENBMB4XDTIxMTIwNDAxMDIwMFoXDTIyMTIwNDAxMDIwMFow\nbTELMAkGA1UEBhMCQkUxEDAOBgNVBAcTB0FudHdlcnAxDjAMBgNVBAoTBU5va2lh\nMRYwFAYDVQQLEw1Db250YWluZXIgbGFiMSQwIgYDVQQDExtsZWFmMWIuZXZwbi1t\naC1hcy1tYy1sYWcuaW8wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDA\nzBGcX6A32wn++iHYyAxl+TbA2IQvWxgtMHx2cPOmXIsu2d86Q+dkMwrpAc+E/Rjp\nXRXzih+suzIb+oN57sK1iP+aIWqIYGEl4tziAzwr1pi8EJDZx3FXrvxinaq+OBN6\n4XLSTtKV6paICsiQzSew49Lk0iJWlzZJVdmt+t96ldzmylsVAMQ4D9P41/KsFriT\n2ipszaaKu/dHVZrcXQV6xcmcRhfQTa9I5oxopAGxQ7nNMYuhNw4d9ipV15839kLA\nhbeRSs3CC8Z9FaLCjErftZVgIHjrwytQsOPl5rweTBWGO2F1R2c2BdYYwpdBYBIe\nZf1HIRr0eGMgOolfoVWxAgMBAAGjgdAwgc0wDgYDVR0PAQH/BAQDAgWgMB0GA1Ud\nJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\nBBT8lEvnL1+/b5/hoCcEgK5m6PdqBzAfBgNVHSMEGDAWgBRQ0yBZ78Zyk1BERm2d\nDNxVO5AC6zBOBgNVHREERzBFggZsZWFmMWKCHWNsYWItZXZwbi1taC1hcy1tYy1s\nYWctbGVhZjFighxsZWFmMWIuZXZwbi1taC1hcy1tYy1sYWcuLmlvMA0GCSqGSIb3\nDQEBCwUAA4IBAQBjEvXthrSo6hLQEdUliz6kCusV+t1Wqr/SIS0sjY0r+IcScEmj\ncG8WPduZrmTfNPflRu4efDZdDw201wgN80oQ/93STpNcPB0SxnAnLB1H+picw/vv\nYht3IBRd0vMUSDChqfeOkDar2DhWVzpUlU7+fkg/3C8DlN0YJde8bnqFqKEapn3t\nCWFcC1zGtKJ4kTTnTZNflTS59zehuIAHcY0isWXiyhULKKRZlsltGWj5WBw0xrZ7\nu7yGHRpZEFz/xKva307OrAK2lREej0fsmXwy7SQgD3qr8654UKddUJ+5tn07SNG5\nF1lBEEMwW/Dp0vzs8TMXAWGEzFFHVIoiEv9i\n-----END CERTIFICATE-----\n",
           "authenticate-client": false
         }
       ]
@@ -1572,16 +1625,20 @@
                 "id": 1,
                 "ethernet-segment": [
                   {
-                    "name": "ES-leaf1-leaf2.CE1",
+                    "name": "mc-lag2",
                     "admin-state": "enable",
-                    "esi": "03:44:38:39:be:ef:aa:00:00:01",
-                    "interface": "lag1"
+                    "esi": "03:aa:c1:ab:00:03:00:00:00:02",
+                    "_annotate_esi": "EVPN MC-LAG with ('1.1.0.1', [2]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
+                    "interface": "lag2",
+                    "multi-homing-mode": "all-active"
                   },
                   {
-                    "name": "ES-leaf1-leaf2.Spines",
+                    "name": "mc-lag26",
                     "admin-state": "enable",
-                    "esi": "03:44:38:39:be:ef:aa:00:00:02",
-                    "interface": "lag2"
+                    "esi": "03:1a:b0:03:ff:00:00:00:00:1a",
+                    "_annotate_esi": "EVPN MC-LAG with ('1.1.0.1', [51]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
+                    "interface": "lag26",
+                    "multi-homing-mode": "all-active"
                   }
                 ]
               }
@@ -1713,6 +1770,49 @@
       }
     },
     {
+      "name": "evpn-lag-discovery",
+      "type": "srl_nokia-network-instance:ip-vrf",
+      "admin-state": "enable",
+      "interface": [
+        {
+          "name": "lo0.1"
+        }
+      ],
+      "vxlan-interface": [
+        {
+          "name": "vxlan0.65535"
+        }
+      ],
+      "protocols": {
+        "bgp-evpn": {
+          "srl_nokia-bgp-evpn:bgp-instance": [
+            {
+              "id": 1,
+              "admin-state": "enable",
+              "vxlan-interface": "vxlan0.65535",
+              "evi": 65535,
+              "ecmp": 8
+            }
+          ]
+        },
+        "srl_nokia-bgp-vpn:bgp-vpn": {
+          "bgp-instance": [
+            {
+              "id": 1,
+              "route-distinguisher": {
+                "rd": "1.1.0.2:65535"
+              },
+              "route-target": {
+                "_annotate": "Special RT/RD for EVPN LAG coordination",
+                "export-rt": "target:4200000000:65535",
+                "import-rt": "target:4200000000:65535"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
       "name": "mgmt",
       "type": "srl_nokia-network-instance:ip-vrf",
       "admin-state": "enable",
@@ -1731,23 +1831,23 @@
       }
     },
     {
-      "name": "Blue-MAC-VRF-10",
+      "name": "overlay-l2-1",
       "type": "srl_nokia-network-instance:mac-vrf",
       "admin-state": "enable",
       "interface": [
-        {
-          "name": "ethernet-1/1.0"
-        },
         {
           "name": "lag1.0"
         },
         {
           "name": "lag2.0"
+        },
+        {
+          "name": "lag26.0"
         }
       ],
       "vxlan-interface": [
         {
-          "name": "vxlan1.10"
+          "name": "vxlan0.1"
         }
       ],
       "protocols": {
@@ -1756,8 +1856,10 @@
             {
               "id": 1,
               "admin-state": "enable",
-              "vxlan-interface": "vxlan1.10",
-              "evi": 10
+              "vxlan-interface": "vxlan0.1",
+              "evi": 4095,
+              "_annotate_evi": "Note: value affects DF election in case of multi-homing",
+              "ecmp": 1
             }
           ]
         },
@@ -1887,13 +1989,23 @@
   },
   "srl_nokia-tunnel-interfaces:tunnel-interface": [
     {
-      "name": "vxlan1",
+      "name": "vxlan0",
       "vxlan-interface": [
         {
-          "index": 10,
+          "index": 1,
           "type": "srl_nokia-interfaces:bridged",
           "ingress": {
-            "vni": 10
+            "vni": 4095
+          },
+          "egress": {
+            "source-ip": "use-system-ipv4-address"
+          }
+        },
+        {
+          "index": 65535,
+          "type": "srl_nokia-interfaces:routed",
+          "ingress": {
+            "vni": 65535
           },
           "egress": {
             "source-ip": "use-system-ipv4-address"

@@ -52,19 +52,19 @@ topology:
       kind: srl
       group: leaves
       type: ixrd2
-      startup-config: delta-auto-config-multivendor.cmd
+      delta-config: delta-auto-config-multivendor.cmd
 
     leaf2b:
       kind: srl
       group: leaves
       type: ixrd2
-      startup-config: delta-auto-config-multivendor.cmd
+      delta-config: delta-auto-config-multivendor.cmd
 
     spine1:
       kind: srl
       group: spines
       type: ixr6
-      startup-config: delta-auto-config-multivendor.cmd
+      delta-config: delta-auto-config-multivendor.cmd
 
     server1:
       kind: linux
