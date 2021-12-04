@@ -42,13 +42,13 @@ iface bond1
 auto swp50
 iface swp50
     # trunk port ideally
-    bridge-access 4094
+    # bridge-access 4094
 
 # To leaf2b
 auto swp51
 iface swp51
     # trunk port ideally
-    bridge-access 4094
+    # bridge-access 4094
 
 # Bond towards leaf2a/leaf2b, cannot use LACP because Cumulus uses same admin
 # key for all bonds
@@ -62,6 +62,8 @@ iface bond2
     mstpctl-portadminedge yes
     # trunk port, potentially multiple VLANs
     # bridge-access 4094
+    bridge-vids 4094
+    bridge-allow-untagged no
 
 # Bridge for VXLAN with leaf1b, untagged
 # auto evpn-mh-bridge
@@ -88,22 +90,49 @@ iface bond2
 #     # bridge-learning on # Cumulus complains about conflict with EVPN?
 
 # Bridge for server traffic, VXLAN only between leaf1a/1b
+# auto bridge
+# iface bridge
+#     mstpctl-portbpdufilter bond1=yes bond2.4094=yes vxlan0=yes
+#     bridge-stp off
+#     bridge-ports bond1 bond2.4094 vxlan0
+#     hwaddress 44:38:39:22:01:b1
+#     # can either use VLAN subinterfaces or a vlan-aware bridge, but not both
+#     bridge-vlan-aware no
+#     # bridge-vids 4094
+#     # bridge-pvid 1
+
+# auto vxlan0
+# iface vxlan0
+#    # XXX VLAN 10 coming in mapping to VLAN 4094 -> likely fails. Only use 4094
+#    # Try mapping 1 (untagged) too, to see what gets advertised if anything
+#    bridge-vlan-vni-map 4094=4094 1=4095
+#    # Add VLAN 1 to list here, shouldn't be needed
+#    bridge-vids 1 4094
+#    bridge-learning off
+#    bridge-arp-nd-suppress off
+#    # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static
+
 auto bridge
 iface bridge
-    mstpctl-portbpdufilter bond1=yes bond2.4094=yes vxlan0=yes
-    bridge-stp off
-    bridge-ports bond1 bond2.4094 vxlan0
-    hwaddress 44:38:39:22:01:b1
-    # can either use VLAN subinterfaces or a vlan-aware bridge, but not both
-    bridge-vlan-aware no
+    bridge-ports bond1 bond2.4094 vni4094
     # bridge-vids 4094
-    # bridge-pvid 1
+    bridge-vlan-aware no
+    bridge-learning off
+    bridge-stp off
+    # bridge-allow-untagged no
 
-auto vxlan0
-iface vxlan0
-   # XXX VLAN 10 coming in mapping to VLAN 4094 -> likely fails. Only use 4094
-   bridge-vlan-vni-map 4094=4094
-   bridge-vids 4094
-   bridge-learning off
-   bridge-arp-nd-suppress off
-   # vxlan-remoteip 1.1.0.2 learnt through EVPN, not static
+auto vlan4094
+iface vlan4094
+    ip6-forward off
+    ip-forward off
+    vlan-id 4094
+    vlan-raw-device bridge
+
+# This is called "traditional VXLAN device", with every VNI a separate device
+auto vni4094
+iface vni4094
+    bridge-arp-nd-suppress off
+    bridge-access 4094
+    mstpctl-bpduguard yes
+    mstpctl-portbpdufilter yes
+    vxlan-id 4094
