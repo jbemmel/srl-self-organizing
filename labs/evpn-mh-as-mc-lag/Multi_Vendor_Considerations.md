@@ -422,7 +422,7 @@ make -C./Docker all
 cd labs/evpn-mh-as-mc-lag
 sudo custom_built_containerlab deploy -t ./multi-vendor-evpn-mh-as-mc-lag.clab.yml --reconfigure
 ```
-Note that this lab config uses a [custom containerlab extension for delta-config](https://github.com/jbemmel/containerlab/tree/delta-config); at the time of writing the feature is released, but not 100% compatible with the approach taken here.
+Note that this lab config uses a [custom containerlab extension for delta-config](https://github.com/jbemmel/containerlab/tree/delta-config); at the time of writing the feature is released, but not 100% compatible with the approach taken here. See [build instructions](https://github.com/jbemmel/containerlab/blob/master/README.md)
 
 Once the lab is up, you may need to go into the CVX node to make it apply its config:
 ```
