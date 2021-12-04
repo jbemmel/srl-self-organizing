@@ -38,7 +38,7 @@ iface bond1
     mstpctl-portadminedge yes
     # bridge-access 4094
     # Ignored when using bridge-access
-    bridge-vids 198 4094
+    bridge-vids 192 4094
     # Try to make 4094 untagged
     bridge-pvid 4094
 
@@ -68,7 +68,7 @@ iface bond2
     mstpctl-portadminedge yes
     # trunk port, potentially multiple VLANs
     # bridge-access 4094
-    bridge-vids 4094
+    bridge-vids 192 4094
     bridge-allow-untagged no
 
 # auto bond2.4094
@@ -125,10 +125,11 @@ iface bond2
 auto bridge
 iface bridge
     # bridge-ports bond1 bond2.4094 ...
-    bridge-ports swp1 bond1 bond2 vni4094 vni198
+    bridge-ports swp1 bond1 bond2 vni4094 vni192
     # mstpctl-portbpdufilter bond1=yes bond2.4094=yes vni4094=yes
-    bridge-vids 4094 198
+    bridge-vids 4094 192
     bridge-vlan-aware yes
+    hwaddress 10:10:10:10:10:10
     # Get duplicate packets without this
     # bridge-learning off
     bridge-stp off
@@ -157,23 +158,23 @@ iface vni4094
     vxlan-id 4094
 
 # Server3 only /31 VLAN towards spines
-auto vlan198
-iface vlan198
+auto vlan192
+iface vlan192
    ip6-forward off
    ip-forward off
-   vlan-id 198
+   vlan-id 192
    vlan-raw-device bridge
 
 # Server3 only /31 VLAN towards spines
-auto vni198
-iface vni198
+auto vni192
+iface vni192
     bridge-arp-nd-suppress off
     bridge-learning off
     # Mandatory when using VLAN aware bridge
-    bridge-access 198
+    bridge-access 192
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
-    vxlan-id 198
+    vxlan-id 192
 
 # Create 2nd VNI for untagged native VLAN? Duplicate packets
 # auto vni4095

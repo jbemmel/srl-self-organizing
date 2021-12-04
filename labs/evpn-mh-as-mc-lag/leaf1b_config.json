@@ -1270,7 +1270,7 @@
     },
     {
       "name": "lag2",
-      "description": "Auto-discovered MC-LAG with ('1.1.0.1', 2)",
+      "description": "Multi-vendor MLAG towards server3",
       "admin-state": "enable",
       "srl_nokia-interfaces-vlans:vlan-tagging": true,
       "subinterface": [
@@ -1281,6 +1281,17 @@
             "encap": {
               "untagged": {
 
+              }
+            }
+          }
+        },
+        {
+          "index": 1,
+          "type": "srl_nokia-interfaces:bridged",
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "single-tagged": {
+                "vlan-id": 192
               }
             }
           }
@@ -1311,6 +1322,17 @@
             "encap": {
               "single-tagged": {
                 "vlan-id": 4094
+              }
+            }
+          }
+        },
+        {
+          "index": 1,
+          "type": "srl_nokia-interfaces:bridged",
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "single-tagged": {
+                "vlan-id": 192
               }
             }
           }
@@ -1798,6 +1820,45 @@
           ]
         }
       }
+    },
+    {
+      "name": "overlay-l2-2",
+      "type": "srl_nokia-network-instance:mac-vrf",
+      "admin-state": "enable",
+      "interface": [
+        {
+          "name": "lag2.1"
+        },
+        {
+          "name": "lag26.1"
+        }
+      ],
+      "vxlan-interface": [
+        {
+          "name": "vxlan0.2"
+        }
+      ],
+      "protocols": {
+        "bgp-evpn": {
+          "srl_nokia-bgp-evpn:bgp-instance": [
+            {
+              "id": 1,
+              "admin-state": "enable",
+              "vxlan-interface": "vxlan0.2",
+              "evi": 192,
+              "_annotate_evi": "VLAN 192 to server3",
+              "ecmp": 1
+            }
+          ]
+        },
+        "srl_nokia-bgp-vpn:bgp-vpn": {
+          "bgp-instance": [
+            {
+              "id": 1
+            }
+          ]
+        }
+      }
     }
   ],
   "srl_nokia-routing-policy:routing-policy": {
@@ -1923,6 +1984,16 @@
           "type": "srl_nokia-interfaces:bridged",
           "ingress": {
             "vni": 4094
+          },
+          "egress": {
+            "source-ip": "use-system-ipv4-address"
+          }
+        },
+        {
+          "index": 2,
+          "type": "srl_nokia-interfaces:bridged",
+          "ingress": {
+            "vni": 192
           },
           "egress": {
             "source-ip": "use-system-ipv4-address"
