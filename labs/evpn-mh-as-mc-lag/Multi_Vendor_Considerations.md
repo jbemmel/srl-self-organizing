@@ -244,7 +244,7 @@ In a centralized routing deployment, you must configure layer 3 interfaces even 
 To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
 ```
 
-After trying various options, I ended up with the following configuration:
+After trying various options (including [NVUE](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_nvue_startup.yaml), I ended up with the following configuration:
 * [/etc/network/interfaces](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces)
 * [/etc/frr/frr.conf](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_frr.conf)
 
