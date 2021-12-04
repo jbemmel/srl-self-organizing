@@ -266,6 +266,39 @@ module auto_config_agent {
             //    }
             // }
 
+            // The core of provisioning: end user services
+            list service {
+              key evi;
+
+              leaf evi {
+                description "EVPN Instance for this service";
+                type uint16 { range "1..65535"; } // or SRL:evi-type
+              }
+              leaf vni {
+                description "VxLAN Virtual Network Identifier for this service, set equal to EVI if not specified";
+                type uint32 { range "1..16777215"; }
+              }
+              leaf vlan {
+                description "VLAN to use, default 0=untagged";
+                type uint16 { range "0..4094"; }
+                default 0;
+              }
+              container l3 {
+                description "L3 properties of the service";
+                leaf gateway {
+                 description "Location of the gateway, defaults to 'anycast-gw-on-leaves'";
+                 type enumeration {
+                  enum anycast-gw-on-leaves;
+                  enum on-spines;
+                 }
+                 default "anycast-gw-on-leaves";
+                }
+
+                leaf gateway-ipv4 { type srl_nokia-comm:ipv4-prefix-with-host-bits; }
+                leaf gateway-ipv6 { type srl_nokia-comm:ipv6-address; }
+              }
+            }
+
             // info from state
             list leaf {
                 key leaf-id;
