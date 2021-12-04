@@ -36,9 +36,11 @@ iface bond1
     bond-lacp-bypass-allow yes
     mstpctl-bpduguard yes
     mstpctl-portadminedge yes
-    bridge-access 4094
-    # Ignored because of bridge-access
-    # bridge-vids 4094
+    # bridge-access 4094
+    # Ignored when using bridge-access
+    bridge-vids 198 4094
+    # Try to make 4094 untagged
+    bridge-pvid 4094
 
 # To leaf2a
 auto swp50
@@ -122,10 +124,10 @@ iface bond2
 
 auto bridge
 iface bridge
-    # bridge-ports bond1 bond2.4094 vni4094
-    bridge-ports swp1 bond1 bond2 vni4094
+    # bridge-ports bond1 bond2.4094 ...
+    bridge-ports swp1 bond1 bond2 vni4094 vni198
     # mstpctl-portbpdufilter bond1=yes bond2.4094=yes vni4094=yes
-    bridge-vids 4094
+    bridge-vids 4094 198
     bridge-vlan-aware yes
     # Get duplicate packets without this
     # bridge-learning off
@@ -141,10 +143,9 @@ iface vlan4094
    vlan-id 4094
    # or bond2? does get tagged when doing that
    vlan-raw-device bridge
-    # JvB: here?
+    # JvB: here? no
     # es-sys-mac aa:c1:ab:00:03:00
 
-# This is called "traditional VXLAN device", with every VNI a separate device
 auto vni4094
 iface vni4094
     bridge-arp-nd-suppress off
@@ -153,9 +154,26 @@ iface vni4094
     bridge-access 4094
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
-    # Doesnt stop STP
-    # bridge-stp off
     vxlan-id 4094
+
+# Server3 only /31 VLAN towards spines
+auto vlan198
+iface vlan198
+   ip6-forward off
+   ip-forward off
+   vlan-id 198
+   vlan-raw-device bridge
+
+# Server3 only /31 VLAN towards spines
+auto vni198
+iface vni198
+    bridge-arp-nd-suppress off
+    bridge-learning off
+    # Mandatory when using VLAN aware bridge
+    bridge-access 198
+    mstpctl-bpduguard yes
+    mstpctl-portbpdufilter yes
+    vxlan-id 198
 
 # Create 2nd VNI for untagged native VLAN? Duplicate packets
 # auto vni4095

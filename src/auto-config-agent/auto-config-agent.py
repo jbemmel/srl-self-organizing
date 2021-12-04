@@ -572,6 +572,7 @@ def Convert_to_lag(state,port,ip,peer_data):
         'admin-key': _lag_id, # range 1..65535, must be unique across all lags
         'system-priority': state.id_from_hostname, # range 0..65535, lower wins
        }
+       # Note: Could also provision /system/lacp/system-id and -priority global
 
    use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
    irb_if = {

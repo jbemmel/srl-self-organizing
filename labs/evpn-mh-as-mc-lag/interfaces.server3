@@ -19,3 +19,10 @@ iface bond0 inet6 static
   netmask 64
   gateway 2001:10:0:0::1
   pre-up echo 0 > /proc/sys/net/ipv6/conf/eth0/accept_ra
+
+# Add a second, premium VNI on top, exclusive /31 from server3 towards the spine
+auto bond0.192
+iface bond0.192 inet static
+  address 192.168.0.103
+  netmask 255.255.255.254
+  vlan-raw-device bond0
