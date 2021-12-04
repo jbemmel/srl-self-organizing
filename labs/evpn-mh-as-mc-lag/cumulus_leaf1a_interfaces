@@ -23,7 +23,7 @@ iface swp1
 auto swp2 # To Server2, mc-lag
 iface swp2
     # Native VLAN 1 untagged, untagged frames mapped to local VLAN 4094
-    bridge-access 4094
+    # bridge-access 4094
 
 # Server2 bond, ES sys MAC is also sent in LACP MAC address
 auto bond1
@@ -123,13 +123,14 @@ iface bond2
 auto bridge
 iface bridge
     # bridge-ports bond1 bond2.4094 vni4094
-    bridge-ports bond1 bond2 vni4094
+    bridge-ports swp1 bond1 bond2 vni4094
     # mstpctl-portbpdufilter bond1=yes bond2.4094=yes vni4094=yes
     bridge-vids 4094
     bridge-vlan-aware yes
     # Get duplicate packets without this
     # bridge-learning off
     bridge-stp off
+    # Doesn't seem to have an effect
     # bridge-allow-untagged no
 
 # For traditional VLAN unaware bridge, ping works without this too, not sure what it adds
