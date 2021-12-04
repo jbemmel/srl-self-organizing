@@ -9,7 +9,9 @@ As defined in [RFC8365](https://datatracker.ietf.org/doc/html/rfc8365) and (also
 A VxLAN Network Identifier (VNI) is a 24-bit label that is used as part of UDP encapsulation: A data plane identifier to distinguish between different services, for example traffic from different customers or different applications. It can be viewed as an extension of the 12-bit VLAN concept.
 
 ## EVPN Instance (EVI)
-An EVPN Instance is a 16-bit value used to identify unique EVPN services inside a given network.
+An EVPN Instance is* a 16-bit value used to identify unique EVPN services inside a given network.
+
+(*) For most data center infrastructure / use cases
 
 ## Virtual Identifier to EVI mapping
 12-bit VLANs and their 24-bit overlay cousins VNIs [can be mapped](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2) to 16-bit EVIs in 2 distinct ways:
@@ -18,13 +20,13 @@ An EVPN Instance is a 16-bit value used to identify unique EVPN services inside 
 
 In the former case, it is possible to [auto-derive](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2.1) EVPN RD and RT values as \<router-id\>:VNI and \<2-byte-AS\>:VNI respectively.
 
-In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assume the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI.
+In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assumes the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI, keeping VNIs below 65536.
 
 # Bonding with Link Aggregation Control Protocol (LACP)
 All network operating systems support bonding (LAGs) with LACP, but they vary in the degree to which parameters can be configured.
 
 ## SR Linux
-In SRL, a sample LACP configuration looks like this:
+In SRL, a sample LACP configuration [looks like this](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/leaf1b_config.json#L1289):
 ```
 lag {
         lag-type lacp
@@ -62,7 +64,7 @@ On the wire, a partner device receives it like this:
 Fairly straightforward, and fully configurable.
 
 ## Cumulus CVX
-On Cumulus, a bond configuration with LACP enabled looks like this:
+On Cumulus, a bond configuration with LACP enabled [looks like this](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces#L28):
 ```
 # Bond towards leaf2a/leaf2b
 auto bond2
@@ -80,13 +82,155 @@ One can configure 'lacp bypass' (SRL calls this "LACP fallback mode") and the ra
 Moreover, note how the LACP system MAC address is based on the 'es-sys-mac', and the generated ESI value contains this same MAC address (using a Type 0x3 ESI).
 While logical, this further reduces flexibility with respect to possible configurations. SR Linux can match the Cumulus configuration by setting ESI==0x03:\<system-id-mac\>:... but vice versa is not always possible.
 
-As a workaround, we can use static lags on the network facing side instead:
+While SR Linux can match most Cumulus settings, it does not accept multiple lags with the same admin-key for LACP. As a workaround, we can use static lags on the network facing side instead; this results in the following Multi-Vendor EVPN Multi-Homing interop topology
 ![plot](Multi_vendor_evpn_mh.png)
 
 # EVPN Control plane
 At the control plane level, both systems send similar routes, with some vendor specific differences:
 
 * Route Distinguisher: SRL uses a RD of \<system-ip\>:0 for Ethernet Segment routes, CVX uses multiple different ones:
+```
+A:leaf-1b-1.1.0.2# /show network-instance default protocols bgp neighbor 1.1.0.1 received-routes evpn                                                                                                              
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Peer        : 1.1.0.1, remote AS: 65000, local AS: 65000
+Type        : static
+Description : EVPN leaf-pair to support MC-LAG based on MH
+Group       : evpn-peer-leaf
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Status codes: u=used, *=valid, >=best, x=stale
+Origin codes: i=IGP, e=EGP, ?=incomplete
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 1 Ethernet Auto-Discovery Routes
++--------+-----------------------------------+--------------------------------+------------+-----------------------------------+-----------------------------------+---------+-----------------------------------+
+| Status |        Route-distinguisher        |              ESI               |   Tag-ID   |             Next-Hop              |                MED                | LocPref |               Path                |
++========+===================================+================================+============+===================================+===================================+=========+===================================+
+| u*>    | 1.1.0.1:2                         | 03:aa:c1:ab:00:03:00:00:00:02  | 0          | 1.1.0.1                           | -                                 | 100     |                                   |
+| u*>    | 1.1.0.1:2                         | 03:aa:c1:ab:00:03:00:00:00:03  | 0          | 1.1.0.1                           | -                                 | 100     |                                   |
+| u*>    | 1.1.0.1:3                         | 03:aa:c1:ab:00:03:00:00:00:02  | 4294967295 | 1.1.0.1                           | -                                 | 100     |                                   |
+| u*>    | 1.1.0.1:4                         | 03:aa:c1:ab:00:03:00:00:00:03  | 4294967295 | 1.1.0.1                           | -                                 | 100     |                                   |
++--------+-----------------------------------+--------------------------------+------------+-----------------------------------+-----------------------------------+---------+-----------------------------------+
+Type 2 MAC-IP Advertisement Routes
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+| Status |     Route-distinguisher      |   Tag-ID   |    MAC-address    |          IP-address          |           Next-Hop           |             MED              | LocPref |             Path             |
++========+==============================+============+===================+==============================+==============================+==============================+=========+==============================+
+| u*>    | 1.1.0.1:2                    | 0          | 00:11:22:33:44:01 | 0.0.0.0                      | 1.1.0.1                      | -                            | 100     |                              |
+| u*>    | 1.1.0.1:2                    | 0          | 00:11:22:33:44:03 | 0.0.0.0                      | 1.1.0.1                      | -                            | 100     |                              |
+| u*>    | 1.1.0.1:2                    | 0          | 00:60:08:69:97:EF | 0.0.0.0                      | 1.1.0.1                      | -                            | 100     |                              |
+| u*>    | 1.1.0.1:2                    | 0          | 1A:B0:07:FF:01:01 | 0.0.0.0                      | 1.1.0.1                      | -                            | 100     |                              |
+| u*>    | 1.1.0.1:2                    | 0          | AA:C1:AB:95:BF:BB | 0.0.0.0                      | 1.1.0.1                      | -                            | 100     |                              |
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 3 Inclusive Multicast Ethernet Tag Routes
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+--------------------------------------+
+| Status |         Route-distinguisher          |   Tag-ID   |    Originator-IP    |               Next-Hop               |                 MED                  | LocPref |                 Path                 |
++========+======================================+============+=====================+======================================+======================================+=========+======================================+
+| u*>    | 1.1.0.1:2                            | 0          | 1.1.0.1             | 1.1.0.1                              | -                                    | 100     |                                      |
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+--------------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 4 Ethernet Segment Routes
++--------+------------------------------+--------------------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+| Status |     Route-distinguisher      |              ESI               |        Originator-IP         |           Next-Hop           |             MED              | LocPref |             Path             |
++========+==============================+================================+==============================+==============================+==============================+=========+==============================+
+| u*>    | 1.1.0.1:3                    | 03:aa:c1:ab:00:03:00:00:00:02  | 1.1.0.1                      | 1.1.0.1                      | -                            | 100     |                              |
+| u*>    | 1.1.0.1:4                    | 03:aa:c1:ab:00:03:00:00:00:03  | 1.1.0.1                      | 1.1.0.1                      | -                            | 100     |                              |
++--------+------------------------------+--------------------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+```
+We see 2 kinds of Type-1 Ethernet Segment routes:
+1. EAD per EVI (tag 0, RD:2), used for aliasing and load balancing of traffic to multiple switches
+2. EAD per ES (tag 0xffffffff), used for faster convergence during access failure scenarios.
+
+In contrast, SRL sends this:
+```
+A:leaf-1b-1.1.0.2# /show network-instance default protocols bgp neighbor 1.1.0.1 advertised-routes evpn                                                                                                            
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Peer        : 1.1.0.1, remote AS: 65000, local AS: 65000
+Type        : static
+Description : EVPN leaf-pair to support MC-LAG based on MH
+Group       : evpn-peer-leaf
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Origin codes: i=IGP, e=EGP, ?=incomplete
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 1 Ethernet Auto-Discovery Routes
++-------------------------------------+--------------------------------+------------+-------------------------------------+-------------------------------------+---------+-------------------------------------+
+|         Route-distinguisher         |              ESI               |   Tag-ID   |              Next-Hop               |                 MED                 | LocPref |                Path                 |
++=====================================+================================+============+=====================================+=====================================+=========+=====================================+
+| 1.1.0.2:4094                        | 03:aa:c1:ab:00:03:00:00:00:02  | 0          | 1.1.0.2                             | -                                   | 100     |                                     |
+| 1.1.0.2:4094                        | 03:aa:c1:ab:00:03:00:00:00:02  | 4294967295 | 1.1.0.2                             | -                                   | 100     |                                     |
+| 1.1.0.2:4094                        | 03:aa:c1:ab:00:03:00:00:00:03  | 0          | 1.1.0.2                             | -                                   | 100     |                                     |
+| 1.1.0.2:4094                        | 03:aa:c1:ab:00:03:00:00:00:03  | 4294967295 | 1.1.0.2                             | -                                   | 100     |                                     |
++-------------------------------------+--------------------------------+------------+-------------------------------------+-------------------------------------+---------+-------------------------------------+
+Type 3 Inclusive Multicast Ethernet Tag Routes
++----------------------------------------+------------+---------------------+----------------------------------------+----------------------------------------+---------+----------------------------------------+
+|          Route-distinguisher           |   Tag-ID   |    Originator-IP    |                Next-Hop                |                  MED                   | LocPref |                  Path                  |
++========================================+============+=====================+========================================+========================================+=========+========================================+
+| 1.1.0.2:4094                           | 0          | 1.1.0.2             | 1.1.0.2                                | -                                      | 100     |                                        |
++----------------------------------------+------------+---------------------+----------------------------------------+----------------------------------------+---------+----------------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 4 Ethernet Segment Routes
++--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+---------+--------------------------------+
+|      Route-distinguisher       |              ESI               |         Originating-IP         |            Next-Hop            |              MED               | LocPref |              Path              |
++================================+================================+================================+================================+================================+=========+================================+
+| 1.1.0.2:0                      | 03:aa:c1:ab:00:03:00:00:00:02  | 1.1.0.2                        | 1.1.0.2                        | -                              | 100     |                                |
+| 1.1.0.2:0                      | 03:aa:c1:ab:00:03:00:00:00:03  | 1.1.0.2                        | 1.1.0.2                        | -                              | 100     |                                |
++--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+---------+--------------------------------+
+```
+SRL uses the same RD for most routes, auto-derived from the EVI (== VNI here) based on [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432#section-7.9).
+For Type 4 routes it uses \<router-id\>:0 as RD. These implementation choices make tracing routes across the EVPN control plane a lot easier, a critical difference especially at larger scale. 65535 different RD values may seem like a lot, but it is better to be frugal where possible.
+
+The BGP routes view may help understand what's going on here:
+```
+A:leaf-1b-1.1.0.2# /show network-instance default protocols bgp routes evpn route-type summary                                                                                                                     
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Show report for the BGP route table of network-instance "default"
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Status codes: u=used, *=valid, >=best, x=stale
+Origin codes: i=IGP, e=EGP, ?=incomplete
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+BGP Router ID: 1.1.0.2      AS: 65000      Local AS: 65000
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 1 Ethernet Auto-Discovery Routes
++--------+-----------------+--------------------------------+------------+------------+-------------+----------+
+| Status |     Route-      |              ESI               |   Tag-ID   |  neighbor  |  Next-hop   |   VNI    |
+|        |  distinguisher  |                                |            |            |             |          |
++========+=================+================================+============+============+=============+==========+
+| u*>    | 1.1.0.1:2       | 03:aa:c1:ab:00:03:00:00:00:02  | 0          | 1.1.0.1    | 1.1.0.1     | 4094     |
+| u*>    | 1.1.0.1:2       | 03:aa:c1:ab:00:03:00:00:00:03  | 0          | 1.1.0.1    | 1.1.0.1     | 4094     |
+| u*>    | 1.1.0.1:3       | 03:aa:c1:ab:00:03:00:00:00:02  | 4294967295 | 1.1.0.1    | 1.1.0.1     | -        |
+| u*>    | 1.1.0.1:4       | 03:aa:c1:ab:00:03:00:00:00:03  | 4294967295 | 1.1.0.1    | 1.1.0.1     | -        |
++--------+-----------------+--------------------------------+------------+------------+-------------+----------+
+Type 2 MAC-IP Advertisement Routes
++--------+-----------------+------------+-------------------+-----------------------------------------+------------+------------------------+----------+--------------------------------+------------------------+
+| Status |     Route-      |   Tag-ID   |    MAC-address    |               IP-address                |  neighbor  |        Next-Hop        |   VNI    |              ESI               |      MAC Mobility      |
+|        |  distinguisher  |            |                   |                                         |            |                        |          |                                |                        |
++========+=================+============+===================+=========================================+============+========================+==========+================================+========================+
+| u*>    | 1.1.0.1:2       | 0          | 00:11:22:33:44:01 | 0.0.0.0                                 | 1.1.0.1    | 1.1.0.1                | 4094     | 00:00:00:00:00:00:00:00:00:00  | -                      |
+| u*>    | 1.1.0.1:2       | 0          | 00:11:22:33:44:03 | 0.0.0.0                                 | 1.1.0.1    | 1.1.0.1                | 4094     | 03:aa:c1:ab:00:03:00:00:00:02  | -                      |
+| u*>    | 1.1.0.1:2       | 0          | 00:60:08:69:97:EF | 0.0.0.0                                 | 1.1.0.1    | 1.1.0.1                | 4094     | 03:aa:c1:ab:00:03:00:00:00:02  | -                      |
+| u*>    | 1.1.0.1:2       | 0          | 1A:B0:07:FF:01:01 | 0.0.0.0                                 | 1.1.0.1    | 1.1.0.1                | 4094     | 03:aa:c1:ab:00:03:00:00:00:03  | -                      |
+| u*>    | 1.1.0.1:2       | 0          | AA:C1:AB:95:BF:BB | 0.0.0.0                                 | 1.1.0.1    | 1.1.0.1                | 4094     | 00:00:00:00:00:00:00:00:00:00  | -                      |
++--------+-----------------+------------+-------------------+-----------------------------------------+------------+------------------------+----------+--------------------------------+------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 3 Inclusive Multicast Ethernet Tag Routes
++--------+-----------------+------------+---------------------+------------+--------------------------------------------------------------------------------------------------------------------------------------+
+| Status |     Route-      |   Tag-ID   |    Originator-IP    |  neighbor  |                                                               Next-Hop                                                               |
+|        |  distinguisher  |            |                     |            |                                                                                                                                      |
++========+=================+============+=====================+============+======================================================================================================================================+
+| u*>    | 1.1.0.1:2       | 0          | 1.1.0.1             | 1.1.0.1    | 1.1.0.1                                                                                                                              |
++--------+-----------------+------------+---------------------+------------+--------------------------------------------------------------------------------------------------------------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 4 Ethernet Segment Routes
++--------+-----------------+--------------------------------+-------------------------------------------------------------------+------------+-------------------------------------------------------------------+
+| Status |     Route-      |              ESI               |                        originating-router                         |  neighbor  |                             Next-Hop                              |
+|        |  distinguisher  |                                |                                                                   |            |                                                                   |
++========+=================+================================+===================================================================+============+===================================================================+
+| u*>    | 1.1.0.1:3       | 03:aa:c1:ab:00:03:00:00:00:02  | 1.1.0.1                                                           | 1.1.0.1    | 1.1.0.1                                                           |
+| u*>    | 1.1.0.1:4       | 03:aa:c1:ab:00:03:00:00:00:03  | 1.1.0.1                                                           | 1.1.0.1    | 1.1.0.1                                                           |
++--------+-----------------+--------------------------------+-------------------------------------------------------------------+------------+-------------------------------------------------------------------+
+```
 
 * Extended communities: CVX includes an bgp-tunnel-encap:VXLAN extended community with its Ethernet Segment routes, SRL does not
 
@@ -96,7 +240,26 @@ According to [the 4.4 manual](https://docs.nvidia.com/networking-ethernet-softwa
 
 Also, 
 ```
-In a centralized routing deployment, you must configure layer 3 interfaces even if you configure the switch only for layer 2 (you are not using VXLAN routing). To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
+In a centralized routing deployment, you must configure layer 3 interfaces even if you configure the switch only for layer 2 (you are not using VXLAN routing). 
+To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
+```
+
+After trying various options (including [NVUE](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_nvue_startup.yaml), I ended up with the following configuration:
+* [/etc/network/interfaces](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces)
+* [/etc/frr/frr.conf](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_frr.conf)
+
+For some reason things do not come up automatically upon boot, but after a ```ifreload -a``` we get:
+```
+root@leaf1a:mgmt:~# net show bridge vlan 
+
+Interface  VLAN  Flags                  VNI
+---------  ----  ---------------------  ----
+swp1       4094  PVID, Egress Untagged
+bond1      4094  PVID, Egress Untagged
+bond2      4094
+bridge        1  PVID, Egress Untagged
+           4094
+vni4094    4094  PVID, Egress Untagged  4094
 ```
 
 # Verification
