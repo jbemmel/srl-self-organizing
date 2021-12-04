@@ -26,7 +26,7 @@ In SR Linux, the EVI and VNI for a service are provisioned separately (under the
 All network operating systems support bonding (LAGs) with LACP, but they vary in the degree to which parameters can be configured.
 
 ## SR Linux
-In SRL, a sample LACP configuration looks like this:
+In SRL, a sample LACP configuration [looks like this](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/leaf1b_config.json#L1289):
 ```
 lag {
         lag-type lacp
