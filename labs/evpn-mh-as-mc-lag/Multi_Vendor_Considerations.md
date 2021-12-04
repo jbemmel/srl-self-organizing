@@ -20,7 +20,7 @@ An EVPN Instance is* a 16-bit value used to identify unique EVPN services inside
 
 In the former case, it is possible to [auto-derive](https://datatracker.ietf.org/doc/html/rfc8365#section-5.1.2.1) EVPN RD and RT values as \<router-id\>:VNI and \<2-byte-AS\>:VNI respectively.
 
-In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assume the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI.
+In SR Linux, the EVI and VNI for a service are provisioned separately (under the mac-vrf instance and the VxLAN tunnel-interface respectively). Cumulus only provisions the VNI and assumes the EVI is the same (implicitly limiting usable VXLAN ID space to 16 bits for auto-rd/rt). Since we cannot provision the EVI, interop requirements force us to configure VNI==EVI, keeping VNIs below 65536.
 
 # Bonding with Link Aggregation Control Protocol (LACP)
 All network operating systems support bonding (LAGs) with LACP, but they vary in the degree to which parameters can be configured.
@@ -64,7 +64,7 @@ On the wire, a partner device receives it like this:
 Fairly straightforward, and fully configurable.
 
 ## Cumulus CVX
-On Cumulus, a bond configuration with LACP enabled looks like this:
+On Cumulus, a bond configuration with LACP enabled [looks like this](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces#L28):
 ```
 # Bond towards leaf2a/leaf2b
 auto bond2
