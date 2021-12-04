@@ -1589,7 +1589,7 @@
                   {
                     "name": "mc-lag2",
                     "admin-state": "enable",
-                    "esi": "03:aa:c1:ab:00:03:00:00:00:02",
+                    "esi": "03:aa:c1:ab:00:03:00:00:00:01",
                     "_annotate_esi": "EVPN MC-LAG with ('1.1.0.1', [2]), bytes 2-7 form auto-derived route target see RFC7432 7.6",
                     "interface": "lag2",
                     "multi-homing-mode": "all-active"
@@ -1597,7 +1597,7 @@
                   {
                     "name": "mc-lag26",
                     "admin-state": "enable",
-                    "esi": "03:aa:c1:ab:00:03:00:00:00:03",
+                    "esi": "03:aa:c1:ab:00:03:00:00:00:02",
                     "_annotate_esi": "try with same MAC",
                     "interface": "lag26",
                     "multi-homing-mode": "all-active",
