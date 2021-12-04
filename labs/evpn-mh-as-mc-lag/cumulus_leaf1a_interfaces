@@ -37,6 +37,8 @@ iface bond1
     mstpctl-bpduguard yes
     mstpctl-portadminedge yes
     bridge-access 4094
+    # Ignored because of bridge-access
+    # bridge-vids 4094
 
 # To leaf2a
 auto swp50
@@ -58,12 +60,18 @@ iface bond2
     es-sys-mac aa:c1:ab:00:03:00
     bond-slaves swp50 swp51
     bond-mode balance-xor
+    # bond-mode 802.3ad
+    # bond-lacp-rate slow
     mstpctl-bpduguard yes
     mstpctl-portadminedge yes
     # trunk port, potentially multiple VLANs
     # bridge-access 4094
     bridge-vids 4094
     bridge-allow-untagged no
+
+# auto bond2.4094
+# iface bond2.4094
+#     es-sys-mac aa:c1:ab:00:03:00
 
 # Bridge for VXLAN with leaf1b, untagged
 # auto evpn-mh-bridge
@@ -114,30 +122,48 @@ iface bond2
 
 auto bridge
 iface bridge
-    bridge-ports bond1 bond2.4094 vni4094
+    # bridge-ports bond1 bond2.4094 vni4094
+    bridge-ports bond1 bond2 vni4094
     # mstpctl-portbpdufilter bond1=yes bond2.4094=yes vni4094=yes
-    # bridge-vids 4094
-    bridge-vlan-aware no
+    bridge-vids 4094
+    bridge-vlan-aware yes
     # Get duplicate packets without this
     # bridge-learning off
     bridge-stp off
     # bridge-allow-untagged no
 
+# For traditional VLAN unaware bridge, ping works without this too, not sure what it adds
 auto vlan4094
 iface vlan4094
-    ip6-forward off
-    ip-forward off
-    vlan-id 4094
-    vlan-raw-device bridge
+   ip6-forward off
+   ip-forward off
+   vlan-id 4094
+   # or bond2? does get tagged when doing that
+   vlan-raw-device bridge
+    # JvB: here?
+    # es-sys-mac aa:c1:ab:00:03:00
 
 # This is called "traditional VXLAN device", with every VNI a separate device
 auto vni4094
 iface vni4094
     bridge-arp-nd-suppress off
     bridge-learning off
+    # Mandatory when using VLAN aware bridge
     bridge-access 4094
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     # Doesnt stop STP
     # bridge-stp off
     vxlan-id 4094
+
+# Create 2nd VNI for untagged native VLAN? Duplicate packets
+# auto vni4095
+# iface vni4095
+#     bridge-arp-nd-suppress off
+#     bridge-learning off
+#     bridge-access 1
+#     mstpctl-bpduguard yes
+#     mstpctl-portbpdufilter yes
+#     # Doesnt stop STP
+#     # bridge-stp off
+#     vxlan-id 4095

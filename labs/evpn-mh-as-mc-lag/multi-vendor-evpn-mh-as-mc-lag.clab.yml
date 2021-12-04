@@ -40,6 +40,7 @@ topology:
       - cumulus_leaf1a_interfaces:/etc/network/interfaces.d/host-mounts
       - cumulus_leaf1a_frr_daemons:/etc/frr/daemons
       - cumulus_leaf1a_frr.conf:/etc/frr/frr.conf
+      - cumulus_enable_mh_switchd.conf:/etc/cumulus/switchd.conf
 
     leaf1b:
       kind: srl

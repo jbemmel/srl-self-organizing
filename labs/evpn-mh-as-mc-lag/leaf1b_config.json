@@ -1597,7 +1597,7 @@
                   {
                     "name": "mc-lag26",
                     "admin-state": "enable",
-                    "esi": "03:aa:c1:ab:00:03:00:00:00:1a",
+                    "esi": "03:aa:c1:ab:00:03:00:00:00:03",
                     "_annotate_esi": "try with same MAC",
                     "interface": "lag26",
                     "multi-homing-mode": "all-active",
