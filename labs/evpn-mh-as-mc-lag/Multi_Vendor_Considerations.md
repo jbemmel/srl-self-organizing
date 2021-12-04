@@ -177,8 +177,10 @@ Type 4 Ethernet Segment Routes
 | 1.1.0.2:0                      | 03:aa:c1:ab:00:03:00:00:00:03  | 1.1.0.2                        | 1.1.0.2                        | -                              | 100     |                                |
 +--------------------------------+--------------------------------+--------------------------------+--------------------------------+--------------------------------+---------+--------------------------------+
 ```
+SRL uses the same RD for most routes, auto-derived from the EVI (== VNI here) based on [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432#section-7.9).
+For Type 4 routes it uses \<router-id\>:0 as RD. These implementation choices make tracing routes across the EVPN control plane a lot easier, a critical difference especially at larger scale. 65535 different RD values may seem like a lot, but it is better to be frugal where possible.
 
-The BGP routes view may help see what's going on here:
+The BGP routes view may help understand what's going on here:
 ```
 A:leaf-1b-1.1.0.2# /show network-instance default protocols bgp routes evpn route-type summary                                                                                                                     
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
