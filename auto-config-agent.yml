@@ -7,8 +7,9 @@ auto_config_agent:
    failure-threshold: 5
    failure-action: wait=forever
    author: 'Nokia'
-   # Seems to have filesystem access issues during boot -> block boot
-   version-command: ' cat build_version'
+   # Seems to have filesystem access issues during boot -> blocks boot
+   # version-command: ' cat build_version'
+   version-command: 'echo "1.0beta"'
    # version-command: ' echo `whoami` >> /tmp/debug_version_command '
    yang-modules:
        names:
