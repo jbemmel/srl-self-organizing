@@ -1105,13 +1105,13 @@ def Handle_Notification(obj, state):
         if obj.lldp_neighbor.op == 2: # Delete, class 'int'
             return False
 
-        my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x or sw[x] for Cumulus
+        my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x or swp[x] for Cumulus
         to_port = obj.lldp_neighbor.data.port_id
         peer_sys_name = obj.lldp_neighbor.data.system_name
 
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
-          m = re.match("^(ethernet-1/|sw)(\d+)$", to_port) # 'sw' for Cumulus
+          m = re.match("^(ethernet-1/|swp)(\d+)$", to_port) # 'swp' for Cumulus
           # Allow SRL-based emulated hosts called h1, h2...
           if m and not re.match("^h[0-9]+", peer_sys_name):
             to_port_id = m.groups()[1]
