@@ -240,7 +240,26 @@ According to [the 4.4 manual](https://docs.nvidia.com/networking-ethernet-softwa
 
 Also, 
 ```
-In a centralized routing deployment, you must configure layer 3 interfaces even if you configure the switch only for layer 2 (you are not using VXLAN routing). To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
+In a centralized routing deployment, you must configure layer 3 interfaces even if you configure the switch only for layer 2 (you are not using VXLAN routing). 
+To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
+```
+
+After trying various options, I ended up with the following configuration:
+* [/etc/network/interfaces](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces)
+* [/etc/frr/frr.conf](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_frr.conf)
+
+For some reason things do not come up automatically upon boot, but after a ```ifreload -a``` we get:
+```
+root@leaf1a:mgmt:~# net show bridge vlan 
+
+Interface  VLAN  Flags                  VNI
+---------  ----  ---------------------  ----
+swp1       4094  PVID, Egress Untagged
+bond1      4094  PVID, Egress Untagged
+bond2      4094
+bridge        1  PVID, Egress Untagged
+           4094
+vni4094    4094  PVID, Egress Untagged  4094
 ```
 
 # Verification
