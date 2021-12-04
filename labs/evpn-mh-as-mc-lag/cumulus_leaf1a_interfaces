@@ -115,9 +115,11 @@ iface bond2
 auto bridge
 iface bridge
     bridge-ports bond1 bond2.4094 vni4094
+    # mstpctl-portbpdufilter bond1=yes bond2.4094=yes vni4094=yes
     # bridge-vids 4094
     bridge-vlan-aware no
-    bridge-learning off
+    # Get duplicate packets without this
+    # bridge-learning off
     bridge-stp off
     # bridge-allow-untagged no
 
@@ -132,7 +134,10 @@ iface vlan4094
 auto vni4094
 iface vni4094
     bridge-arp-nd-suppress off
+    bridge-learning off
     bridge-access 4094
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
+    # Doesnt stop STP
+    # bridge-stp off
     vxlan-id 4094
