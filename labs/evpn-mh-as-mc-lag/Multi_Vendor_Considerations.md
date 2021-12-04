@@ -1,5 +1,23 @@
 ![plot](Multi_vendor_evpn_mh.png)
 
+# Try this out for yourself!
+If you would like to explore this beautiful and exciting multi-vendor EVPN Multi-Homing topology:
+```
+git clone https://github.com/jbemmel/srl-self-organizing.git --recursive
+cd srl-self-organizing
+git submodule foreach --recursive git checkout main
+make -C./Docker all
+cd labs/evpn-mh-as-mc-lag
+sudo custom_built_containerlab deploy -t ./multi-vendor-evpn-mh-as-mc-lag.clab.yml --reconfigure
+```
+Note that this lab config uses a [custom containerlab extension for delta-config](https://github.com/jbemmel/containerlab/tree/delta-config); at the time of writing the feature is released, but not 100% compatible with the approach taken here. See [build instructions](https://github.com/jbemmel/containerlab/blob/master/README.md)
+
+Once the lab is up, you may need to go into the CVX node to make it apply its config:
+```
+ssh root@clab-multi-vendor-evpn-mh-as-mc-lag-leaf1a (password: root)
+ifreload -a
+```
+
 # VNI versus EVI
 
 As defined in [RFC8365](https://datatracker.ietf.org/doc/html/rfc8365) and (also) illustrated by Juniper [here](https://www.juniper.net/documentation/us/en/software/junos/evpn-vxlan/topics/concept/vxlan-evpn-integration-overview.html) under "VNI Aware Service Use Case", a VxLAN Network Identifier (VNI) is not the same thing as an [EVPN Instance (EVI)](https://datatracker.ietf.org/doc/html/rfc7432#section-3).
@@ -411,21 +429,3 @@ round-trip min/avg/max = 0.209/0.276/0.344 ms
 ```
 
 Q.E.D.
-
-# Try this out for yourself
-If you would like to explore this beautiful and exciting multi-vendor EVPN Multi-Homing topology:
-```
-git clone https://github.com/jbemmel/srl-self-organizing.git --recursive
-cd srl-self-organizing
-git submodule foreach --recursive git checkout main
-make -C./Docker all
-cd labs/evpn-mh-as-mc-lag
-sudo custom_built_containerlab deploy -t ./multi-vendor-evpn-mh-as-mc-lag.clab.yml --reconfigure
-```
-Note that this lab config uses a [custom containerlab extension for delta-config](https://github.com/jbemmel/containerlab/tree/delta-config); at the time of writing the feature is released, but not 100% compatible with the approach taken here. See [build instructions](https://github.com/jbemmel/containerlab/blob/master/README.md)
-
-Once the lab is up, you may need to go into the CVX node to make it apply its config:
-```
-ssh root@clab-multi-vendor-evpn-mh-as-mc-lag-leaf1a (password: root)
-ifreload -a
-```
