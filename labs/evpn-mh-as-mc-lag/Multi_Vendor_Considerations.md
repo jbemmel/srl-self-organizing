@@ -244,7 +244,7 @@ In a centralized routing deployment, you must configure layer 3 interfaces even 
 To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
 ```
 
-After trying various options (including [NVUE](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_nvue_startup.yaml), I ended up with the following configuration:
+After trying various options (including [NVUE](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_nvue_startup.yaml)), I ended up with the following configuration:
 * [/etc/network/interfaces](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_interfaces)
 * [/etc/frr/frr.conf](https://github.com/jbemmel/srl-self-organizing/blob/main/labs/evpn-mh-as-mc-lag/cumulus_leaf1a_frr.conf)
 
@@ -262,6 +262,8 @@ bridge        1  PVID, Egress Untagged
 vni4094    4094  PVID, Egress Untagged  4094
 ```
 
+To explore all the options, the ES on bond1 is configured for the default DF election algorithm (no additional parameters) while the ES on bond2 uses priority-based election (higher value wins, in this case CVX 50000 > SRL 49999). Given that the ES are connected back-to-back, in practice it would be better to use the same algorithm for both of course.
+
 # Verification
 
 ## Leaf1a (CVX)
@@ -270,35 +272,143 @@ root@leaf1a:mgmt:~# net show bgp l2vpn evpn es-evi
 Flags: L local, R remote, I inconsistent
 VTEP-Flags: E EAD-per-ES, V EAD-per-EVI
 VNI      ESI                            Flags VTEPs
-10       03:44:38:39:be:ef:aa:00:00:01  LR    1.1.0.2(EV)
-10       03:44:38:39:be:ef:aa:00:00:02  LR    1.1.0.2(EV) 
+4094     03:aa:c1:ab:00:03:00:00:00:01  LR    1.1.0.2(EV)
+4094     03:aa:c1:ab:00:03:00:00:00:02  LR    1.1.0.2(EV) 
 ```
 
 ## Leaf1b (SRL):
 ```
 A:leaf-1b-1.1.0.2# /show system network-instance ethernet-segments                                                                                                                                                 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ES-leaf1-leaf2.CE1 is up, all-active
-  ESI      : 03:44:38:39:be:ef:aa:00:00:01
-  Alg      : default
-  Peers    : 1.1.0.1
-  Interface: lag1
-  Network-instances:
-     Blue-MAC-VRF-10
-      Candidates : 1.1.0.1 (DF), 1.1.0.2
-      Interface : lag1.0
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ES-leaf1-leaf2.Spines is up, all-active
-  ESI      : 03:44:38:39:be:ef:aa:00:00:02
+mc-lag2 is up, all-active
+  ESI      : 03:aa:c1:ab:00:03:00:00:00:01
   Alg      : default
   Peers    : 1.1.0.1
   Interface: lag2
   Network-instances:
-     Blue-MAC-VRF-10
+     overlay-l2-1
       Candidates : 1.1.0.1 (DF), 1.1.0.2
       Interface : lag2.0
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+mc-lag26 is up, all-active
+  ESI      : 03:aa:c1:ab:00:03:00:00:00:02
+  Alg      : preference
+  Peers    : 1.1.0.1
+  Interface: lag26
+  Network-instances:
+     overlay-l2-1
+      Candidates : 1.1.0.1 (DF), 1.1.0.2
+      Interface : lag26.0
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Summary
  2 Ethernet Segments Up
  0 Ethernet Segments Down
 ```
+
+Server3 data path:
+```
+jeroen@jvm:~/srlinux/srl-self-organizing/labs/evpn-mh-as-mc-lag$ docker exec -it clab-multi-vendor-evpn-mh-as-mc-lag-server3 /bin/sh
+/ # cat /proc/net/bonding/bond0 
+Ethernet Channel Bonding Driver: v5.11.0-40-generic
+
+Bonding Mode: IEEE 802.3ad Dynamic link aggregation
+Transmit Hash Policy: layer3+4 (1)
+MII Status: up
+MII Polling Interval (ms): 100
+Up Delay (ms): 0
+Down Delay (ms): 0
+Peer Notification Delay (ms): 0
+
+802.3ad info
+LACP rate: slow
+Min links: 0
+Aggregator selection policy (ad_select): stable
+System priority: 65535
+System MAC address: aa:c1:ab:15:a7:e7
+Active Aggregator Info:
+	Aggregator ID: 1
+	Number of ports: 2
+	Actor Key: 15
+	Partner Key: 15
+	Partner Mac Address: aa:c1:ab:00:03:00
+
+Slave Interface: eth1
+MII Status: up
+Speed: 10000 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: aa:c1:ab:15:a7:e7
+Slave queue ID: 0
+Aggregator ID: 1
+Actor Churn State: none
+Partner Churn State: none
+Actor Churned Count: 0
+Partner Churned Count: 0
+details actor lacp pdu:
+    system priority: 65535
+    system mac address: aa:c1:ab:15:a7:e7
+    port key: 15
+    port priority: 255
+    port number: 1
+    port state: 61
+details partner lacp pdu:
+    system priority: 65535
+    system mac address: aa:c1:ab:00:03:00
+    oper key: 15
+    port priority: 255
+    port number: 1
+    port state: 61
+
+Slave Interface: eth2
+MII Status: up
+Speed: 10000 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: aa:c1:ab:94:a6:29
+Slave queue ID: 0
+Aggregator ID: 1
+Actor Churn State: none
+Partner Churn State: none
+Actor Churned Count: 0
+Partner Churned Count: 0
+details actor lacp pdu:
+    system priority: 65535
+    system mac address: aa:c1:ab:15:a7:e7
+    port key: 15
+    port priority: 255
+    port number: 2
+    port state: 61
+details partner lacp pdu:
+    system priority: 65535
+    system mac address: aa:c1:ab:00:03:00
+    oper key: 15
+    port priority: 32768
+    port number: 2
+    port state: 61
+/ # ping 10.0.0.1 -c2
+PING 10.0.0.1 (10.0.0.1): 56 data bytes
+64 bytes from 10.0.0.1: seq=0 ttl=64 time=15.675 ms
+64 bytes from 10.0.0.1: seq=1 ttl=64 time=6.146 ms
+
+--- 10.0.0.1 ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 6.146/10.910/15.675 ms
+/ # ping 10.0.0.101 -c2
+PING 10.0.0.101 (10.0.0.101): 56 data bytes
+64 bytes from 10.0.0.101: seq=0 ttl=64 time=0.383 ms
+64 bytes from 10.0.0.101: seq=1 ttl=64 time=0.241 ms
+
+--- 10.0.0.101 ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.241/0.312/0.383 ms
+/ # ping 10.0.0.102 -c2
+PING 10.0.0.102 (10.0.0.102): 56 data bytes
+64 bytes from 10.0.0.102: seq=0 ttl=64 time=0.344 ms
+64 bytes from 10.0.0.102: seq=1 ttl=64 time=0.209 ms
+
+--- 10.0.0.102 ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.209/0.276/0.344 ms
+```
+
+Q.E.D.
