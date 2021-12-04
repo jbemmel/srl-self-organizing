@@ -92,6 +92,12 @@ At the control plane level, both systems send similar routes, with some vendor s
 
 
 ## CVX
+According to [the 4.4 manual](https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Network-Virtualization/Ethernet-Virtual-Private-Network-EVPN/EVPN-Multihoming/) EVPN MultiHoming requires the use of VLAN-aware bridging and ARP suppression.
+
+Also, 
+```
+In a centralized routing deployment, you must configure layer 3 interfaces even if you configure the switch only for layer 2 (you are not using VXLAN routing). To avoid installing unnecessary layer 3 information, you can turn off IP forwarding.
+```
 
 # Verification
 
