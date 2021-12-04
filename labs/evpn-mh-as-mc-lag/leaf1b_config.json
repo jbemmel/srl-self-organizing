@@ -1857,7 +1857,7 @@
               "id": 1,
               "admin-state": "enable",
               "vxlan-interface": "vxlan0.1",
-              "evi": 4095,
+              "evi": 4094,
               "_annotate_evi": "Note: value affects DF election in case of multi-homing",
               "ecmp": 1
             }
@@ -1995,7 +1995,7 @@
           "index": 1,
           "type": "srl_nokia-interfaces:bridged",
           "ingress": {
-            "vni": 4095
+            "vni": 4094
           },
           "egress": {
             "source-ip": "use-system-ipv4-address"

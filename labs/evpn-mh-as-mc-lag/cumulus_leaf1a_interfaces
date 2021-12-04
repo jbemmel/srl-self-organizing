@@ -102,7 +102,7 @@ iface bridge
 auto vxlan0
 iface vxlan0
    # XXX VLAN 10 coming in mapping to VLAN 4094 -> likely fails. Only use 4094
-   bridge-vlan-vni-map 4094=4095
+   bridge-vlan-vni-map 4094=4094
    bridge-vids 4094
    bridge-learning off
    bridge-arp-nd-suppress off
