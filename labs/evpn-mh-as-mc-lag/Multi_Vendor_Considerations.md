@@ -1,4 +1,4 @@
-![plot](Fig13_evpn_mh.PNG)
+![plot](Multi_vendor_evpn_mh.png)
 
 # VNI versus EVI
 
@@ -82,8 +82,7 @@ One can configure 'lacp bypass' (SRL calls this "LACP fallback mode") and the ra
 Moreover, note how the LACP system MAC address is based on the 'es-sys-mac', and the generated ESI value contains this same MAC address (using a Type 0x3 ESI).
 While logical, this further reduces flexibility with respect to possible configurations. SR Linux can match the Cumulus configuration by setting ESI==0x03:\<system-id-mac\>:... but vice versa is not always possible.
 
-While SR Linux can match most Cumulus settings, it does not accept multiple lags with the same admin-key for LACP. As a workaround, we can use static lags on the network facing side instead; this results in the following Multi-Vendor EVPN Multi-Homing interop topology
-![plot](Multi_vendor_evpn_mh.png)
+While SR Linux can match most Cumulus settings, it does not accept multiple lags with the same admin-key for LACP. As a workaround, we can use static lags on the network facing side instead; this results in the following Multi-Vendor EVPN Multi-Homing interop topology shown at the top.
 
 # EVPN Control plane
 At the control plane level, both systems send similar routes, with some vendor specific differences:
