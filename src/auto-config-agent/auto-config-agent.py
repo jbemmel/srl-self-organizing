@@ -1396,7 +1396,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
-       logging.info(f'script_update_interface result: {stdoutput} err={stderroutput}')
+       logging.info(f'script_update_interface result: {stdoutput} \nerr={stderroutput}')
     except Exception as e:
        logging.error(f'Exception caught in script_update_interface :: {e}')
 
