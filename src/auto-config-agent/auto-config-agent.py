@@ -473,17 +473,19 @@ def Convert_to_lag(state,port,ip,peer_data):
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
      orig_vrf = 'overlay' if peer_data['type']=='host' else 'default'
-     return [ f'/interface[{eth}]/subinterface[index=*]',
-              f'/bfd/subinterface[id=ethernet-1/{p}.0]',
-              f'/interface[{eth}]/vlan-tagging',
-              f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
+     deletes = [ f'/interface[{eth}]/subinterface[index=*]',
+                 f'/interface[{eth}]/vlan-tagging',
+                 f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
+     if state.enable_bfd=="true":
+         deletes += [ f'/bfd/subinterface[id=ethernet-1/{p}.0]', ]
+     return deletes
 
    deletes = deletes_for_port(port)
 
    # Support multiple port-to-service mappings, 0 = all ports in service 1
    _svc_id = state.svc_id( port )
-
-   _vrf = "overlay" if state.is_spine() else f"overlay-l2-{_svc_id}"
+   use_irb = state.useIRB()
+   _vrf = f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
@@ -572,14 +574,13 @@ def Convert_to_lag(state,port,ip,peer_data):
         'interval' : "SLOW", # or FAST
         'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
 
-        # CHANGEME to support spine clusters (up to 16 links)
-        'system-id-mac': f"02:00:00:00:01:{state.id_from_hostname:02x}",
+        # Use lag id to support arbitrary number of members
+        'system-id-mac': f"02:00:00:00:01:{_lag_id:02x}",
         'admin-key': _lag_id, # range 1..65535, must be unique across all lags
-        'system-priority': state.id_from_hostname, # range 0..65535, lower wins
+        'system-priority': 0  # state.id_from_hostname, # range 0..65535, lower wins
        }
        # Note: Could also provision /system/lacp/system-id and -priority global
 
-   use_irb = state.bridging_supported and (state.evpn != "l2_only_leaves" or state.is_spine()) # TODO check host_use_irb
    irb_if = {
     "admin-state": "enable",
     "subinterface": [
@@ -642,7 +643,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    }
    updates += [ (f'/network-instance[name={_vrf}]', vrf_inst) ]
 
-   use_evpn_vxlan = state.evpn != 'disabled' and not state.is_spine()
+   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!="overlay"
    if use_evpn_vxlan:
       vrf_inst.update(
       {
@@ -1080,8 +1081,8 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = (state.igp == "bgp_unnumbered")
                 if 'lacp' in data:
                     state.lacp = data['lacp'][5:]
-                if 'enable_bfd' in data:
-                    state.enable_bfd = "true" if data['enable_bfd']['value'] else "false"
+
+                state.enable_bfd = "true" if 'enable_bfd' in data and data['enable_bfd']['value'] else "false"
 
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
@@ -1429,6 +1430,10 @@ class State(object):
 
         self.services = {} # Map of ESI->service config
 
+        self.bridging_supported = False
+        self.evpn = ""
+        self.gateway = {}
+
     def svc_id(self,port):
         """
         Support various port-to-service mappings
@@ -1581,6 +1586,23 @@ class State(object):
                if 'vlan' in s and int(s['vlan']['value'])!=0:
                    return True
         return False
+
+    def useIRB(self,evi=None): # TODO per service logic
+        """
+        Determine whether to use an IRB interface (mac-vrf <-> ip-vrf)
+        """
+        # It must be supported by this platform, and a gateway must be configured
+        if (not self.bridging_supported) or (self.gateway=={}):
+            return False
+
+        if self.evpn=="l2_only_leaves" and self.get_role()=="leaf":
+            return False # XXX Would also be caught by gw location
+
+        # TODO generalized services config
+        return self.gateway['location']==self.get_role() and self.gateway['anycast']
+
+    def l2Only(self):
+        return self.get_role()=="leaf" and self.evpn=="l2_only_leaves"
 
     def commit(self):
         logging.info(f"State.commit() services={self.services}")

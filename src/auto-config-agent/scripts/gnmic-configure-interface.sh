@@ -689,15 +689,15 @@ if [[ "${IP_PREFIX}" != "" ]]; then
 
 # Replace ipv4 prefix with /127 for ipv6
 if [[ "$PEER_TYPE" != "host" ]]; then
-_IP127="${IP_PREFIX//\/31/\/127}"
+_IP127="2001::${IP_PREFIX//\/31/\/127}"
 else
 # Use /64 towards each host? Note host bits cannot be 0
-# Avoid overlap with loopback IPs 2001::
-_IP127="${IP_PREFIX//\/[23][0-9]/\/64}"
+# Avoid overlap with loopback/link IPs 2001::
+_IP127="2001:1::${IP_PREFIX//\/[23][0-9]/\/64}"
 fi
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
- "ipv6": { "address": [ { "ip-prefix": "2001:1::${_IP127//\./:}" } ] }
+ "ipv6": { "address": [ { "ip-prefix": "${_IP127//\./:}" } ] }
 EOF
 else
 # Enable IPv4+IPv6 but don't put addresses (yet)
@@ -804,6 +804,7 @@ fi # "$PEER_IP" != "*"
 fi # IGP logic
 
 # Enable BFD, except for host facing interfaces or L2-only leaf-leaf
+if [[ "$enable_bfd" == "true" ]]; then
 if [[ "$PEER_TYPE" != "host" && ( "$PEER_TYPE" != "leaf" || "$USE_EVPN_OVERLAY" != "l2_only_leaves" || "$PEER_ROUTER_ID"!="?" ) ]]; then
 cat > $temp_file << EOF
 {
@@ -816,6 +817,7 @@ EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 fi # "$PEER_TYPE" != "host"
+fi # enable_bfd
 fi # $ROLE != "endpoint"
 
 # Handle evpn_rr=="spine" or "leaf-pairs" case here, on a per-uplink basis
