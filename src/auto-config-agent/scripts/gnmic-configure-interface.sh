@@ -390,9 +390,16 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 }
 EOF
 
+DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
+DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
+EVPN_PEER_GROUP=""
+
 if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
+
+if [[ "$USE_EVPN_OVERLAY" != "lag_discovery_only" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
+fi
 
 if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
   TRANSPORT="${ROUTER_ID}"
@@ -422,11 +429,6 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "ipv6-unicast": { "admin-state": "disable" }
 }
 EOF
-
-else
-DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
-DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
-EVPN_PEER_GROUP=""
 fi
 
 IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF

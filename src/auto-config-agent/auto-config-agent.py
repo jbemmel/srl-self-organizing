@@ -788,7 +788,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
        mc_lag = state.mc_lags[_lag_id] = entry
 
    if len( mc_lag ) > 3:
-       logging.error( "Platform does not support MC-LAG with more than 4 members" )
+       logging.error( f"Platform does not support MC-LAG with more than 4 members: {mc_lag}" )
        return False
 
    peers = ",".join( map(str, sorted( mc_lag.items() )) )
