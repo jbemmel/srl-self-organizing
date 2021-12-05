@@ -548,7 +548,7 @@ def Convert_to_lag(state,port,ip,peer_data):
       "subinterface": [
        {
          "index": 0,
-         "type": "routed" if is_routed else "bridged",
+         "type": "routed" if is_routed and not use_irb else "bridged",
        }
       ],
       "lag": {
@@ -634,7 +634,7 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    # Could configure MAC table size here
    vrf_inst = {
-     "type": "ip-vrf" if is_routed else "mac-vrf",
+     "type": "ip-vrf" if is_routed and not use_irb else "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
      "interface": [ { "name": f"{_lag}.0" } ],
