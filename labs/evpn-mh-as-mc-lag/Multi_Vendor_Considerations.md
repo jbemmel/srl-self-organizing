@@ -156,7 +156,7 @@ Type 4 Ethernet Segment Routes
 ```
 We see 2 kinds of Type-1 Ethernet Auto-Discovery (EAD) routes:
 1. EAD per EVI (tag 0, RD:2), used for aliasing and load balancing of traffic to multiple switches
-2. EAD per ES (tag 0xffffffff), used for faster convergence during access failure scenarios.
+2. EAD per ES (tag 0xffffffff), used for faster convergence during access failure scenarios (~a wildcard withdraw, VNI=*)
 
 In contrast, SRL sends this:
 ```
