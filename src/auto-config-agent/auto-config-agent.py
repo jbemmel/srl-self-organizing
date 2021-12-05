@@ -622,7 +622,7 @@ def Convert_to_lag(state,port,ip,peer_data):
        if gw['location'] == state.get_role():
           addr = { "ip-prefix": state.gateway['ipv4'] }
           if gw['anycast'] and use_irb: # Some platforms like ixr6 don't support this
-            irb_if['anycast-gw'] = {} # Only supported on IRB interfaces
+            irb_if['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
             addr[ 'anycast-gw' ] = True
           if 'ipv4' in l3_intf['subinterface'][0]:
             l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
