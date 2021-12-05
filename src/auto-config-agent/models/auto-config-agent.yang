@@ -119,6 +119,9 @@ module auto_config_agent {
                   enum asymmetric-irb;
                   enum symmetric-irb;
                   enum l2-only-leaves; // no ip-vrf on leaves
+                  enum lag-discovery-only {
+                    description "Use only for MC-LAG discovery, not VxLAN";
+                  }
                   enum disabled;
                 }
                 default "disabled";
