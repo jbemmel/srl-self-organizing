@@ -606,7 +606,10 @@ def Convert_to_lag(state,port,ip,peer_data):
    l3_intf = irb_if if use_irb else lag
    if is_routed and state.host_enable_ipv6:
        # TODO could add ipv6 link IP too
+       logging.info( f"Enabling ipv6 towards host on {_lag}" )
        l3_intf['subinterface'][0]['ipv6'] = { }
+   else:
+       logging.info( f"NOT enabling ipv6 towards host on {_lag}" )
 
    if is_routed and hasattr(state,'gateway'):
        gw = state.gateway
@@ -800,6 +803,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
               # Type 3 MAC-based ESI with 3-byte local distinguisher
               # Compatible with Cumulus too
               # Need to use LOWER case (SRL issue)
+              # Actually, peer MAC is not a great value to use; better own router/pair-id
               "esi": f"03:{mac.lower()}:00:00:{min(peer_port_list+[_lag_id]):02x}",
               "_annotate_esi": "EVPN MC-LAG with " + peers + ", bytes 2-7 form auto-derived route target see RFC7432 7.6",
               "interface": f"lag{ _lag_id }",
