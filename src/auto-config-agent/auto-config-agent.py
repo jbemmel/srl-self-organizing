@@ -1608,7 +1608,6 @@ def Run():
     state = State()
     count = 1
     lldp_subscribed = False
-    commit_ready = False
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
@@ -1616,15 +1615,13 @@ def Run():
             for obj in r.notification:
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
                     # state.commit() # not yet, wait a bit
-                    commit_ready = True
+                    if lldp_subscribed:
+                        state.commit()
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
                        # Add some delay to avoid exceptions during startup
                        logging.info( "Adding 5s delay before LLDP subscribe..." )
                        time.sleep( 5 )
-
-                       if commit_ready:
-                           state.commit()
 
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
