@@ -390,16 +390,17 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 }
 EOF
 
+# XXX perhaps hosts should never be in the 'default' vrf
 DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
 DEFAULT_DYNAMIC_HOST_PEERING="$DYNAMIC_HOST_PEERING,"
 EVPN_PEER_GROUP=""
 
 if [[ "$USE_EVPN_OVERLAY" != "disabled" ]]; then
 
-if [[ "$USE_EVPN_OVERLAY" != "lag_discovery_only" ]]; then
+# if [[ "$USE_EVPN_OVERLAY" != "lag_discovery_only" ]]; then
 DEFAULT_HOSTS_GROUP=""
 DEFAULT_DYNAMIC_HOST_PEERING=""
-fi
+# fi
 
 if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
   TRANSPORT="${ROUTER_ID}"
@@ -731,7 +732,7 @@ exitcode+=$?
 
 VRF="default"
 if [[ "$ROLE" == "leaf" ]]; then
- if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" || "$USE_EVPN_OVERLAY" == "lag_discovery_only" ]]; then
+ if [[ "$USE_EVPN_OVERLAY" == "l2_only_leaves" ]]; then
   if [[ "$PEER_ROUTER_ID" == "?" ]]; then
    VRF="none"
   fi
