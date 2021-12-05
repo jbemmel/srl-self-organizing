@@ -1416,6 +1416,7 @@ class State(object):
         self.evpn_rr = None
 
         self.services = {} # Map of ESI->service config
+        self.services_created = False
 
     def svc_id(self,port):
         """
@@ -1548,9 +1549,29 @@ class State(object):
 
     def processServiceConfig(self,cfg):
         json_acceptable_string = cfg.data.json.replace("'", "\"")
-        evi = cfg.keys[0]
+        evi = int( cfg.key.keys[0] )
         assert( evi not in self.services )
         self.services[ evi ] = json.loads(json_acceptable_string)
+
+    def commit(self):
+        if not self.services_created:
+            updates = []
+            for evi,s in self.services.items():
+                svc_name = s['name']['value'] if 'name' in s else f'Service{evi}'
+                is_l3 = False
+                if 'l3' in s:
+                    gw = s['l3']['gateway']['value']
+                    if self.is_spine() and gw == 'on_spine':
+                       is_l3 = True
+                    elif self.get_role()=='leaf' and gw == 'anycast_gw_on_leaves':
+                       is_l3 = True
+                       # TODO use anycast if supported
+                svc = {
+                 'type': 'ip-vrf' if is_l3 else 'mac-vrf'
+                }
+                updates += [ ( f'/network-instance[name={svc_name}]', svc ) ]
+            gnmiConnection( lambda c : c.set( encoding='json_ietf', update=updates ) )
+            self.services_created = True
 
 
 ##################################################################################################
@@ -1580,22 +1601,23 @@ def Run():
     state = State()
     count = 1
     lldp_subscribed = False
+    commit_ready = False
     try:
         for r in stream_response:
             logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
             count += 1
             for obj in r.notification:
                 if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
-                    logging.info('TO DO -commit.end config')
+                    # state.commit() # not yet, wait a bit
+                    commit_ready = True
                 else:
                     if Handle_Notification(obj, state) and not lldp_subscribed:
-
-                       # Open gNMI connection first
-                       # state.connectGNMI()
-
                        # Add some delay to avoid exceptions during startup
                        logging.info( "Adding 5s delay before LLDP subscribe..." )
                        time.sleep( 5 )
+
+                       if commit_ready:
+                           state.commit()
 
                        Subscribe(stream_id, 'lldp')
                        lldp_subscribed = True
