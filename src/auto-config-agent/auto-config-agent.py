@@ -1005,9 +1005,12 @@ def Handle_Notification(obj, state):
                 response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
                 logging.info('Handle_Config: Unregister response:: {}'.format(response))
             elif obj.config.key.js_path==".auto_config_agent.service":
-                # TODO handle service config
-                logging.info( "TODO: Process service config" )
-                return state.processServiceConfig(obj.config)
+                try:
+                  logging.info( "Process service config" )
+                  return state.processServiceConfig(obj.config)
+                except Exception as e:
+                  logging.error(e)
+                return False
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
@@ -1416,7 +1419,6 @@ class State(object):
         self.evpn_rr = None
 
         self.services = {} # Map of ESI->service config
-        self.services_created = False
 
     def svc_id(self,port):
         """
@@ -1552,26 +1554,31 @@ class State(object):
         evi = int( cfg.key.keys[0] )
         assert( evi not in self.services )
         self.services[ evi ] = json.loads(json_acceptable_string)
+        logging.info( f"processServiceConfig: {self.services}" )
 
     def commit(self):
-        if not self.services_created:
-            updates = []
-            for evi,s in self.services.items():
-                svc_name = s['name']['value'] if 'name' in s else f'Service{evi}'
-                is_l3 = False
-                if 'l3' in s:
-                    gw = s['l3']['gateway']['value']
-                    if self.is_spine() and gw == 'on_spine':
-                       is_l3 = True
-                    elif self.get_role()=='leaf' and gw == 'anycast_gw_on_leaves':
-                       is_l3 = True
-                       # TODO use anycast if supported
-                svc = {
-                 'type': 'ip-vrf' if is_l3 else 'mac-vrf'
-                }
-                updates += [ ( f'/network-instance[name={svc_name}]', svc ) ]
+        logging.info(f"State.commit() services={self.services}")
+        updates = []
+        for evi,s in self.services.items():
+            if 'created' in s:
+                continue
+            svc_name = s['name']['value'] if 'name' in s else f'Service{evi}'
+            is_l3 = False
+            if 'l3' in s:
+                gw = s['l3']['gateway'][8:] # strip GATEWAY_
+                if self.is_spine() and gw == 'on_spine':
+                   is_l3 = True
+                elif self.get_role()=='leaf' and gw == 'anycast_gw_on_leaves':
+                   is_l3 = True
+                   # TODO use anycast if supported
+            svc = {
+             'type': 'ip-vrf' if is_l3 else 'mac-vrf'
+            }
+            updates += [ ( f'/network-instance[name={svc_name}]', svc ) ]
+            s['created'] = svc
+        if updates!=[]:
+            logging.info( f"About to create: {updates}" )
             gnmiConnection( lambda c : c.set( encoding='json_ietf', update=updates ) )
-            self.services_created = True
 
 
 ##################################################################################################
