@@ -851,7 +851,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
        # Both members on the split side need same ID, also when spine facing
-       mac_id = state.id_from_hostname # if leaf_pair_lag else 0
+       # Simpler to use lag_id
+       mac_id = _lag_id # state.id_from_hostname # if leaf_pair_lag else 0
        member_count = len( mc_lag ) + 1
        lag['lag'] = {
         'lag-type': 'lacp',
@@ -1095,7 +1096,7 @@ def Handle_Notification(obj, state):
                       state.gateway = {
                         'ipv4': gw['ipv4']['value'],
                         'location': ('spine' if state.evpn == 'l2_only_leaves'
-                                     else gw['location'][:9]), # default 'leaf'
+                                     else gw['location'][9:]), # default 'leaf'
                         'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
                       }
 
@@ -1593,12 +1594,15 @@ class State(object):
         """
         # It must be supported by this platform, and a gateway must be configured
         if (not self.bridging_supported) or (self.gateway=={}):
+            logging.info( f"useIRB: bridging_supported={self.bridging_supported} gw={self.gateway} => False" )
             return False
 
         if self.evpn=="l2_only_leaves" and self.get_role()=="leaf":
+            logging.info( f"useIRB: l2_only_leaves with self.role==leaf => False" )
             return False # XXX Would also be caught by gw location
 
         # TODO generalized services config
+        logging.info( f"useIRB: based on gw={self.gateway}" )
         return self.gateway['location']==self.get_role() and self.gateway['anycast']
 
     def l2Only(self):
