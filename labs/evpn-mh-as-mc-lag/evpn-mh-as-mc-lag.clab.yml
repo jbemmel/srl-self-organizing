@@ -9,8 +9,8 @@ topology:
     srl:
       # image: ghcr.io/nokia/srlinux
       image: srl/auto-config-v2:latest
-      startup-config: delta-auto-config.cmd
-      # delta-config: delta-auto-config.cmd
+      # startup-config: delta-auto-config.cmd
+      delta-config: delta-auto-config.cmd
       extras:
         srl-agents: [ ../../auto-config-agent.yml ]
     linux:

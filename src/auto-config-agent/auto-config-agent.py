@@ -1007,6 +1007,7 @@ def Handle_Notification(obj, state):
             elif obj.config.key.js_path==".auto_config_agent.service":
                 # TODO handle service config
                 logging.info( "TODO: Process service config" )
+                return state.processServiceConfig(obj.config)
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
@@ -1414,6 +1415,8 @@ class State(object):
         self.loopbacks_prefix = []
         self.evpn_rr = None
 
+        self.services = {} # Map of ESI->service config
+
     def svc_id(self,port):
         """
         Support various port-to-service mappings
@@ -1542,6 +1545,13 @@ class State(object):
 
     def is_spine(self):
         return self.get_role() == "spine" or self.get_role() == "superspine"
+
+    def processServiceConfig(self,cfg):
+        json_acceptable_string = cfg.data.json.replace("'", "\"")
+        evi = cfg.keys[0]
+        assert( evi not in self.services )
+        self.services[ evi ] = json.loads(json_acceptable_string)
+
 
 ##################################################################################################
 ## This is the main proc where all processing for auto_config_agent starts.
