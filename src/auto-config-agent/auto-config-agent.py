@@ -535,22 +535,18 @@ def Convert_to_lag(state,port,ip,peer_data):
       else:
          logging.warning( "Convert_to_lag: LEAF-LEAF link but no pair_key match!" )
 
-   is_routed = (peer_data['type']=="spine" and state.evpn!="l2_only_leaves") or state.is_spine()
+   is_routed = (state.get_role()=="leaf" and state.evpn!="l2_only_leaves") or state.is_spine()
+
+   # TODO could reference lag in service only_on_ports too, but don't know index
+   use_vlans = state.useVLANs( f"ethernet-1/{port}" )
    lag = {
       "admin-state": "enable",
       "description": lag_desc,
-      "srl_nokia-interfaces-vlans:vlan-tagging": True,
+      "srl_nokia-interfaces-vlans:vlan-tagging": use_vlans,
       "subinterface": [
        {
          "index": 0,
          "type": "routed" if is_routed else "bridged",
-         "srl_nokia-interfaces-vlans:vlan": {
-           # Routed interface cannot be untagged, and cannot use VLAN 0
-           # Implies bridge interface must have matching vlan tag too
-           # when fabric-facing
-           "encap": { "single-tagged": { "vlan-id": 4094 } } if peer_data['type']!='host'
-                    else { "untagged": { } }
-         }
        }
       ],
       "lag": {
@@ -561,6 +557,15 @@ def Convert_to_lag(state,port,ip,peer_data):
        "member-speed": "100G"
       }
    }
+   if use_vlans:
+       lag['subinterface'][0]["srl_nokia-interfaces-vlans:vlan"] = {
+         # Routed interface cannot be untagged, and cannot use VLAN 0
+         # Implies bridge interface must have matching vlan tag too
+         # when fabric-facing (and multiple services are to be provided)
+         "encap": { "single-tagged": { "vlan-id": 4094 } } if peer_data['type']!='host' or is_routed
+                  else { "untagged": { } }
+       }
+
    if spine_mc_lag and state.lacp != "disabled":
        lag['lag']['lag-type'] = "lacp"
        lag['lag']['lacp'] = {
@@ -1557,8 +1562,25 @@ class State(object):
         json_acceptable_string = cfg.data.json.replace("'", "\"")
         evi = int( cfg.key.keys[0] )
         assert( evi not in self.services )
-        self.services[ evi ] = json.loads(json_acceptable_string)
+        svc = json.loads(json_acceptable_string)
+
+        # Normalize service parameters
+        if 'vlan' not in svc:
+            svc['vlan'] = { 'value': 0 if len(self.services)==0 else evi }
+
+        self.services[ evi ] = svc
         logging.info( f"processServiceConfig: {self.services}" )
+
+
+    def useVLANs(self,port):
+        """
+        Determine whether to use VLANs on the given port.
+        """
+        for s in self.services.values():
+            if 'only_on_ports' not in s or port in s['only_on_ports']:
+               if 'vlan' in s and int(s['vlan']['value'])!=0:
+                   return True
+        return False
 
     def commit(self):
         logging.info(f"State.commit() services={self.services}")
