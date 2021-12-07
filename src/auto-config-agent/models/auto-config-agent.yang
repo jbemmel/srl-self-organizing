@@ -185,6 +185,11 @@ module auto_config_agent {
               }
               default disabled;
             }
+            leaf lacp-fallback {
+              description "Time to wait (seconds) before enabling links that have not received LACP, default 0=disabled";
+              type uint16 { range { 0 | 4..3600 } };
+              default 0;
+            }
             leaf igp {
                 description "IGP to use for distributing loopback IPs";
                 type enumeration {

@@ -477,7 +477,7 @@ def Convert_to_lag(state,port,ip,peer_data):
                  f'/interface[{eth}]/vlan-tagging',
                  f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
      if state.enable_bfd=="true":
-         deletes += [ f'/bfd/subinterface[id=ethernet-1/{p}.0]', ]
+        deletes += [ f'/bfd/subinterface[id=ethernet-1/{p}.0]', ]
      return deletes
 
    deletes = deletes_for_port(port)
@@ -493,6 +493,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    _lag = f"lag{ _lag_id  }" # Maximum lag ID is 32, max 100G port is 56
    _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
+   enable_lacp = state.lacp != "disabled"
    lag_desc = f"Single link ethernet-1/{port}"
    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag } ) ]
    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
@@ -521,7 +522,7 @@ def Convert_to_lag(state,port,ip,peer_data):
                  if not state.is_spine():
                     state.leaf_pairs[ pair['a'] ] = _base_port
                     state.leaf_pairs[ pair['b'] ] = _base_port
-
+                    enable_lacp = False # postpone until MC lag is created
                     # Announce virtual port pair community, using both ports
                     Announce_LLDP_using_EVPN( state,
                       f"00:00:00:00:00:{int(_pk):02X}", [ pair['a'], pair['b'] ] )
@@ -568,7 +569,7 @@ def Convert_to_lag(state,port,ip,peer_data):
                   else { "untagged": { } }
        }
 
-   if spine_mc_lag and state.lacp != "disabled":
+   if spine_mc_lag and enable_lacp:
        lag['lag']['lag-type'] = "lacp"
        lag['lag']['lacp'] = {
         'interval' : "SLOW", # or FAST
@@ -580,6 +581,10 @@ def Convert_to_lag(state,port,ip,peer_data):
         'system-priority': 0  # state.id_from_hostname, # range 0..65535, lower wins
        }
        # Note: Could also provision /system/lacp/system-id and -priority global
+
+       if state.lacp_fallback!=0:
+           lag['lag']['lacp-fallback-mode'] = 'static'
+           lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
    irb_if = {
     "admin-state": "enable",
@@ -776,7 +781,7 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
 # Assumes lag is already created
 #
 def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
-   logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port_list={peer_port_list}")
+   logging.info(f"Convert_lag_to_mc_lag :: port={port} mac={mac} peer_leaf={peer_leaf} peer_port_list={peer_port_list} leaf_pairs={state.leaf_pairs}")
 
    # Check if port is member of a local leaf-pair group
    _lag_id = lag_id( state.leaf_pairs[port] if port in state.leaf_pairs else port )
@@ -865,6 +870,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
            'system-priority': mac_id # lower = higher priority
         }
        }
+       if state.lacp_fallback!=0:
+           lag['lag']['lacp-fallback-mode'] = 'static'
+           lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
    updates += [ (f'/interface[name=lag{ _lag_id }]',lag),
      (f'/interface[name=ethernet-1/{port}]/ethernet',
@@ -1082,6 +1090,8 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = (state.igp == "bgp_unnumbered")
                 if 'lacp' in data:
                     state.lacp = data['lacp'][5:]
+                if 'lacp_fallback' in data:
+                    state.lacp_fallback = int( data['lacp_fallback']['value'] )
 
                 state.enable_bfd = "true" if 'enable_bfd' in data and data['enable_bfd']['value'] else "false"
 
