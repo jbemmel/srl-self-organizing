@@ -213,6 +213,15 @@ module auto_config_agent {
                 }
                 default enable;
             }
+            leaf anycast-nexthops {
+               description "Enable anycast nexthops for BGP, requires FRR agent";
+               type boolean;
+               default false;
+
+               must ".=false() or ../igp = 'bgp-unnumbered'" {
+                 error-message "Anycast nexthops can only be used in combination with BGP unnumbered";
+               }
+            }
             container gateway {
                 // Allow a single config to be loaded across multiple types of platforms
                 leaf anycast-supported {
