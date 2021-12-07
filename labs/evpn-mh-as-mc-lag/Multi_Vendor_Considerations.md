@@ -252,6 +252,7 @@ Type 4 Ethernet Segment Routes
 * Extended communities: CVX includes an bgp-tunnel-encap:VXLAN extended community with its Ethernet Segment routes, SRL does not
 
 For reference, in case multi-vendor interop requires the encap to be set, one can use a policy on SRL:
+### SRL export policy to add VXLAN encap extended community
 ```
 community-set vxlan-encap { member [ bgp-tunnel-encap:VXLAN ] }
 
