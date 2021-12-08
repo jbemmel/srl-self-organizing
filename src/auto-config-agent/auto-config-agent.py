@@ -857,8 +857,8 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
        # Both members on the split side need same ID, also when spine facing
-       # Simpler to use lag_id
-       mac_id = _lag_id # state.id_from_hostname # if leaf_pair_lag else 0
+       # Cannot only use lag_id, in case of leaf-pair both using same #lag
+       mac_id = _lag_id + state.id_from_hostname # if leaf_pair_lag else 0
        member_count = len( mc_lag ) + 1
        lag['lag'] = {
         'lag-type': 'lacp',
