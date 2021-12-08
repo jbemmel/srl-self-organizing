@@ -251,6 +251,23 @@ Type 4 Ethernet Segment Routes
 
 * Extended communities: CVX includes an bgp-tunnel-encap:VXLAN extended community with its Ethernet Segment routes, SRL does not
 
+For reference, in case multi-vendor interop requires the encap to be set, one can use a policy on SRL:
+### SRL export policy to add VXLAN encap extended community
+```
+community-set vxlan-encap { member [ bgp-tunnel-encap:VXLAN ] }
+
+policy export-to-DCGW {
+  default-action { accept { } }
+  statement 10 { 
+   match {
+    protocol bgp-evpn
+    bgp { evpn { route-type [ 4 ] } } 
+   }
+   action { accept { bgp { communities { add vxlan-encap } } } }
+  }
+}
+```
+
 
 ## CVX
 According to [the 4.4 manual](https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Network-Virtualization/Ethernet-Virtual-Private-Network-EVPN/EVPN-Multihoming/) EVPN MultiHoming requires the use of VLAN-aware bridging and ARP suppression. Specifically, [traditional bridges are not supported](https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Network-Virtualization/Ethernet-Virtual-Private-Network-EVPN/EVPN-Multihoming/#unsupported-features) in combination with EVPN MH.
