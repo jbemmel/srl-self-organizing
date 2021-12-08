@@ -30,3 +30,6 @@ build-alpine:
 		cd .. && sudo docker build --build-arg http_proxy=${HTTP_PROXY} --build-arg https_proxy=${HTTP_PROXY} \
 		         -f Docker/Dockerfile.alpine -t alpine-with-lldp .
 		sudo docker tag alpine-with-lldp alpine-with-lldp:latest
+
+lint-yang:
+	cd .. && sudo docker run --rm -v $$(pwd)/src/auto-config-agent/models:/work ghcr.io/hellt/yanglint auto-config-agent.yang

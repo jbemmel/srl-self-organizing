@@ -582,9 +582,10 @@ def Convert_to_lag(state,port,ip,peer_data):
        }
        # Note: Could also provision /system/lacp/system-id and -priority global
 
-       if state.lacp_fallback!=0:
-           lag['lag']['lacp-fallback-mode'] = 'static'
-           lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
+       # Provision LACP fallback only host-facing
+       #if state.lacp_fallback!=0:
+       #   lag['lag']['lacp-fallback-mode'] = 'static'
+       #   lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
    irb_if = {
     "admin-state": "enable",
