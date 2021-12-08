@@ -1639,6 +1639,9 @@ class State(object):
                 elif self.get_role()=='leaf' and gw == 'anycast_gw_on_leaves':
                    is_l3 = True
                    # TODO use anycast if supported
+            if not is_l3 and not self.bridging_supported:
+                logging.warning( f"mac-vrf not supported on this platform, skipping: {s}" )
+                continue
             svc = {
              'type': 'ip-vrf' if is_l3 else 'mac-vrf'
             }

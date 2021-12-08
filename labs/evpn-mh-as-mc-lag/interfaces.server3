@@ -8,7 +8,8 @@ iface bond0 inet static
   netmask 255.255.255.0
   gateway 10.0.0.1
 	# bond0 uses standard IEEE 802.3ad LACP bonding protocol
-  bond-mode 4
+  # bond-mode 4
+  bond-mode balance-xor
   # bond-miimon 100
   bond-lacp-rate slow
   bond-xmit-hash-policy layer3+4
