@@ -562,7 +562,7 @@ $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
 # For leaves, create L3 VXLAN tunnel interface vxlan0 for overlay VRF
-if [[ "$ROLE" == "leaf" && ("$USE_EVPN_OVERLAY" != "symmetric_irb" || "$USE_EVPN_OVERLAY" == "asymmetric_irb") ]]; then
+if [[ "$ROLE" == "leaf" && ("$USE_EVPN_OVERLAY" == "symmetric_irb" || "$USE_EVPN_OVERLAY" == "asymmetric_irb") ]]; then
 
 if [[ "$USE_EVPN_OVERLAY" == "symmetric_irb" ]]; then
 cat > $temp_file << EOF
