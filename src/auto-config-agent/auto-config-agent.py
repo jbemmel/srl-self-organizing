@@ -572,7 +572,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    if spine_mc_lag and enable_lacp:
        lag['lag']['lag-type'] = "lacp"
        lag['lag']['lacp'] = {
-        'interval' : "SLOW", # or FAST
+        'interval' : state.lacp_rate, # or FAST
         'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
 
         # Use lag id to support arbitrary number of members
@@ -864,7 +864,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
         'lag-type': 'lacp',
         'member-speed': "100G",
         'lacp': {
-           'interval' : "SLOW", # or FAST
+           'interval' : state.lacp_rate, # or FAST
            'lacp-mode': "ACTIVE" if leaf_pair_lag else state.lacp.upper(), # ACTIVE or PASSIVE
            'system-id-mac': f"02:00:00:00:{member_count:02x}:{mac_id:02x}", # Must match for A/A MC-LAG
            'admin-key': _lag_id, # Must be unique across all lags
@@ -1091,8 +1091,13 @@ def Handle_Notification(obj, state):
                     state.use_bgp_unnumbered = (state.igp == "bgp_unnumbered")
                 if 'lacp' in data:
                     state.lacp = data['lacp'][5:]
+                state.lacp_rate = "SLOW" # XXX hardcoded
                 if 'lacp_fallback' in data:
                     state.lacp_fallback = int( data['lacp_fallback']['value'] )
+
+                    if state.lacp_rate == "SLOW" and state.lacp_fallback!=0:
+                        # Cannot be less than 90 for SLOW
+                        state.lacp_fallback = max( state.lacp_fallback, 90 )
 
                 state.enable_bfd = "true" if 'enable_bfd' in data and data['enable_bfd']['value'] else "false"
 
