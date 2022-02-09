@@ -1,0 +1,146 @@
+#
+# A spine-leaf EVPN fabric using 7220 D1 as L2-only fabric extension towards D2s running EVPN/VXLAN MH
+#
+# * D1 switches have BGP EVPN peering enabled, but exchange no routes
+#
+
+module: [ bgp, evpn ] # iBGP for EVPN overlay, eBGP as IGP
+
+plugin: [ ebgp-local_as ]
+
+provider: clab
+
+defaults:
+ device: srlinux
+ devices:
+  srlinux.image.clab: ghcr.io/nokia/srlinux:21.11.1
+  # srlinux.image.clab: srl/bgp-unnumbered-using-frr:latest
+  srlinux.clab.node:
+    type: ixrd1
+    # srl-agents: [ ../../srl-frr-agent.yml ]
+  # frr.image.clab: frrouting/frr:v8.1.0 # fails
+ extra_attributes.link: [ server ]
+ evpn.extra_attributes:
+  global: [ vxlan_vnis, use_symmetric_irb, host_route_mobility, internet_vni ]
+  link: [ esi, multi_homing ]
+ bgp.extra_attributes.node: [ export ]
+
+addressing:
+  p2p:
+    ipv4: 172.16.0.0/24
+    prefix: 31
+
+bgp:
+  advertise_loopback: all
+  as: 65000 # iBGP AS
+  as_list:
+    65000: # EVPN overlay with Route Reflectors at spines
+      members: [ leaf1a,leaf1b,leaf2a,leaf2b,spine1,spine2,h1,h2 ]
+      rr: [ spine1,spine2 ]
+
+    # eBGP underlay is created using bgp.underlay_as attributes below
+
+evpn:
+  use_ibgp: True
+  use_symmetric_irb: False
+  host_route_mobility: False
+  vxlan_vnis: [ 100, 200 ]
+  internet_vni: 101 # L3VNI
+
+groups:
+  fabric:
+    members: [ spine1,spine2 ]
+  internet:
+    members: [ isp ]
+  hosts:
+    members: [ h1,h2 ]
+
+nodes:
+  leaf1a:
+    config: [ srl-d1-vlans.j2 ]
+  leaf1b:
+    config: [ srl-d1-vlans.j2 ]
+  leaf2a:
+    config: [ srl-d1-vlans.j2 ]
+  leaf2b:
+    config: [ srl-d1-vlans.j2 ]
+
+  spine1:
+    clab:
+     type: ixrd2
+    bgp.underlay_as: 65011 # Cannot be 65000, AS path will block routes
+    # config: [ srl-spine-allow-own-as-ebgp.j2 ]
+  spine2:
+    clab:
+     type: ixrd2
+    bgp.underlay_as: 65012
+
+  isp:
+    bgp.as: 65100
+    bgp.advertise_loopback: False
+    bgp.originate: [ 1.1.1.1/32, 8.8.8.8/32, 0.0.0.0/1, 128.0.0.0/1 ]
+    module: [ bgp ] # No EVPN here, just eBGP
+
+  h1:
+    device: frr
+    bgp.underlay_as: 65099 # Same AS only possible with default route to fabric
+    # config: [ frr-vxlan-vnis.j2, frr-multipath-relax.j2 ]
+  h2:
+    device: frr
+    bgp.underlay_as: 65099
+    # config: [ frr-vxlan-vnis.j2, frr-multipath-relax.j2 ]
+
+  baremetal1:
+    device: linux
+  baremetal2:
+    device: linux
+
+links:
+
+# See https://blog.ipspace.net/2018/06/avoid-summarization-in-leaf-and-spine.html
+- spine1-spine2
+
+- leaf1a-spine1
+- leaf1a-spine2
+- leaf1b-spine1
+- leaf1b-spine2
+- leaf2a-spine1
+- leaf2a-spine2
+- leaf2b-spine1
+- leaf2b-spine2
+
+- spine1:
+  isp:
+  role: external
+
+- spine2:
+  isp:
+  role: external
+
+# Host dual connected, ECMP VXLAN (routed)
+- leaf1a:
+  h1:
+  server: True
+  role: l2only
+- leaf1b:
+  h1:
+  server: True
+  role: l2only
+- leaf2a:
+  h2:
+  server: True
+  role: l2only
+- leaf2b:
+  h2:
+  server: True
+  role: l2only
+
+# Bare metal servers single connected, these become 'stub' links due to Linux
+- leaf1a:
+  baremetal1:
+  server: True
+  role: l2only
+- leaf2a:
+  baremetal2:
+  server: True
+  role: l2only

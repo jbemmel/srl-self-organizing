@@ -1,0 +1,87 @@
+{#
+ These gNMI YANG updates provision untagged server ports on SR Linux, onto a
+ dedicated VLAN on the uplink lag
+#}
+
+delete:
+{% for port in interfaces %}
+- interface[name={{ port.ifname }}]/subinterface[index=0]
+- network-instance[name=default]/interface[name={{port.ifname}}.0]
+{% endfor %}
+
+updates:
+- path: interface[name=irb0]
+  val:
+   admin-state: enable
+   subinterface:
+{% for port in interfaces if 'server' not in port %}
+   - index: {{ loop.index0 }}
+     admin-state: enable
+     ipv4:
+      address:
+      - ip-prefix: "{{ port.ipv4 }}"
+        primary: [null]
+{% endfor %}
+
+{% for port in interfaces if 'server' not in port %}
+- path: network-instance[name=default]
+  val:
+   type: default
+   interface:
+   - name: irb0.{{ loop.index0 }}
+{% endfor %}
+
+{# Single LAG across all uplinks, with a VLAN for each LAN port #}
+{# TODO: LACP #}
+- path: interface[name=lag1]
+  val:
+   admin-state: enable
+   vlan-tagging: True
+   lag:
+    lag-type: static
+    member-speed: 10G
+   subinterface:
+   - index: 0
+     admin-state: enable
+     type: bridged
+     vlan:
+      encap:
+       untagged:
+        _annotate: "Network uplink, matches packets with no tag or VLAN tag 0"
+{% for s in interfaces if 'server' in s %}
+   - index: {{ s.ifindex }}
+     admin-state: enable
+     type: bridged
+     vlan:
+      encap:
+       single-tagged:
+        vlan-id: {{ s.ifindex }}
+{% endfor %}
+
+{% for port in interfaces %}
+- path: interface[name={{ port.ifname }}]
+  val:
+   admin-state: enable
+{% if 'server' in port %}
+   vlan-tagging: False
+   subinterface:
+   - index: 0
+     admin-state: enable
+     type: bridged
+{% else %} # uplink
+   ethernet:
+    aggregate-id: lag1
+{% endif %}
+
+{% if 'server' in port %}
+- path: network-instance[name=port{{port.ifindex}}-l2-vrf]
+  val:
+   type: mac-vrf
+   description: "mac-vrf for port {{port.ifname}}"
+   admin-state: enable
+   interface:
+   - name: {{ port.ifname }}.0
+   - name: lag1.{{ port.ifindex }}
+{% endif %}
+
+{% endfor %}

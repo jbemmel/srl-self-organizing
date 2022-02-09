@@ -7,7 +7,7 @@ topology:
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # Uses custom container image containing auto-config agent
       # image: registry.srlinux.dev/pub/srlinux # latest, or srlinux:21.3.1-410
-      image: srl/auto-config:latest
+      image: srl/auto-config-v2:latest
       extras:
         srl-agents: [ auto-config-agent.yml ]
     #binds:
@@ -16,7 +16,7 @@ topology:
       image: frr-with-lldp:latest # Custom built image with lldpad and daemons included
 
   nodes:
-    leaf1:  { kind: srl, startup-config: auto-leaf.cfg.json }
+    leaf1:  { kind: srl, startup-config: delta-auto-config.cmd }
     leaf2:  { kind: srl, startup-config: auto-leaf.cfg.json }
     leaf3:  { kind: srl, startup-config: auto-leaf.cfg.json }
     leaf4:  { kind: srl, startup-config: auto-leaf.cfg.json }
