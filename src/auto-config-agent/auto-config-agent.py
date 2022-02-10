@@ -911,7 +911,7 @@ def Configure_BGP_unnumbered(state,port):
 
    bgp_u = { "peer-as": "external" }
    updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
-             (f'/interface[name={eth}]/subinterface[index=0]/ipv6', {} ),
+             (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
              (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
