@@ -623,7 +623,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    else:
        logging.info( f"NOT enabling ipv6 towards host on {_lag}" )
 
-   if is_routed and hasattr(state,'gateway'):
+   if is_routed and state.gateway['ipv4']:
        gw = state.gateway
        if gw['location'] == state.get_role():
           addr = { "ip-prefix": state.gateway['ipv4'] }
@@ -1114,14 +1114,13 @@ def Handle_Notification(obj, state):
                     _b = data['overlay_bgp_admin_state'][24:]
                     state.overlay_bgp_admin_state = _b
                 if 'gateway' in data:
-                    gw = data['gateway']
-                    if 'ipv4' in gw: # Leave undefined if no IP
-                      state.gateway = {
-                        'ipv4': gw['ipv4']['value'],
-                        'location': ('spine' if state.evpn == 'l2_only_leaves'
-                                     else gw['location'][9:]), # default 'leaf'
-                        'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
-                      }
+                  gw = data['gateway']
+                  state.gateway = {
+                    'ipv4': gw['ipv4']['value'] if 'ipv4' in gw else False,
+                    'location': ('spine' if state.evpn == 'l2_only_leaves'
+                                 else gw['location'][9:]), # default 'leaf'
+                    'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
+                  }
 
                 # Flag that gets set based on platform feature 'bridged'
                 # User can disable it explicitly too, even if supported
@@ -1460,7 +1459,7 @@ class State(object):
 
         self.bridging_supported = False
         self.evpn = ""
-        self.gateway = {}
+        self.gateway = { 'ipv4': False }
 
     def svc_id(self,port):
         """
@@ -1620,7 +1619,7 @@ class State(object):
         Determine whether to use an IRB interface (mac-vrf <-> ip-vrf)
         """
         # It must be supported by this platform, and a gateway must be configured
-        if (not self.bridging_supported) or (self.gateway=={}):
+        if (not self.bridging_supported) or (not self.gateway['ipv4']):
             logging.info( f"useIRB: bridging_supported={self.bridging_supported} gw={self.gateway} => False" )
             return False
 
