@@ -850,7 +850,11 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
        updates += [ (f'/interface[name=irb0]/subinterface[index={_lag_id}]/ipv4/arp', arp) ]
 
    lag = {
-    'description': "Auto-discovered MC-LAG with " + re.sub('\[|\]','',peers)
+    'description': "Auto-discovered MC-LAG with " + re.sub('\[|\]','',peers),
+    'lag': {
+     'lag-type': 'static',
+     'member-speed': "100G",
+    }
    }
 
    # Update LAG to use LACP if configured
