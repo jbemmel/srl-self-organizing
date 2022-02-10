@@ -166,6 +166,13 @@ module auto_config_agent {
                    error-message "EVPN auto-LAG discovery requires EVPN to be enabled";
                  }
              }
+             leaf-list auto-lag-ports {
+                 description "Subset of ports for which auto-lag is enabled, empty(default)=all";
+                 type leafref {
+                   path "/srl_nokia-if:interface/srl_nokia-if:name";
+                   require-instance "true";
+                 }
+             }
              leaf bgp-peering {
                 description "IP version to use for iBGP EVPN peering, default ipv6";
                 type enumeration {
@@ -284,6 +291,21 @@ module auto_config_agent {
             //       default true;
             //    }
             // }
+
+            container ddos-protection {
+             presence "DDoS related configuration";
+             leaf server {
+               description "IP address or DNS hostname of an sFlow server to receive sampled packets";
+               type string;
+               mandatory true;
+             }
+
+             leaf sample-rate {
+              description "sFlow sample rate to provision";
+              type uint32;
+              default 1; // 1 in 1 packets, for demo purposes
+             }
+            }
 
             // The core of provisioning: end user services
             list service {

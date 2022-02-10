@@ -145,7 +145,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
     #     state.lag_state[ lldp_peer_name ] = { leaf_ip: port }
 
 #
-# Encodes the peer MAC address discovered through LLDP as a RFC8092 large community
+# Encodes the peer MAC address discovered through LLDP as IPV6 or a RFC8092 large community
 # A:B:C where A is the access port and B,C each include 3 bytes (hex)
 # RFC8092 recommends the first value to be an ASN; an alternative encoding would
 # be: [4-byte ASN]:[2-byte port/flags + 2-byte MAC]:[4-byte MAC]
@@ -1080,6 +1080,9 @@ def Handle_Notification(obj, state):
                     if 'auto_lags' in evpn:
                        state.evpn_auto_lags = evpn['auto_lags'][10:]
                        logging.info( f"EVPN auto lags: {state.evpn_auto_lags}" )
+                    if 'auto_lag_ports' in evpn:
+                       state.evpn_auto_lag_ports = evpn['auto_lag_ports']
+                       logging.info( f"EVPN auto lag ports: {state.evpn_auto_lag_ports}" )
                     if 'route_reflector_enum' in evpn:
                         # state.evpn_rr = ipaddress.ip_network( data['evpn_rr']['value'] )
                         state.set_EVPN_RR( evpn['route_reflector_enum'][21:] )
@@ -1112,7 +1115,7 @@ def Handle_Notification(obj, state):
                     state.overlay_bgp_admin_state = _b
                 if 'gateway' in data:
                     gw = data['gateway']
-                    if 'ipv4' in gw:
+                    if 'ipv4' in gw: # Leave undefined if no IP
                       state.gateway = {
                         'ipv4': gw['ipv4']['value'],
                         'location': ('spine' if state.evpn == 'l2_only_leaves'
@@ -1203,10 +1206,12 @@ def Handle_Notification(obj, state):
 
           if router_id_changed:
              for intf in state.pending_peers:
-                 _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
-                 configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
-                 if state.get_role() == "leaf":
-                     Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
+               _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
+               configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+               if state.get_role() == "leaf":
+                 # Only create LAGs on spine-facing ports if gateway is on spines
+                 if not re.match("^spine.*$", _peer_sys_name) or state.gateway['location'] == "spine":
+                   Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
 
              if state.get_role()=="leaf":
                 Update_EVPN_RR_Neighbors( state, first_time=True )
@@ -1216,7 +1221,8 @@ def Handle_Notification(obj, state):
 
           # Could also announce communities for spines
           if state.get_role() == "leaf" and hasattr(state,"router_id"):
-             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
+            if not re.match("^spine.*$", peer_sys_name) or state.gateway['location'] == "spine":
+              Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
           else:
              logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
@@ -1448,6 +1454,7 @@ class State(object):
         self.mc_lags = {}
         self.loopbacks_prefix = []
         self.evpn_rr = None
+        self.evpn_auto_lag_ports = [] # Default: all ports
 
         self.services = {} # Map of ESI->service config
 
