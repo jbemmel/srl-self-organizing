@@ -906,9 +906,9 @@ def Configure_BGP_unnumbered(state,port):
    # BGP unnumbered interfaces must have ipv4 and ipv6 enabled, now handled
    # by FRR agent itself
 
-   bgp_u = { "bgp-unnumbered-peer-as": "external" }
+   bgp_u = { "peer-as": "external" }
    updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
-             (f'/network-instance[name=default]/interface[{eth}.0]', bgp_u ),
+             (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
            ]
    logging.info(f"gNMI SET updates={updates}" )
    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
