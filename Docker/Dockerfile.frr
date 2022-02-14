@@ -7,6 +7,7 @@ FROM frrouting/frr:latest
 # Start lldpd before calling ifup; latter waits for ipv6 dad
 RUN apk add --no-cache lldpd iperf3 bonding vlan && \
  sed -i '2 i /usr/sbin/lldpd' /usr/lib/frr/docker-start && \
- sed -i '3 i /sbin/ifup -a -v &' /usr/lib/frr/docker-start
+ sed -i '3 i /sbin/ifup -a -v &' /usr/lib/frr/docker-start && \
+ sed -i '4 i [[ "${NO_DEFAULT_ROUTE}"=="1" ]] && ip route del default dev eth0' /usr/lib/frr/docker-start
 
 COPY --chown=root:root Docker/daemons /etc/frr
