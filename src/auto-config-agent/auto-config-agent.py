@@ -14,6 +14,7 @@ import json
 import signal
 import subprocess
 import traceback
+import requests
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
@@ -366,6 +367,9 @@ def Set_LLDP_Systemname(state,name):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                username="admin",password="admin",insecure=True) as c:
    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] ) )
+
+   # Update DNS if server configured? Removed, too complex
+   # UpdateDNS(f"{state.get_role()}-{state.node_id}",state.router_id)
 
 def Set_Default_Systemname(state):
     if state.pair_role > 0:
