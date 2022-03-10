@@ -26,9 +26,9 @@ commit stay
 
 4. Logout of the CLI to see configuration changes
 ```
-A:spine-1-1.1.1.1# /network-instance default protocols ospf                                                                                                                                                
---{ + running }--[ network-instance default protocols ospf ]--                                                                                                                                             
-A:spine-1-1.1.1.1# info                                                                                                                                                                                    
+A:spine-1-1.1.1.1# /network-instance default protocols ospf
+--{ + running }--[ network-instance default protocols ospf ]--
+A:spine-1-1.1.1.1# info
     instance main {
         admin-state enable
         version ospf-v3
