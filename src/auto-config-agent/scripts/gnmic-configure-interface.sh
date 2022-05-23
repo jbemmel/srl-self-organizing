@@ -288,7 +288,7 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
   "admin-state": "enable",
   "peer-as": ${evpn_overlay_as},
   "_annotate_peer-as": "iBGP with leaves",
-  "evpn": { "admin-state": "enable" },
+  "evpn": { "admin-state": "enable", "advertise-ipv6-next-hops": ${use_ipv6_nexthops} },
   "ipv4-unicast": { "admin-state": "disable" },
   "ipv6-unicast": { "admin-state": "disable" },
   "route-reflector": {
@@ -316,7 +316,8 @@ EOF
 
 IFS='' read -r -d '' EVPN_SECTION << EOF
 "evpn": {
- "rapid-update": true ,
+ "rapid-update": true,
+ "advertise-ipv6-next-hops": ${use_ipv6_nexthops},
  "keep-all-routes": true,
  "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
 },
@@ -423,7 +424,7 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "export-policy": "${EVPN_EXPORT_POLICY}",
   "peer-as": ${evpn_overlay_as},
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
-  "evpn": { "admin-state": "enable" },
+  "evpn": { "admin-state": "enable", "advertise-ipv6-next-hops": ${use_ipv6_nexthops} },
   "transport" : { "local-address" : "${TRANSPORT}" },
   "timers": { "connect-retry": 10 },
   "ipv4-unicast": { "admin-state": "disable" },

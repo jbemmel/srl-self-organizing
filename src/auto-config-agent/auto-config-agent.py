@@ -1096,6 +1096,7 @@ def Handle_Notification(obj, state):
                         logging.info( f"EVPN RR IP(s): {state.evpn_rr}" )
                     if 'bgp_peering' in evpn: # ipv4 or ipv6(default)
                         state.evpn_bgp_peering = evpn['bgp_peering'][12:]
+                    state.use_ipv6_nexthops = "true" if 'ipv6_nexthops' in evpn and evpn['ipv6_nexthops']['value'] else "false"
 
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
@@ -1114,6 +1115,7 @@ def Handle_Notification(obj, state):
 
                 if 'host_use_irb' in data:
                     state.host_use_irb = data['host_use_irb']['value']
+
                 if 'overlay_bgp_admin_state' in data:
                     _b = data['overlay_bgp_admin_state'][24:]
                     state.overlay_bgp_admin_state = _b
@@ -1452,6 +1454,7 @@ class State(object):
 
         # self.lag_state = {}     # Used for auto-provisioning of LAGs
         self.host_use_irb = True
+        self.use_ipv6_nexthops = "false"
         self.use_bgp_unnumbered = False
         self.local_lldp = {}
         self.mc_lags = {}

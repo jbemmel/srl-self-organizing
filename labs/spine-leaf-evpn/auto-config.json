@@ -5,7 +5,8 @@
       "model": "symmetric-irb",
       "overlay-as": 8675309,
       "route-reflector": "spine",
-      "bgp-peering": "ipv4"
+      "bgp-peering": "ipv4",
+      "ipv6-nexthops": true
     },
     "lacp": "passive",
     "gateway": {

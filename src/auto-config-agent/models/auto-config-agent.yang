@@ -181,6 +181,13 @@ module auto_config_agent {
                 }
                 default "ipv6";
              }
+
+             leaf ipv6-nexthops {
+                description "Enable use of IPv6 nexthops for BGP EVPN, default false";
+                type boolean;
+                default false;
+             }
+
             }
             // Cannot reference system lacp settings group due to must clause
             leaf lacp {
