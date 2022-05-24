@@ -6,7 +6,7 @@
       "overlay-as": 8675309,
       "route-reflector": "spine",
       "bgp-peering": "ipv4",
-      "ipv6-nexthops": true
+      "ipv6-nexthops": false
     },
     "lacp": "passive",
     "gateway": {

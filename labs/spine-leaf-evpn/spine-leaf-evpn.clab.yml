@@ -31,7 +31,7 @@ topology:
     leaf4:
       kind: srl
       group: leaves
-      type: ixrd2
+      type: ixrd1
 
     spine1:
       kind: srl
