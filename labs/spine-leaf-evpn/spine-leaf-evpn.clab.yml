@@ -31,6 +31,7 @@ topology:
       type: ixrd2
     leaf4:
       kind: srl
+      image: ghcr.io/nokia/srlinux:21.11.2
       group: leaves
       type: ixrd1
 

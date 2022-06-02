@@ -64,7 +64,7 @@ topology:
     spine1:
       kind: srl
       group: spines
-      type: ixr6
+      #type: ixr6
       delta-config: delta-auto-config-multivendor.cmd
 
     server1:
