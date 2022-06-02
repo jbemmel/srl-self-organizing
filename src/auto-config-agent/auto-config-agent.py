@@ -488,7 +488,7 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    # Support multiple port-to-service mappings, 0 = all ports in service 1
    _svc_id = state.svc_id( port )
-   use_irb = state.useIRB()
+   use_irb = state.useIRB() # and not state.is_spine() ?
    _vrf = f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
@@ -540,7 +540,7 @@ def Convert_to_lag(state,port,ip,peer_data):
              logging.info( f"Convert_to_lag: Defer {port} until 2nd MC-LAG port is known" )
              return
       else:
-         logging.warning( "Convert_to_lag: LEAF-LEAF link but no pair_key match!" )
+         logging.warning( "Convert_to_lag: LEAF link, no pair_key(a|b) match" )
 
    is_routed = (state.get_role()=="leaf" and state.evpn!="l2_only_leaves") or state.is_spine()
 
@@ -696,9 +696,10 @@ def Convert_to_lag(state,port,ip,peer_data):
    if use_irb:
       vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
       # XXX assumes 'overlay' ip-vrf created elsewhere
+      _l3_vrf = "default" if state.is_spine() else "overlay"
       updates += [
         (f'/interface[name=irb0]', irb_if),
-        (f'/network-instance[name=overlay]/interface[name=irb0.{_svc_id}]', {}),
+        (f'/network-instance[name={_l3_vrf}]/interface[name=irb0.{_svc_id}]', {}),
       ]
 
       if state.evpn != 'disabled':
