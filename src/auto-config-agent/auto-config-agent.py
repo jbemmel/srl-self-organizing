@@ -489,7 +489,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    # Support multiple port-to-service mappings, 0 = all ports in service 1
    _svc_id = state.svc_id( port )
    use_irb = state.useIRB() # and not state.is_spine() ?
-   _vrf = f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
+   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
 
    # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
    # form a lag on this side
@@ -644,7 +644,7 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    # Could configure MAC table size here
    vrf_inst = {
-     "type": "ip-vrf" if is_routed and not use_irb else "mac-vrf",
+     "type": "default" if _vrf=='default' else "ip-vrf" if is_routed and not use_irb else "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other lag interfaces
      "interface": [ { "name": f"{_lag}.0" } ],
