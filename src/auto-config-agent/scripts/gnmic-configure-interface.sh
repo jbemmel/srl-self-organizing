@@ -31,7 +31,7 @@ EVPN_PEER_DESC="EVPN route-reflector for overlay services"
 fi
 
 # Can add --debug
-GNMIC="/sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
+GNMIC="/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
