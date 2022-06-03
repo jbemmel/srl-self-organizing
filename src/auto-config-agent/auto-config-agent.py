@@ -823,7 +823,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
               # Actually, peer MAC is not a great value to use; better own router/pair-id
               "esi": f"03:{mac.lower()}:00:00:{min(peer_port_list+[_lag_id]):02x}",
               "_annotate_esi": "EVPN MC-LAG with " + peers + ", bytes 2-7 form auto-derived route target see RFC7432 7.6",
-              "interface": f"lag{ _lag_id }",
+              "interface": [ { "ethernet-interface": f"lag{ _lag_id }" } ], # Since 22.3.1
               "multi-homing-mode": "all-active" # default
             }
           ]
