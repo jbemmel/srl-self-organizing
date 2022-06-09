@@ -696,7 +696,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    if use_irb:
       vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
       # XXX assumes 'overlay' ip-vrf created elsewhere
-      _l3_vrf = "default" if state.is_spine() else "overlay"
+      _l3_vrf = 'overlay' if peer_data['type']=='host' else 'default'
       updates += [
         (f'/interface[name=irb0]', irb_if),
         (f'/network-instance[name={_l3_vrf}]/interface[name=irb0.{_svc_id}]', {}),
