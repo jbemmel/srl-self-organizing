@@ -553,7 +553,6 @@ def Convert_to_lag(state,port,ip,peer_data):
    use_vlans = state.useVLANs( f"ethernet-1/{port}" )
    lag = {
       "admin-state": "enable",
-      "description": lag_desc,
       "srl_nokia-interfaces-vlans:vlan-tagging": use_vlans,
       "subinterface": [
        {
@@ -563,6 +562,7 @@ def Convert_to_lag(state,port,ip,peer_data):
       ],
    }
    if state.evpn_auto_lags != "disabled": # todo combine
+     lag['description'] = lag_desc
      lag['lag'] = {
       "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
 
@@ -1230,7 +1230,8 @@ def Handle_Notification(obj, state):
                 Update_EVPN_RR_Neighbors( state, first_time=True )
 
                 # XXX assumes router_id wont change after this point
-                EVPNRouteMonitoringThread(state).start()
+                if state.evpn_auto_lags != "disabled":
+                   EVPNRouteMonitoringThread(state).start()
 
           # Could also announce communities for spines
           if state.get_role() == "leaf" and hasattr(state,"router_id"):
