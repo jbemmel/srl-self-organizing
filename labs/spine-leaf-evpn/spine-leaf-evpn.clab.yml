@@ -33,7 +33,7 @@ topology:
       kind: srl
       image: ghcr.io/nokia/srlinux:21.11.2
       group: leaves
-      type: ixrd1
+      type: ixrd2 # ixrd1
 
     spine1:
       kind: srl
@@ -74,12 +74,12 @@ topology:
     - endpoints: ["leaf4:e1-1", "spine1:e1-4"]
     - endpoints: ["leaf4:e1-2", "spine2:e1-4"]
 
-    # LAGs to pairs of leaves
+    # LAG to pair of leaves
     - endpoints: ["client1:eth1", "leaf1:e1-3"]
     - endpoints: ["client1:eth2", "leaf2:e1-3"]
 
     - endpoints: ["client2:eth1", "leaf3:e1-3"]
-    - endpoints: ["client2:eth2", "leaf4:e1-3"]
+    # - endpoints: ["client2:eth2", "leaf4:e1-3"]
 
-    - endpoints: ["client3:eth1", "leaf1:e1-4"]
-    - endpoints: ["client3:eth2", "leaf2:e1-4"]
+    - endpoints: ["client3:eth1", "leaf4:e1-3"]
+    # - endpoints: ["client3:eth2", "leaf4:e1-4"]
