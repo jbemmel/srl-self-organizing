@@ -1392,7 +1392,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      setattr( state, link_name, _ip )
 
      # For access ports or L2-only leaves, convert to L2 service if requested
-     if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
+     if state.evpn_auto_lags != "disabled":
+      if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
          (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')] and not leaf_pair_link)):
         peer_data = {
           'name': lldp_peer_name,
@@ -1400,7 +1401,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
           'port': lldp_peer_port
         }
         Convert_to_lag( state, lldp_my_port, _ip, peer_data ) # No EVPN MC-LAG yet
-     else:
+      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
      if state.use_bgp_unnumbered:
