@@ -457,13 +457,13 @@ def HandleLLDPChange(state,peername,my_port,their_port):
 
 def lag_id(port):
     """
-    Calculates the lag id to use for the given port. Max lag id is 32,
-    using all 8 100G ports as separate lags leaves 1..24 for 25G ports
+    Calculates the lag id to use for the given port. Max lag id is 48 (since 22.3.1),
+    using all 8 100G ports as separate lags leaves 1..40 for 25G ports
     """
-    if port<=24:   # 25G ports on IXR-D2
+    if port<=40:   # 25G ports on IXR-D2
         return port
     elif port>=49: # 8x 100G ports on IXR-D2
-        return 25 + (port-49)
+        return 40 + (port-49)
     else:
         raise Exception( f"Unable to allocate LAG ID for port {port}" )
 
@@ -491,16 +491,19 @@ def Convert_to_lag(state,port,ip,peer_data):
    use_irb = state.useIRB() # and not state.is_spine() ?
    _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
 
-   # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
-   # form a lag on this side
-   _lag_id = lag_id(port)
-   _lag = f"lag{ _lag_id  }" # Maximum lag ID is 32, max 100G port is 56
+   enable_lacp = state.lacp != "disabled"
    _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
-   enable_lacp = state.lacp != "disabled"
-   lag_desc = f"Single link ethernet-1/{port}"
-   updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag } ) ]
-   if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
+   updates = []
+
+   # Support leaf-pair lags; if peer belongs to another leaf-pair, assume 2 links
+   # form a lag on this side
+   if state.evpn_auto_lags != "disabled":
+    _lag_id = lag_id(port)
+    _lag = f"lag{ _lag_id  }" # Maximum lag ID is 32, max 100G port is 56
+    lag_desc = f"Single link ethernet-1/{port}"
+    updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag } ) ]
+    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
       pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
          _pk, _ab = pair_key.groups()
@@ -541,6 +544,8 @@ def Convert_to_lag(state,port,ip,peer_data):
              return
       else:
          logging.warning( "Convert_to_lag: LEAF link, no pair_key(a|b) match" )
+   else:
+      _lag = f"ethernet-1/{port}"
 
    is_routed = (state.get_role()=="leaf" and state.evpn!="l2_only_leaves") or state.is_spine()
 
@@ -556,14 +561,16 @@ def Convert_to_lag(state,port,ip,peer_data):
          "type": "routed" if is_routed and not use_irb else "bridged",
        }
       ],
-      "lag": {
-       "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
-
-       # Leaf IXR-D2: 1G, 10G, 25G, 40G, 100G
-       # Spine IXR-6: 40G, 100G, 400G
-       "member-speed": "100G"
-      }
    }
+   if state.evpn_auto_lags != "disabled": # todo combine
+     lag['lag'] = {
+      "lag-type": "static", # May get upgraded to LACP in case of MC-LAG
+
+      # Leaf IXR-D2: 1G, 10G, 25G, 40G, 100G
+      # Spine IXR-6: 40G, 100G, 400G
+      "member-speed": "100G"
+     }
+
    if use_vlans:
        lag['subinterface'][0]["srl_nokia-interfaces-vlans:vlan"] = {
          # Routed interface cannot be untagged, and cannot use VLAN 0
@@ -1221,9 +1228,9 @@ def Handle_Notification(obj, state):
 
              if state.get_role()=="leaf":
                 Update_EVPN_RR_Neighbors( state, first_time=True )
-                if state.evpn_auto_lags != "disabled":
-                   # XXX assumes router_id wont change after this point
-                   EVPNRouteMonitoringThread(state).start()
+
+                # XXX assumes router_id wont change after this point
+                EVPNRouteMonitoringThread(state).start()
 
           # Could also announce communities for spines
           if state.get_role() == "leaf" and hasattr(state,"router_id"):
@@ -1392,8 +1399,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      setattr( state, link_name, _ip )
 
      # For access ports or L2-only leaves, convert to L2 service if requested
-     if state.evpn_auto_lags != "disabled":
-      if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
+     if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
          (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')] and not leaf_pair_link)):
         peer_data = {
           'name': lldp_peer_name,
@@ -1401,7 +1407,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
           'port': lldp_peer_port
         }
         Convert_to_lag( state, lldp_my_port, _ip, peer_data ) # No EVPN MC-LAG yet
-      else:
+     else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
      if state.use_bgp_unnumbered:
