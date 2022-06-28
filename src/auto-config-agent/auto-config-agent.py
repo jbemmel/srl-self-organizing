@@ -905,7 +905,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 # Configures the default network instance to use BGP unnumbered between
 # spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
 ##
-def Configure_BGP_unnumbered(state,port):
+def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as):
    logging.info(f"Configure_BGP_unnumbered :: port={port}")
    eth = f'name=ethernet-1/{port}'
 
@@ -928,11 +928,15 @@ def Configure_BGP_unnumbered(state,port):
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
               ]
    else:
-      dyn_n = { "peer-group": "bgp-unnumbered-peers" }
+      dyn_n = { "peer-group": "bgp-unnumbered-peers",
+                "allowed-peer-as": [ f"{min_peer_as}..{max_peer_as}" ] }
+      bgp_group = {
+       "local-as": [ { "as-number": state.local_as, "prepend-global-as": False } ],
+      }
       ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } } }
 
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
-                (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', {} ),
+                (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', bgp_group ),
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', ipv6_ra ),
               ]
 
@@ -1423,7 +1427,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 
      if state.use_bgp_unnumbered:
          if (peer_type!='host' and state.get_role() != 'endpoint'):
-             Configure_BGP_unnumbered( state, lldp_my_port )
+             Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
