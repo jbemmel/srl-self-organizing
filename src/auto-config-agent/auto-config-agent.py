@@ -927,9 +927,9 @@ def Configure_BGP_unnumbered(state,port):
                 (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
               ]
    else:
-      dyn_n = { "peer-group": "bgp-unnumbered" }
+      dyn_n = { "peer-group": "bgp-unnumbered-peers" }
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
-                (f'/network-instance[name=default]/protocols/bgp/groups[name=bgp-unnumbered]', {} ),
+                (f'/network-instance[name=default]/protocols/bgp/group[name=bgp-unnumbered-peers]', {} ),
               ]
    updates += [ (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ), ]
 
