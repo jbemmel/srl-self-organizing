@@ -925,13 +925,16 @@ def Configure_BGP_unnumbered(state,port):
       bgp_u = { "peer-as": "external" }
       updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
                 (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
+                (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
               ]
    else:
       dyn_n = { "peer-group": "bgp-unnumbered-peers" }
+      ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } } }
+
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
                 (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', {} ),
+                (f'/interface[{eth}]/subinterface[index=0]/ipv6', ipv6_ra ),
               ]
-   updates += [ (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ), ]
 
    logging.info(f"gNMI SET updates={updates}" )
    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
