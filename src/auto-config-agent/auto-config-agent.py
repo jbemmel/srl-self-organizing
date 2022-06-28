@@ -937,11 +937,15 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as):
       bgp_evpn = {
        "advertise-ipv6-next-hops": True, # TODO disable ipv4 check
       }
+      ip_forwarding = {
+       "receive-ipv4-check": False
+      }
       ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } } }
 
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
                 (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', bgp_group ),
                 (f'/network-instance[name=default]/protocols/bgp/evpn', bgp_evpn ),
+                (f'/network-instance[name=default]/ip-forwarding', ip_forwarding ),
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', ipv6_ra ),
               ]
 
