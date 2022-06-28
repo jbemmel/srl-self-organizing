@@ -932,11 +932,16 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as):
                 "allowed-peer-as": [ f"{min_peer_as}..{max_peer_as}" ] }
       bgp_group = {
        "local-as": [ { "as-number": state.local_as, "prepend-global-as": False } ],
+       "export-policy": "select-loopbacks",
+      }
+      bgp_evpn = {
+       "advertise-ipv6-next-hops": True, # TODO disable ipv4 check
       }
       ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } } }
 
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
                 (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', bgp_group ),
+                (f'/network-instance[name=default]/protocols/bgp/evpn', bgp_evpn ),
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', ipv6_ra ),
               ]
 
