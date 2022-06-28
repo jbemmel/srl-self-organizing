@@ -932,6 +932,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as):
                 "allowed-peer-as": [ f"{min_peer_as}..{max_peer_as}" ] }
       bgp_group = {
        "local-as": [ { "as-number": state.local_as, "prepend-global-as": False } ],
+       "import-policy": "select-loopbacks",
        "export-policy": "select-loopbacks",
       }
       bgp_evpn = {
