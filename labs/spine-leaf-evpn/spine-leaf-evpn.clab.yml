@@ -21,6 +21,8 @@ topology:
       kind: srl
       group: leaves
       type: ixrd2
+      binds:
+      - ../../../opergroup-lab/lldp_before_l2cp.py:/etc/opt/srlinux/eventmgr/lldp_before_l2cp.py
     leaf2:
       kind: srl
       group: leaves
@@ -64,21 +66,21 @@ topology:
       - interfaces.client3:/etc/network/interfaces
 
   links:
-    - endpoints: ["leaf1:e1-1", "spine1:e1-1"]
-    - endpoints: ["leaf1:e1-2", "spine2:e1-1"]
-    - endpoints: ["leaf2:e1-1", "spine1:e1-2"]
-    - endpoints: ["leaf2:e1-2", "spine2:e1-2"]
+    - endpoints: ["leaf1:e1-49", "spine1:e1-1"]
+    - endpoints: ["leaf1:e1-50", "spine2:e1-1"]
+    - endpoints: ["leaf2:e1-49", "spine1:e1-2"]
+    - endpoints: ["leaf2:e1-50", "spine2:e1-2"]
 
-    - endpoints: ["leaf3:e1-1", "spine1:e1-3"]
-    - endpoints: ["leaf3:e1-2", "spine2:e1-3"]
-    - endpoints: ["leaf4:e1-1", "spine1:e1-4"]
-    - endpoints: ["leaf4:e1-2", "spine2:e1-4"]
+    - endpoints: ["leaf3:e1-49", "spine1:e1-3"]
+    - endpoints: ["leaf3:e1-50", "spine2:e1-3"]
+    - endpoints: ["leaf4:e1-49", "spine1:e1-4"]
+    - endpoints: ["leaf4:e1-50", "spine2:e1-4"]
 
     # LAG to pair of leaves
-    - endpoints: ["client1:eth1", "leaf1:e1-3"]
-    - endpoints: ["client1:eth2", "leaf2:e1-3"]
+    - endpoints: ["client1:eth1", "leaf1:e1-1"]
+    - endpoints: ["client1:eth2", "leaf2:e1-1"]
 
-    - endpoints: ["client2:eth1", "leaf3:e1-3"]
+    - endpoints: ["client2:eth1", "leaf3:e1-2"]
     # - endpoints: ["client2:eth2", "leaf4:e1-3"]
 
     - endpoints: ["client3:eth1", "leaf4:e1-3"]

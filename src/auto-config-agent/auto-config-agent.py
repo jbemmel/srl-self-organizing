@@ -910,22 +910,29 @@ def Configure_BGP_unnumbered(state,port):
    eth = f'name=ethernet-1/{port}'
 
    # This gets updated every time an interface is added
-   frr = {
-    "admin-state": "enable",
-    "router-id" : state.router_id,
-    "autonomous-system" : state.local_as,
-    "bgp" : {
-     "admin-state": "enable",
-    }
-   }
+   if state.igp == "bgp_unnumbered_frr":
+      frr = {
+       "admin-state": "enable",
+       "router-id" : state.router_id,
+       "autonomous-system" : state.local_as,
+       "bgp" : {
+        "admin-state": "enable",
+       }
+      }
 
-   # BGP unnumbered interfaces must have ipv6 enabled
+      # BGP unnumbered interfaces must have ipv6 enabled
 
-   bgp_u = { "peer-as": "external" }
-   updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
-             (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
-             (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
-           ]
+      bgp_u = { "peer-as": "external" }
+      updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
+                (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
+              ]
+   else:
+      dyn_n = { "peer-group": "bgp-unnumbered" }
+      updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-name={eth}.0]', dyn_n),
+                (f'/network-instance[name=default]/protocols/bgp/groups[name=bgp-unnumbered]', {} ),
+              ]
+   updates += [ (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ), ]
+
    logging.info(f"gNMI SET updates={updates}" )
    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
 
@@ -1108,7 +1115,7 @@ def Handle_Notification(obj, state):
 
                 if 'igp' in data:
                     state.igp = data['igp'][4:] # strip IGP_
-                    state.use_bgp_unnumbered = (state.igp == "bgp_unnumbered")
+                    state.use_bgp_unnumbered = state.igp in ["bgp_unnumbered","bgp_unnumbered_frr"]
                 if 'lacp' in data:
                     state.lacp = data['lacp'][5:]
                 state.lacp_rate = "SLOW" # XXX hardcoded
@@ -1154,7 +1161,7 @@ def Handle_Notification(obj, state):
                 return state.role is not None
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
-        logging.info(f"process LLDP notification : {obj} op='{obj.lldp_neighbor.op}'")
+        logging.info(f"process LLDP notification : op='{obj.lldp_neighbor.op}'")
 
         # Since 21.6 there are 'Delete' events too
         if obj.lldp_neighbor.op == 2: # Delete, class 'int'

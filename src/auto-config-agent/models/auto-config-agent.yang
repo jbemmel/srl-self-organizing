@@ -208,7 +208,8 @@ module auto_config_agent {
                 description "IGP to use for distributing loopback IPs";
                 type enumeration {
                   enum bgp;
-                  enum bgp-unnumbered; // Using FRR agent
+                  enum bgp-unnumbered; // Using 22.6 feature
+                  enum bgp-unnumbered-frr; // Using FRR agent
                   enum isis;
                   enum ospf; // could do both v2 and v3
                 }
