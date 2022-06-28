@@ -929,7 +929,7 @@ def Configure_BGP_unnumbered(state,port):
    else:
       dyn_n = { "peer-group": "bgp-unnumbered-peers" }
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
-                (f'/network-instance[name=default]/protocols/bgp/group[name=bgp-unnumbered-peers]', {} ),
+                (f'/network-instance[name=default]/protocols/bgp/group[group-name=bgp-unnumbered-peers]', {} ),
               ]
    updates += [ (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ), ]
 
