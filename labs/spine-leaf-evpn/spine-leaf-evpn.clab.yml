@@ -27,6 +27,8 @@ topology:
       kind: srl
       group: leaves
       type: ixrd2
+      binds:
+      - ../../../opergroup-lab/lldp_before_l2cp.py:/etc/opt/srlinux/eventmgr/lldp_before_l2cp.py
     leaf3:
       kind: srl
       group: leaves

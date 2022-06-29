@@ -703,12 +703,12 @@ IFS='' read -r -d '' _IP_ADDRESSING << EOF
 ,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
  "ipv6": { "address": [ { "ip-prefix": "${_IP127//\./:}" } ] }
 EOF
-else
+# else
 # Enable IPv4+IPv6 but don't put addresses (yet)
-IFS='' read -r -d '' _IP_ADDRESSING << EOF
-,"ipv4": {  },
- "ipv6": {  }
-EOF
+# IFS='' read -r -d '' _IP_ADDRESSING << EOF
+# ,"ipv4": {  },
+#  "ipv6": {  }
+# EOF
 fi
 
 # Removed $_VLAN_TAGGING and $_VLAN
