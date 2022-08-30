@@ -474,9 +474,13 @@ def lag_id(port):
 def Convert_to_lag(state,port,ip,peer_data):
    logging.info(f"Convert_to_lag :: port={port} ip={ip} peer_data={peer_data}")
 
+   # Support multiple port-to-service mappings, 0 = all ports in service 1
+   _svc_id = state.svc_id( port )
+   _vrf_id = state.vrf_id( port )
+
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
-     orig_vrf = 'overlay-1' if peer_data['type']=='host' else 'default'
+     orig_vrf = f'overlay-{_vrf_id}' if peer_data['type']=='host' else 'default'
      deletes = [ f'/interface[{eth}]/subinterface[index=*]',
                  f'/interface[{eth}]/vlan-tagging',
                  f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
@@ -486,10 +490,8 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    deletes = deletes_for_port(port)
 
-   # Support multiple port-to-service mappings, 0 = all ports in service 1
-   _svc_id = state.svc_id( port )
    use_irb = state.useIRB() # and not state.is_spine() ?
-   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay-1"
+   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else f"overlay-{_vrf_id}"
 
    enable_lacp = state.lacp != "disabled"
    _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
@@ -647,7 +649,7 @@ def Convert_to_lag(state,port,ip,peer_data):
             l3_intf['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
 
    # EVPN VXLAN interface
-   VNI_EVI = 4095 # Cannot use 0
+   VNI_EVI = 4095 + _vrf_id # Cannot use 0
 
    # Could configure MAC table size here
    vrf_inst = {
@@ -660,7 +662,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    }
    updates += [ (f'/network-instance[name={_vrf}]', vrf_inst) ]
 
-   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!="overlay-1"
+   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!=f"overlay-{_vrf_id}"
    if use_evpn_vxlan:
       vrf_inst.update(
       {
@@ -703,7 +705,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    if use_irb:
       vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
       # XXX assumes 'overlay' ip-vrf created elsewhere
-      _l3_vrf = 'overlay-1' if peer_data['type']=='host' else 'default'
+      _l3_vrf = f'overlay-{_vrf_id}' if peer_data['type']=='host' else 'default'
       updates += [
         (f'/interface[name=irb0]', irb_if),
         (f'/network-instance[name={_l3_vrf}]/interface[name=irb0.{_svc_id}]', {}),
@@ -1102,6 +1104,8 @@ def Handle_Notification(obj, state):
                 #    state.max_lag_links = int( data['max_lag_links']['value'] )
                 if 'ports_per_service' in data:
                     state.ports_per_service = int( data['ports_per_service']['value'] )
+                if 'vrf_per_service' in data:
+                    state.vrf_per_service = bool( data['vrf_per_service']['value'] )
 
                 state.evpn_overlay_as = 0
                 state.evpn = state.evpn_auto_lags = 'disabled'
@@ -1420,7 +1424,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id,
-         "1", # vrf_id
+         str( state.vrf_id(lldp_peer_port) ) if peer_type=='host' else "1", # vrf_id
      )
      setattr( state, link_name, _ip )
 
@@ -1475,6 +1479,7 @@ class State(object):
         self.max_level = 0 # Maximum topology level, learnt through LLDP
         self.top_count = 1 # Number of nodes at top, learnt through LLDP
         self.ports_per_service = 0 # By default, map all ports to service 1
+        self.vrf_per_service = False
 
         self._determine_role() # May not be set in config, default 'auto'
         self.host_lldp_seen = False # To auto-detect leaves: >= 1 host connected
@@ -1511,6 +1516,13 @@ class State(object):
             return 1 # 0 -> all ports in service 1
         else:
             return (port % self.ports_per_service + 1) # 1,2,3...8
+
+    def vrf_id(self,port):
+        """
+        Support VRF-per-port and single VRF models
+        """
+        return port if self.vrf_per_service else 1
+
 
     # Use single, globally shared gNMI connection? hard to make work correctly
     # def connectGNMI(self):
