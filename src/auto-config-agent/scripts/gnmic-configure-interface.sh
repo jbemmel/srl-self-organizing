@@ -261,7 +261,10 @@ fi
 IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
-  "peer-group": "${DYNAMIC_EBGP_GROUP}"
+  "peer-group": "${DYNAMIC_EBGP_GROUP}",
+  "allowed-peer-as": [
+    "$PEER_AS_MIN..$PEER_AS_MAX"
+  ]  
 }
 EOF
 EBGP_NEIGHBORS_COMMA=","
@@ -799,18 +802,7 @@ EOF
 echo "Adding BGP peer ${PEER_IP} in VRF ${VRF}..."
 $GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/neighbor[peer-address=$PEER_IP] --update-file $temp_file
 exitcode+=$?
-elif [[ "$ROLE" != "leaf" || "$evpn" != "l2_only_leaves" ]]; then
 
-# Update EBGP dynamic peering group on (super)spines and leaves with correct AS range
-cat > $temp_file << EOF
-{
-  "allowed-peer-as": [
-    "$PEER_AS_MIN..$PEER_AS_MAX"
-  ]
-}
-EOF
-$GNMIC set --update-path /network-instance[name=$VRF]/protocols/bgp/dynamic-neighbors/accept/match[prefix=$LINK_PREFIX] --update-file $temp_file
-exitcode+=$?
 fi # "$PEER_IP" != "*"
 
 fi # IGP logic

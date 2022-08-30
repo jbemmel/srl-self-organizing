@@ -1450,16 +1450,16 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,vrf_id):
+def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,vrf_id):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
-                 f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
+                 f'first_run={first_run} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max} vrf_id={vrf_id}' )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
        logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
-                                       state.get_role(),name,ip,peer,peer_ip,router_id,
+                                       state.get_role(),name,ip,peer,peer_ip,first_run,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type, peer_rid, state.igp,
                                        state.evpn, state.overlay_bgp_admin_state, vrf_id],
