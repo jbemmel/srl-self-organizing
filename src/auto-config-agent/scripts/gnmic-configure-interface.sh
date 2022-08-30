@@ -34,28 +34,6 @@ EVPN_PEER_GROUPNAME="evpn-rr"
 EVPN_PEER_DESC="EVPN route-reflector for overlay services"
 fi
 
-# Can add --debug
-GNMIC="/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
-
-temp_file=$(mktemp --suffix=.json)
-exitcode=0
-
-#
-# 1) One-time configuration at startup, first run of the script
-#
-if [[ "$FIRST_RUN" == "1" ]]; then
-
-# if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
-#  echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
-#  # Setting is per netns (could put this in a separate agent...)
-#  /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
-# fi
-
-if [[ "$ROLE" == "leaf" ]]; then
-LOOPBACK_IF="system"
-#LOOPBACK_IP4="$router_id/31" # Use /31 to have multiple source IPs for traceroute
-#LOOPBACK_IP6="2001::${router_id//\./:}/127"
-
 # Only used on leaves
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
@@ -84,6 +62,28 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
     }
 }
 EOF
+
+# Can add --debug
+GNMIC="/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
+
+temp_file=$(mktemp --suffix=.json)
+exitcode=0
+
+#
+# 1) One-time configuration at startup, first run of the script
+#
+if [[ "$FIRST_RUN" == "1" ]]; then
+
+# if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
+#  echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
+#  # Setting is per netns (could put this in a separate agent...)
+#  /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
+# fi
+
+if [[ "$ROLE" == "leaf" ]]; then
+LOOPBACK_IF="system"
+#LOOPBACK_IP4="$router_id/31" # Use /31 to have multiple source IPs for traceroute
+#LOOPBACK_IP6="2001::${router_id//\./:}/127"
 
 else
 LOOPBACK_IF="lo"
@@ -684,7 +684,7 @@ cat > $temp_file << EOF
 EOF
 
 echo "Creating or updating VRF '${VRF_NAME}'"
-cp $temp_file /tmp/create_vrf_${VRF_NAME}.json
+# cp $temp_file /tmp/create_vrf_${VRF_NAME}.json
 $GNMIC set --update-path /network-instance[name=${VRF_NAME}] --update-file $temp_file
 exitcode+=$?
 
