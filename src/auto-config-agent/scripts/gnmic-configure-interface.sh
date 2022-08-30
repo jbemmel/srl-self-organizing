@@ -676,6 +676,7 @@ cat > $temp_file << EOF
     }
   }
 EOF
+
 $GNMIC set --update-path /network-instance[name=${VRF_NAME}] --update-file $temp_file
 exitcode+=$?
 

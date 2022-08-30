@@ -1424,7 +1424,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id,
-         str( state.vrf_id(lldp_peer_port) ) if peer_type=='host' else "1", # vrf_id
+         str( state.vrf_id(lldp_my_port) ) if peer_type=='host' else "1", # vrf_id
      )
      setattr( state, link_name, _ip )
 
@@ -1441,8 +1441,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
      if state.use_bgp_unnumbered:
-         if (peer_type!='host' and state.get_role() != 'endpoint'):
-             Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as )
+        if (peer_type!='host' and state.get_role() != 'endpoint'):
+           Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
@@ -1514,6 +1514,8 @@ class State(object):
         """
         if self.ports_per_service == 0:
             return 1 # 0 -> all ports in service 1
+        elif self.ports_per_service == 1:
+            return port
         else:
             return (port % self.ports_per_service + 1) # 1,2,3...8
 
@@ -1521,7 +1523,7 @@ class State(object):
         """
         Support VRF-per-port and single VRF models
         """
-        return port if self.vrf_per_service else 1
+        return port if self.vrf_per_service and self.ports_per_service != 0 else 1
 
 
     # Use single, globally shared gNMI connection? hard to make work correctly
