@@ -9,7 +9,7 @@ INTF="$2"
 IP_PREFIX="$3"
 PEER="$4"         # 'host' for Linux nodes and endpoints
 PEER_IP="$5"
-ROUTER_ID="$6"       # '*' when not set
+FIRST_RUN="$6"       # '1' when running for first time, '0' otherwise
 PEER_AS_MIN="$7"     # Overlay AS in case of leaf-host
 PEER_AS_MAX="$8"     # Host AS in case of leaf-host
 LINK_PREFIX="${9}"   # IP subnet used for allocation of IPs to BGP peers
@@ -41,9 +41,9 @@ temp_file=$(mktemp --suffix=.json)
 exitcode=0
 
 #
-# 1) One-time configuration at startup, when ROUTER_ID is provided
+# 1) One-time configuration at startup, first run of the script
 #
-if [[ "$ROUTER_ID" != "*" ]]; then
+if [[ "$FIRST_RUN" == "1" ]]; then
 
 # if [[ "${disable_icmp_ttl0_rate_limiting}" == "True" ]]; then
 #  echo "Disabling ICMP TTL 0 rate limiting in srbase-default by setting net.ipv4.icmp_ratemask=4120"
@@ -53,13 +53,13 @@ if [[ "$ROUTER_ID" != "*" ]]; then
 
 if [[ "$ROLE" == "leaf" ]]; then
 LOOPBACK_IF="system"
-#LOOPBACK_IP4="$ROUTER_ID/31" # Use /31 to have multiple source IPs for traceroute
-#LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/127"
+#LOOPBACK_IP4="$router_id/31" # Use /31 to have multiple source IPs for traceroute
+#LOOPBACK_IP6="2001::${router_id//\./:}/127"
 else
 LOOPBACK_IF="lo"
 fi
-LOOPBACK_IP4="$ROUTER_ID/32"
-LOOPBACK_IP6="2001::${ROUTER_ID//\./:}/128"
+LOOPBACK_IP4="$router_id/32"
+LOOPBACK_IP6="2001::${router_id//\./:}/128"
 # fi
 
 cat > $temp_file << EOF
@@ -168,7 +168,7 @@ fi
 
 cat > $temp_file << EOF
 {
-  "router-id": "$ROUTER_ID",
+  "router-id": "$router_id",
   "admin-state": "enable",
   "version": "ospf-v3",
   "address-family": "ipv4-unicast",
@@ -193,7 +193,7 @@ exitcode+=$?
 
 elif [[ "$IGP" == "isis" ]]; then
 
-IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+IFS=. read ip1 ip2 ip3 ip4 <<< "$router_id"
 NET_ID=$( printf "49.0001.9999.%02x%02x.%02x%02x.00" $ip1 $ip2 $ip3 $ip4 )
 
 cat > $temp_file << EOF
@@ -297,13 +297,13 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
   "ipv6-unicast": { "admin-state": "disable" },
   "route-reflector": {
     "client": true,
-    "cluster-id": "$ROUTER_ID"
+    "cluster-id": "$router_id"
   }
 }
 EOF
 
 if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
-IFS=. read ip1 ip2 ip3 ip4 <<< "$ROUTER_ID"
+IFS=. read ip1 ip2 ip3 ip4 <<< "$router_id"
 NBR_PREFIX="$ip1.$ip2.0.0/24"
 else
 # XXX very broad, could reduce this
@@ -408,9 +408,9 @@ DEFAULT_DYNAMIC_HOST_PEERING=""
 # fi
 
 if [[ "$evpn_bgp_peering" == "ipv4" ]]; then
-  TRANSPORT="${ROUTER_ID}"
+  TRANSPORT="${router_id}"
 else
-  TRANSPORT="2001::${ROUTER_ID//\./:}"
+  TRANSPORT="2001::${router_id//\./:}"
 fi
 
 if [[ "$evpn" == "l2_only_leaves" ]]; then
@@ -543,7 +543,7 @@ cat > $temp_file << EOF
   "admin-state": "enable",
   "autonomous-system": ${evpn_overlay_as},
   "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
-  "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
+  "router-id": "$router_id", "_annotate_router-id": "${router_id##*.}",
   $DYNAMIC_NEIGHBORS
   $BGP_IP_UNDERLAY
   ${BGP_UNNUMBERED_IMPORT_POLICY}
@@ -560,13 +560,15 @@ exitcode+=$?
 
 # Annotate /system as well
 cat > $temp_file << EOF
-{ "_annotate" : "${ROUTER_ID##*.}" }
+{ "_annotate" : "${router_id##*.}" }
 EOF
 
 $GNMIC set --update-path /system --update-file $temp_file
 exitcode+=$?
 
-# For leaves, create L3 VXLAN tunnel interface vxlan0 for overlay VRF
+fi # if FIRST_RUN
+
+# For leaves with EVPN, create overlay VRF with optional L3 VXLAN tunnel interface vxlan0
 if [[ "$ROLE" == "leaf" && ("$USE_EVPN_OVERLAY" == "symmetric_irb" || "$USE_EVPN_OVERLAY" == "asymmetric_irb") ]]; then
 
 if [[ "$USE_EVPN_OVERLAY" == "symmetric_irb" ]]; then
@@ -647,7 +649,7 @@ cat > $temp_file << EOF
       "bgp": {
         "admin-state": "enable",
         "autonomous-system": ${evpn_overlay_as},
-        "router-id": "$ROUTER_ID", "_annotate_router-id": "${ROUTER_ID##*.}",
+        "router-id": "$router_id", "_annotate_router-id": "${router_id##*.}",
         "ipv4-unicast": {
           "admin-state": "enable",
           "multipath": {
@@ -677,11 +679,11 @@ cat > $temp_file << EOF
   }
 EOF
 
+echo "Creating or updating VRF '${VRF_NAME}'"
 $GNMIC set --update-path /network-instance[name=${VRF_NAME}] --update-file $temp_file
 exitcode+=$?
 
 fi # leaf with EVPN enabled
-fi # if ROUTER_ID provided, first time only
 
 #
 # 2) Per-link provisioning
@@ -751,7 +753,8 @@ echo "Selected VRF: ${VRF} for INTF=${INTF}.0 towards ${PEER_TYPE}"
 
 # Add it to the correct instance - host (lag) interfaces managed in Python code
 if [[ "$VRF" != "none" ]]; then
- $GNMIC set --update /network-instance[name=$VRF]/interface[name=${INTF}.0]:::string:::''
+ echo "Adding interface ${INTF}.0 to VRF '${VRF}' - assumes ip-vrf exists"
+ $GNMIC set --update /network-instance[name=${VRF}]/interface[name=${INTF}.0]:::string:::''
  exitcode+=$?
 
 # Add it to OSPF (if enabled)

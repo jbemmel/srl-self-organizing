@@ -1418,7 +1418,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          lldp_peer_desc,
          _peer if ((peer_type=='spine' and _r==1)
                    or leaf_pair_link) else '*', # Only when connecting "upwards"
-         state.router_id if set_router_id else "*",
+         "1" if set_router_id else "0", # FIRST_RUN
          min_peer_as, # For spine, allow both iBGP (same AS) and eBGP
          max_peer_as,
          state.peerlinks_prefix,
