@@ -176,9 +176,9 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
 
        updates = [('/routing-policy/community-set[name=LLDP]',value)]
 
-       # Toggle a special IP address on lo0.1 to trigger route count updates
+       # Toggle a special IP address on lo0.0 to trigger route count updates
        ip99 = '99.99.99.99/32'
-       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv4/address'
+       ip_path = '/interface[name=lo0]/subinterface[index=0]/ipv4/address'
 
        if not hasattr(state,'toggle_route_update') or not state.toggle_route_update:
           state.toggle_route_update = True
@@ -188,7 +188,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
           deletes = [ ip_path + f"[ip-prefix={ip99}]" ]
 
     elif state.evpn_auto_lags == "encoded_ipv6": # Use FC00::/7 range
-       ip_path = '/interface[name=lo0]/subinterface[index=1]/ipv6'
+       ip_path = '/interface[name=lo0]/subinterface[index=0]/ipv6'
        pairs = [ (bytes[2*i]+bytes[2*i+1]) for i in range(0,3) ]
        # See https://www.rfc-editor.org/rfc/rfc4193.html for fc00::/7 range
        # Set 'local' bit -> 0xfd
@@ -964,7 +964,7 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
     "admin-state": "enable",
     "subinterface": [
      {
-      "index": 1,
+      "index": 0,
       "admin-state": "enable",
      }
     ]
@@ -989,7 +989,7 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
    ip_vrf = {
      "type": "srl_nokia-network-instance:ip-vrf",
      "admin-state": "enable",
-     "interface": [ { "name": "lo0.1" } ],
+     "interface": [ { "name": "lo0.0" } ],
      "vxlan-interface": [ { "name": "vxlan0.65535" } ],
      "protocols": {
       "bgp-evpn": {
