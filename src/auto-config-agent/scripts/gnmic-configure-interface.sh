@@ -55,6 +55,36 @@ if [[ "$ROLE" == "leaf" ]]; then
 LOOPBACK_IF="system"
 #LOOPBACK_IP4="$router_id/31" # Use /31 to have multiple source IPs for traceroute
 #LOOPBACK_IP6="2001::${router_id//\./:}/127"
+
+# Only used on leaves
+IFS='' read -r -d '' HOSTS_GROUP << EOF
+{
+  "group-name": "hosts",
+  "admin-state": "$OVERLAY_BGP_ADMIN_STATE",
+  "ipv6-unicast" : { "admin-state" : "enable" },
+  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
+  "send-default-route": {
+    "ipv4-unicast": true,
+    "ipv6-unicast": true
+  },
+  "export-policy": "overlay-export-as-to-community"
+}
+EOF
+
+IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
+"dynamic-neighbors": {
+    "accept": {
+      "match": [
+        {
+          "prefix": "$LINK_PREFIX",
+          "peer-group": "hosts",
+          "allowed-peer-as": [ "${evpn_overlay_as}" ]
+        }
+      ]
+    }
+}
+EOF
+
 else
 LOOPBACK_IF="lo"
 fi
@@ -262,9 +292,7 @@ IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
   "peer-group": "${DYNAMIC_EBGP_GROUP}",
-  "allowed-peer-as": [
-    "$PEER_AS_MIN..$PEER_AS_MAX"
-  ]  
+  "allowed-peer-as": [ "$PEER_AS_MIN..$PEER_AS_MAX" ]  
 }
 EOF
 EBGP_NEIGHBORS_COMMA=","
@@ -370,33 +398,6 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
-
-IFS='' read -r -d '' HOSTS_GROUP << EOF
-{
-  "group-name": "hosts",
-  "admin-state": "$OVERLAY_BGP_ADMIN_STATE",
-  "ipv6-unicast" : { "admin-state" : "enable" },
-  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
-  "send-default-route": {
-    "ipv4-unicast": true,
-    "ipv6-unicast": true
-  },
-  "export-policy": "overlay-export-as-to-community"
-}
-EOF
-
-IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
-"dynamic-neighbors": {
-    "accept": {
-      "match": [
-        {
-          "prefix": "$LINK_PREFIX",
-          "peer-group": "hosts"
-        }
-      ]
-    }
-}
-EOF
 
 # XXX perhaps hosts should never be in the 'default' vrf
 DEFAULT_HOSTS_GROUP="$HOSTS_GROUP"
@@ -683,6 +684,7 @@ cat > $temp_file << EOF
 EOF
 
 echo "Creating or updating VRF '${VRF_NAME}'"
+cp $temp_file /tmp/create_vrf_${VRF_NAME}.json
 $GNMIC set --update-path /network-instance[name=${VRF_NAME}] --update-file $temp_file
 exitcode+=$?
 
