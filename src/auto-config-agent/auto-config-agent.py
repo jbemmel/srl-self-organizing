@@ -400,7 +400,7 @@ def Announce_LLDP_peer(state,name,port):
 
 def HandleLLDPChange(state,peername,my_port,their_port):
     # XXX assumes port=single digit, only ethernet-1/x
-    m = re.match( r"^(?:spine-)?(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
+    m = re.match( r"^(?:\w+[-])?(\d+[.]\d+[.]\d+[.]\d+)-(\d+)-(.*)$", peername )
     if m:
         peer_ip = m.groups()[0]
         peer_if = m.groups()[1]
@@ -908,7 +908,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 # spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
 ##
 def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id):
-   logging.info(f"Configure_BGP_unnumbered :: port={port}")
+   logging.info(f"Configure_BGP_unnumbered :: port={port} peer_router_id={peer_router_id}")
    eth = f'name=ethernet-1/{port}'
 
    # This gets updated every time an interface is added
@@ -930,14 +930,26 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id):
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
               ]
    else:
-      group_name = f"bgp-unnumbered-self-{port}" if state.router_id == peer_router_id else "bgp-unnumbered-peers"
+      if state.router_id == peer_router_id:
+        group_name = f"bgp-unnumbered-self-{port}"
+        local_as = state.local_as + port%2 # eBGP, assume ports are adjacent
+        if port%2 == 0:
+          min_peer_as = max_peer_as = local_as + 1
+        evpn_admin_state = "enable"
+      else:
+        group_name = "bgp-unnumbered-peers"
+        local_as = state.local_as
+        evpn_admin_state = "disable"
 
       dyn_n = { "peer-group": group_name,
                 "allowed-peer-as": [ f"{min_peer_as}..{max_peer_as}" ] }
       bgp_group = {
-       "local-as": [ { "as-number": state.local_as, "prepend-global-as": False } ],
+       "local-as": [ { "as-number": local_as, "prepend-global-as": False } ],
        "import-policy": "select-loopbacks",
        "export-policy": "select-loopbacks",
+       "evpn": {
+         "admin-state" : evpn_admin_state
+       }
       }
       bgp_evpn = {
        "advertise-ipv6-next-hops": True, 
@@ -1348,7 +1360,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       # Reuse underlay address space, optionally allocate unique IPs per leaf
       link_index = (lldp_my_port - 1)
 
-      # Support a/b leaf pairs
+      # Support a/b leaf pairs and self-loops
       leaf_pair = re.match("^leaf[-]?(\d+)?(a|b)?.*", lldp_peer_name)
       if leaf_pair:
          peer_type = 'leaf'
@@ -1360,6 +1372,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
             peer_node_id = node_id + (1 if state.pair_role==1 else -1)
             peer_router_id = state.determine_router_id( peer_type, peer_node_id )
             _r = state.pair_role - 1  # a = .0, b = .1
+         elif peer_id == node_id:
+            logging.info( f"Detected leaf self loop on ports {lldp_my_port} and {lldp_peer_port}" )
+            peer_router_id = state.router_id
+            _r = 0 if lldp_my_port<lldp_peer_port else 1
          else:
             _r = 0 if state.id_from_hostname<peer_id else 1
 

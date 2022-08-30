@@ -1,4 +1,5 @@
 set /system gnmi-server unix-socket admin-state enable
+set /system gnmi-server rate-limit 200
 set /auto-config-agent gateway ipv4 10.0.0.1/24 location leaf
 set /auto-config-agent lacp active # reload-delay-secs 0
 
