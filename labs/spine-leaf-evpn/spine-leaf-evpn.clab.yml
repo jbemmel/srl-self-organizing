@@ -74,6 +74,10 @@ topology:
     - endpoints: ["leaf2:e1-49", "spine1:e1-2"]
     - endpoints: ["leaf2:e1-50", "spine2:e1-2"]
 
+    # VRF leaking loops
+    - endpoints: ["leaf1:e1-51", "leaf1:e1-52"]
+    - endpoints: ["leaf2:e1-51", "leaf2:e1-52"]
+
     #- endpoints: ["leaf3:e1-49", "spine1:e1-3"]
     #- endpoints: ["leaf3:e1-50", "spine2:e1-3"]
     #- endpoints: ["leaf4:e1-49", "spine1:e1-4"]
