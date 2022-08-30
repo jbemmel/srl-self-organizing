@@ -34,6 +34,9 @@ EVPN_PEER_GROUPNAME="evpn-rr"
 EVPN_PEER_DESC="EVPN route-reflector for overlay services"
 fi
 
+LOOPBACK_IP4="$router_id/32"
+LOOPBACK_IP6="2001::${router_id//\./:}/128"
+
 # Only used on leaves
 IFS='' read -r -d '' HOSTS_GROUP << EOF
 {
@@ -82,15 +85,9 @@ if [[ "$FIRST_RUN" == "1" ]]; then
 
 if [[ "$ROLE" == "leaf" ]]; then
 LOOPBACK_IF="system"
-#LOOPBACK_IP4="$router_id/31" # Use /31 to have multiple source IPs for traceroute
-#LOOPBACK_IP6="2001::${router_id//\./:}/127"
-
 else
 LOOPBACK_IF="lo"
 fi
-LOOPBACK_IP4="$router_id/32"
-LOOPBACK_IP6="2001::${router_id//\./:}/128"
-# fi
 
 cat > $temp_file << EOF
 {
