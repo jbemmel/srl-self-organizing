@@ -476,7 +476,7 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    def deletes_for_port(p):
      eth = f'name=ethernet-1/{p}'
-     orig_vrf = 'overlay' if peer_data['type']=='host' else 'default'
+     orig_vrf = 'overlay-1' if peer_data['type']=='host' else 'default'
      deletes = [ f'/interface[{eth}]/subinterface[index=*]',
                  f'/interface[{eth}]/vlan-tagging',
                  f'/network-instance[name={orig_vrf}]/interface[{eth}.0]' ]
@@ -489,7 +489,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    # Support multiple port-to-service mappings, 0 = all ports in service 1
    _svc_id = state.svc_id( port )
    use_irb = state.useIRB() # and not state.is_spine() ?
-   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay"
+   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else "overlay-1"
 
    enable_lacp = state.lacp != "disabled"
    _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
@@ -660,7 +660,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    }
    updates += [ (f'/network-instance[name={_vrf}]', vrf_inst) ]
 
-   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!="overlay"
+   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!="overlay-1"
    if use_evpn_vxlan:
       vrf_inst.update(
       {
@@ -703,7 +703,7 @@ def Convert_to_lag(state,port,ip,peer_data):
    if use_irb:
       vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
       # XXX assumes 'overlay' ip-vrf created elsewhere
-      _l3_vrf = 'overlay' if peer_data['type']=='host' else 'default'
+      _l3_vrf = 'overlay-1' if peer_data['type']=='host' else 'default'
       updates += [
         (f'/interface[name=irb0]', irb_if),
         (f'/network-instance[name={_l3_vrf}]/interface[name=irb0.{_svc_id}]', {}),
@@ -1098,8 +1098,8 @@ def Handle_Notification(obj, state):
                     state.max_leaves = int( data['max_leaves']['value'] )
                 if 'max_hosts_per_leaf' in data:
                     state.max_hosts_per_leaf = int( data['max_hosts_per_leaf']['value'] )
-                if 'max_lag_links' in data:
-                    state.max_lag_links = int( data['max_lag_links']['value'] )
+                #if 'max_lag_links' in data:
+                #    state.max_lag_links = int( data['max_lag_links']['value'] )
                 if 'ports_per_service' in data:
                     state.ports_per_service = int( data['ports_per_service']['value'] )
 
@@ -1420,6 +1420,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id,
+         "1", # vrf_id
      )
      setattr( state, link_name, _ip )
 
@@ -1445,10 +1446,10 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
+def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,vrf_id):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'router_id={router_id} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
-                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
+                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max} vrf_id={vrf_id}' )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
@@ -1457,7 +1458,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,router_id,peer_as_min,pee
                                        state.get_role(),name,ip,peer,peer_ip,router_id,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type, peer_rid, state.igp,
-                                       state.evpn, state.overlay_bgp_admin_state],
+                                       state.evpn, state.overlay_bgp_admin_state, vrf_id],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()
@@ -1470,6 +1471,7 @@ class State(object):
         # YAML attributes
         self.base_as = None
         self.max_leaves = None
+        self.max_hosts_per_leaf = 4
         self.max_level = 0 # Maximum topology level, learnt through LLDP
         self.top_count = 1 # Number of nodes at top, learnt through LLDP
         self.ports_per_service = 0 # By default, map all ports to service 1

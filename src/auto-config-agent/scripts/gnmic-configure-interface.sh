@@ -18,6 +18,10 @@ PEER_ROUTER_ID="${11}" # '?' if not set
 IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
+OVERLAY_VRF_ID="${15}" # Overlay instance starting from 1
+
+VRF_ID=$(( 10000 + OVERLAY_VRF_ID ))
+VRF_NAME="overlay-${OVERLAY_VRF_ID}"
 
 echo "DEBUG: PEER='$PEER' PEER_IP='$PEER_IP' PEER_TYPE='$PEER_TYPE' PEER_ROUTER_ID='$PEER_ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
@@ -570,10 +574,10 @@ cat > $temp_file << EOF
 {
   "vxlan-interface": [
     {
-      "index": 0,
+      "index": ${VRF_ID},
       "type": "srl_nokia-interfaces:routed",
       "ingress": {
-        "vni": 10000
+        "vni": ${VRF_ID}
       },
       "egress": {
         "source-ip": "use-system-ipv4-address"
@@ -585,7 +589,7 @@ EOF
 $GNMIC set --update-path /tunnel-interface[name=vxlan0] --update-file $temp_file
 exitcode+=$?
 
-L3_VXLAN_INTERFACE='"vxlan-interface": [ { "name": "vxlan0.0", "_annotate": "This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes" } ],'
+L3_VXLAN_INTERFACE="\"vxlan-interface\": [ { \"name\": \"vxlan0.${VRF_ID}\", \"_annotate\": \"This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes\" } ],"
 
 IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
 ,"bgp-evpn": {
@@ -593,8 +597,8 @@ IFS='' read -r -d '' IP_VRF_BGP_EVPN << EOF
     {
       "id": 1,
       "admin-state": "enable",
-      "vxlan-interface": "vxlan0.0",
-      "evi": 10000,
+      "vxlan-interface": "vxlan0.${VRF_ID}",
+      "evi": ${VRF_ID},
       "ecmp": 8
     }
   ]
@@ -611,13 +615,13 @@ else
 L3_VXLAN_INTERFACE='"_annotate": "This is asymmetric IRB, no BGP-EVPN or vxlan interface in this ip-vrf",'
 fi
 
-# Configure lo0.0 on Leaf with router IP for ping testing in overlay
+# Configure lo0.N on Leaf with router IP for ping testing in overlay
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
   "subinterface": [
     {
-      "index": 0,
+      "index": $OVERLAY_VRF_ID,
       "description": "Overlay loopback",
       "admin-state": "enable",
       "ipv4": { "address": [ { "ip-prefix": "$LOOPBACK_IP4" } ] },
@@ -637,7 +641,7 @@ cat > $temp_file << EOF
     "type": "srl_nokia-network-instance:ip-vrf",
     "_annotate_type": "routed",
     "admin-state": "enable",
-    "interface": [ { "name": "lo0.0" } ],
+    "interface": [ { "name": "lo0.$OVERLAY_VRF_ID" } ],
     $L3_VXLAN_INTERFACE
     "protocols": {
       "bgp": {
@@ -672,7 +676,7 @@ cat > $temp_file << EOF
     }
   }
 EOF
-$GNMIC set --update-path /network-instance[name=overlay] --update-file $temp_file
+$GNMIC set --update-path /network-instance[name=${VRF_NAME}] --update-file $temp_file
 exitcode+=$?
 
 fi # leaf with EVPN enabled
@@ -739,7 +743,7 @@ if [[ "$ROLE" == "leaf" ]]; then
   fi
  elif [[ "${USE_EVPN_OVERLAY}" != "disabled" && "${PEER_TYPE}" == "host" ]]; then
   echo "Peer type 'host' -> overlay"
-  VRF="overlay"
+  VRF="${VRF_NAME}"
  fi
 fi
 echo "Selected VRF: ${VRF} for INTF=${INTF}.0 towards ${PEER_TYPE}"

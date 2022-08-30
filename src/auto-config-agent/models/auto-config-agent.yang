@@ -109,6 +109,11 @@ module auto_config_agent {
                 type uint8 { range "0 .. 8"; }
                 default 0; // all ports in 1 service
             }
+            leaf vrf-per-service {
+                description "Use a separate ip-vrf per mac-vrf, default false";
+                type boolean;
+                default false; // Use single overlay VRF by default
+            }
 
 
             container evpn {
