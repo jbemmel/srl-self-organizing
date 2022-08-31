@@ -370,6 +370,7 @@ def Set_LLDP_Systemname(state,name):
    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
    #                username="admin",password="admin",insecure=True) as c:
    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=[('/system/name',value)] ) )
+   state.lldp_system_name = name
 
    # Update DNS if server configured? Removed, too complex
    # UpdateDNS(f"{state.get_role()}-{state.node_id}",state.router_id)
@@ -471,11 +472,10 @@ def lag_id(port):
         raise Exception( f"Unable to allocate LAG ID for port {port}" )
 
 ###
-# Converts an ethernet interface to a lag, creating/joining a LAN mac-vrf, irb,
-# optional: bgp-evpn l2 vni, ethernet segment with ESI
+# Converts an ethernet interface to a lag
 ##
-def Convert_to_lag(state,port,ip,peer_data):
-   logging.info(f"Convert_to_lag :: port={port} ip={ip} peer_data={peer_data}")
+def Convert_to_lag(state,port,peer_data):
+   logging.info(f"Convert_to_lag :: port={port} peer_data={peer_data}")
 
    # Support multiple port-to-service mappings, 0 = all ports in service 1
    _svc_id = state.svc_id( port )
@@ -493,11 +493,9 @@ def Convert_to_lag(state,port,ip,peer_data):
 
    deletes = deletes_for_port(port)
 
-   use_irb = state.useIRB() # and not state.is_spine() ?
-   _vrf = "default" if peer_data['type']=='spine' else f"overlay-l2-{_svc_id}" if use_irb or state.l2Only() else f"overlay-{_vrf_id}"
+   use_irb = state.useIRB() and peer_data['type']=='host' # and not state.is_spine() ?
 
    enable_lacp = state.lacp != "disabled"
-   _vxlan_if = f"vxlan0.{_svc_id}"  # vxlan0.0 is routed in case of symmetric
    spine_mc_lag = False
    updates = []
 
@@ -508,45 +506,58 @@ def Convert_to_lag(state,port,ip,peer_data):
     _lag = f"lag{ _lag_id  }" # Maximum lag ID is 32, max 100G port is 56
     lag_desc = f"Single link ethernet-1/{port}"
     updates = [ (f'/interface[name=ethernet-1/{port}]/ethernet',{ 'aggregate-id' : _lag } ) ]
-    if peer_data['type']=='leaf': # leaf-leaf and leaf-spine
+    if peer_data['type']=='leaf' and not peer_data['pair']: # leaf-leaf and leaf-spine, exclude same pair links
       pair_key = re.match( '^leaf[-]?(\d+)(a|b).*$', peer_data['name'] )
       if pair_key:
          _pk, _ab = pair_key.groups()
          if _pk in state.leaf_pairs:
              pair = state.leaf_pairs[_pk] # string type key
-             pair[ _ab ] = port # peer_data['port']
-             if len(pair)==2: # XXX Could have up to 4 ports
+
+             # Handle self loops where 'a' or 'b' is already included
+             if _ab in pair and pair[ _ab ]['local'] != port:
+                logging.info( "Detected self-loop link(s), not creating LAG for now" )
+                if 'self' in pair[_ab]:
+                  pair[ _ab ][ 'self' ] += [ { 'local': port, 'remote': peer_data['port'] } ]
+                else:
+                  pair[ _ab ][ 'self' ] = [ { 'local': port, 'remote': peer_data['port'] } ]
+                return f"ethernet-1/{port}" # TODO create 2 local lags, one for each side
+             else:   
+                pair[ _ab ] = { 'local': port, 'remote': peer_data['port'] }
+
+                if len(pair)==2 and int(_pk) != state.id_from_hostname: # XXX Could have up to 4 ports
                  # mc_lag = True
-                 _base_port = min(pair['a'],pair['b'])
+                 _port_a = pair['a']['local']
+                 _port_b = pair['b']['local']
+                 _base_port = min(_port_a,_port_b)
                  _lag_id = lag_id( _base_port )
                  _lag = f"lag{_lag_id}" # Take 'a' port as lag ID
                  lag_desc = f"Leaf pair mc-lag on ports {pair['a']},{pair['b']}"
                  logging.info( f"Convert_to_lag: Completed leaf-pair {pair} using {_lag}" )
-                 deletes += deletes_for_port( pair['b' if port==pair['a'] else 'a'] )
+                 deletes += deletes_for_port( _port_b if port==_port_a else _port_a )
                  updates = [
-                  (f'/interface[name=ethernet-1/{pair["a"]}]/ethernet',
+                  (f'/interface[name=ethernet-1/{_port_a}]/ethernet',
                    { 'aggregate-id' : _lag, **state.reload_delay } ),
-                  (f'/interface[name=ethernet-1/{pair["b"]}]/ethernet',
+                  (f'/interface[name=ethernet-1/{_port_b}]/ethernet',
                    { 'aggregate-id' : _lag, **state.reload_delay } ),
                  ]
 
                  # Record port number for mc-lag conversion, if any
                  if not state.is_spine():
-                    state.leaf_pairs[ pair['a'] ] = _base_port
-                    state.leaf_pairs[ pair['b'] ] = _base_port
+                    state.leaf_pairs[ _port_a ] = _base_port
+                    state.leaf_pairs[ _port_b ] = _base_port
                     enable_lacp = False # postpone until MC lag is created
                     # Announce virtual port pair community, using both ports
                     Announce_LLDP_using_EVPN( state,
-                      f"00:00:00:00:00:{int(_pk):02X}", [ pair['a'], pair['b'] ] )
+                      f"00:00:00:00:00:{int(_pk):02X}", [ _port_a, _port_b ] )
                  else:
                     spine_mc_lag = True # Only on spine, don't configure system-id twice differently
-             else:
+                else:
                  logging.warning( f"Convert_to_lag: Still missing 2nd port? {pair}" )
-                 return
+                 return None
          else:
              state.leaf_pairs[_pk] = { _ab : port }
              logging.info( f"Convert_to_lag: Defer {port} until 2nd MC-LAG port is known" )
-             return
+             return None
       else:
          logging.warning( "Convert_to_lag: LEAF link, no pair_key(a|b) match" )
    else:
@@ -603,7 +614,36 @@ def Convert_to_lag(state,port,ip,peer_data):
        #   lag['lag']['lacp-fallback-mode'] = 'static'
        #   lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
-   irb_if = {
+   updates += [ (f'/interface[name={_lag}]',lag) ]
+
+   logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
+   try:
+     gnmiConnection( lambda c: c.set( encoding='json_ietf', delete=deletes, update=updates ) )
+   except Exception as ex:
+     # Dont quit agent. Usually means 'overlay' didn't get created
+     logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
+
+   return _lag # Lag name e.g. "lag1" passed as 'interface' parameter to code below
+
+###
+# Configure EVPN overlay for host facing ports (on leaves)
+# * L2 mac-vrf + VXLAN interface + (optional) IRB interface
+# * L3 ip-vrf + (optional) IRB interface + L3 VXLAN interface in case of symmetric irb
+##
+def Configure_EVPN(state,port,interface,ip):
+   logging.info(f"Configure_EVPN :: port={port} interface={interface}")
+
+   # Support multiple port-to-service mappings, 0 = all ports in service 1
+   _svc_id = state.svc_id( port )
+   _vrf_id = state.vrf_id( port )
+
+   use_irb = state.useIRB()
+
+   updates = []
+
+   is_routed = (state.get_role()=="leaf" and state.evpn!="l2_only_leaves") or state.is_spine()
+
+   l3_if = {
     "admin-state": "enable",
     "subinterface": [
     {
@@ -630,132 +670,169 @@ def Convert_to_lag(state,port,ip,peer_data):
     }
     ]
    }
-
-   l3_intf = irb_if if use_irb else lag
+   
    if is_routed and state.host_enable_ipv6:
        # TODO could add ipv6 link IP too
-       logging.info( f"Enabling ipv6 towards host on {_lag}" )
-       l3_intf['subinterface'][0]['ipv6'] = { }
+       logging.info( f"Enabling ipv6 towards host on port {port}" )
+       l3_if['subinterface'][0]['ipv6'] = { }
    else:
-       logging.info( f"NOT enabling ipv6 towards host on {_lag}" )
+       logging.info( f"NOT enabling ipv6 on port {port}" )
 
    if is_routed and state.gateway['ipv4']:
        gw = state.gateway
        if gw['location'] == state.get_role():
           addr = { "ip-prefix": state.gateway['ipv4'].format( vrf=_vrf_id ) }
           if gw['anycast'] and use_irb: # Some platforms like ixr6 don't support this
-            irb_if['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
+            l3_if['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
             addr[ 'anycast-gw' ] = True
-          if 'ipv4' in l3_intf['subinterface'][0]:
-            l3_intf['subinterface'][0]['ipv4']['address'].append( addr )
+          if 'ipv4' in l3_if['subinterface'][0]:
+            l3_if['subinterface'][0]['ipv4']['address'].append( addr )
           else:
-            l3_intf['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
+            l3_if['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
 
-   # EVPN VXLAN interface
-   VNI_EVI = 4095 + _vrf_id # Cannot use 0
+   if_name = 'irb0' if use_irb else interface
+   updates += [ (f'/interface[name={if_name}]', l3_if) ]
+
+   # EVPN L2 VXLAN interface
+   L2_VNI_EVI = 4095 + _svc_id # Cannot use 0
 
    # Could configure MAC table size here
-   vrf_inst = {
-     "type": "default" if _vrf=='default' else "ip-vrf" if is_routed and not use_irb else "mac-vrf",
+   _vxlan_if_l2 = f"vxlan0.{_svc_id}"  # vxlan0.vrf is routed in case of symmetric
+   mac_vrf = {
+     "type": "mac-vrf",
      "admin-state": "enable",
-     # Update, may already have other lag interfaces
-     "interface": [ { "name": f"{_lag}.0" } ],
-
+     # Update, may already have other interfaces
+     "interface": [ { "name": f"{interface}.0" }, { "name": _vxlan_if_l2 } ],
+     "vxlan-interface": [ { "name": _vxlan_if_l2 } ],
+     "protocols": {
+      "bgp-evpn": {
+       "bgp-instance": [
+        {
+          "id": 1,
+          "admin-state": "enable",
+          "vxlan-interface": _vxlan_if_l2,
+          "evi": L2_VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
+          "_annotate_evi": "Note: value affects DF election in case of multi-homing",
+          "ecmp": 1 if state.evpn=="l2_only_leaves" else 8,
+          #"routes": {
+          # "bridge-table": {
+          #    "mac-ip": {
+          #      "advertise": False # Avoid duplicate IPs on links
+          #    }
+          #  }
+          # }
+        }
+       ]
+      },
+      "bgp-vpn": {
+       "bgp-instance": [
+        { "id": 1,
+         # "export-policy": f"add-rt-{state.base_as}-{port}",
+         #"route-target": {
+         # "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
+         # "export-rt": rt,
+         # "import-rt": rt
+         #}
+        }
+       ]
+      }
+     }
      # bridge-table { mac-learning: { age-time: 300 } } leave as default value
    }
-   updates += [ (f'/network-instance[name={_vrf}]', vrf_inst) ]
+   updates += [ (f'/network-instance[name=overlay-l2-{_svc_id}]', mac_vrf) ]
 
-   use_evpn_vxlan = state.evpn!='disabled' and not state.is_spine() and _vrf!=f"overlay-{_vrf_id}"
-   if use_evpn_vxlan:
-      vrf_inst.update(
-      {
-        "vxlan-interface": [ { "name": _vxlan_if } ],
-        "protocols": {
-         "bgp-evpn": {
-          "srl_nokia-bgp-evpn:bgp-instance": [
-           {
-             "id": 1,
-             "admin-state": "enable",
-             "vxlan-interface": _vxlan_if,
-             "evi": VNI_EVI, # Range 1..65535, cannot match VLAN 0 (untagged)
-             "_annotate_evi": "Note: value affects DF election in case of multi-homing",
-             "ecmp": 1 if state.evpn=="l2_only_leaves" else 8,
-             #"routes": {
-             # "bridge-table": {
-             #    "mac-ip": {
-             #      "advertise": False # Avoid duplicate IPs on links
-             #    }
-             #  }
-             # }
-           }
-          ]
-         },
-         "srl_nokia-bgp-vpn:bgp-vpn": {
-           "bgp-instance": [
-            { "id": 1,
-              # "export-policy": f"add-rt-{state.base_as}-{port}",
-              #"route-target": {
-              # "_annotate": "Need to specify explicitly, each leaf has a different AS so auto-RT won't work",
-              # "export-rt": rt,
-              # "import-rt": rt
-              #}
-            }
-           ]
-         }
-        }
-      })
+   loopback_if = {
+    "admin-state": "enable",
+    "subinterface": [
+     {
+      "index": _vrf_id,
+      "description": "Overlay loopback",
+      "admin-state": "enable",
+      "ipv4": { "address": [ { "ip-prefix": f"{state.router_id}/32" } ] },
+      "ipv6": { "address": [ { "ip-prefix": f"2001::{state.router_id.replace('.',':')}/128" } ] }
+     }
+    ]
+   }
+   updates += [ ( f'/interface[name=lo0]', loopback_if) ]
+   ip_vrf = {
+     "type": "ip-vrf",
+     "admin-state": "enable",
+
+     # Add loopback interface for ping testing
+     "interface": [ { "name" : f"lo0.{_vrf_id}" } ]
+   }
+   updates += [ (f'/network-instance[name=overlay-{_vrf_id}]', ip_vrf) ]
 
    if use_irb:
-      vrf_inst['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
-      # XXX assumes 'overlay' ip-vrf created elsewhere
-      _l3_vrf = f'overlay-{_vrf_id}' if peer_data['type']=='host' else 'default'
-      updates += [
-        (f'/interface[name=irb0]', irb_if),
-        (f'/network-instance[name={_l3_vrf}]/interface[name=irb0.{_svc_id}]', {}),
-      ]
+      mac_vrf['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
+      ip_vrf['interface'] += [ { "name" : f"irb0.{_svc_id}" } ]
 
-      if state.evpn != 'disabled':
+      # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
+      # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
+      # IRB subinterface should be set to a value that is 30 seconds lower than
+      # the age-time configured in the MAC-VRF. This avoids transient packet loss situations
+      # triggered by the MAC address of an active ARP/ND entry being removed from the MAC
+      # table.
+      IRB_ARP_ND_TIMEOUT = 300 - 30
+      ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
 
-         # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
-         # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
-         # IRB subinterface should be set to a value that is 30 seconds lower than
-         # the age-time configured in the MAC-VRF. This avoids transient packet loss situations
-         # triggered by the MAC address of an active ARP/ND entry being removed from the MAC
-         # table.
-         IRB_ARP_ND_TIMEOUT = 300 - 30
-         ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
-      else:
-         IRB_ARP_ND_TIMEOUT = 300
-         ANNOTATION = "Avoid prolonged flooding due to MAC expiration (no EVPN triggered learning)"
-
-      irb_if['subinterface'][0]['ipv4']['arp'] = {
+      l3_if['subinterface'][0]['ipv4']['arp'] = {
         'timeout': IRB_ARP_ND_TIMEOUT,
         '_annotate_timeout': ANNOTATION
       }
-      if 'ipv6' in irb_if['subinterface'][0]:
-          irb_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
+      if 'ipv6' in l3_if['subinterface'][0]:
+          l3_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
             'stale-time': IRB_ARP_ND_TIMEOUT,
             '_annotate_stale-time': ANNOTATION
           }
 
-   updates += [ (f'/interface[name={_lag}]',lag) ]
-   if use_evpn_vxlan:
-       vxlan_if = {
-          "type": "srl_nokia-interfaces:bridged",
-          "ingress": { "vni": VNI_EVI },
-          "egress": { "source-ip": "use-system-ipv4-address" }
-       }
-       updates += [
-         (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={_svc_id}]', vxlan_if ),
-         # ('/routing-policy', export_policy)
-       ]
+   vxlan_if = {
+      "type": "srl_nokia-interfaces:bridged",
+      "ingress": { "vni": L2_VNI_EVI },
+      "egress": { "source-ip": "use-system-ipv4-address" }
+   }
+   updates += [
+     (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={_svc_id}]', vxlan_if ),
+     # ('/routing-policy', export_policy)
+   ]
 
-   logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
+   if state.evpn == "symmetric_irb":
+     L3_VNI_EVI = 10000 + _vrf_id
+     l3_vxlan_if = {
+       "type": "srl_nokia-interfaces:routed",
+       "ingress": { "vni": L3_VNI_EVI },
+       "egress": { "source-ip": "use-system-ipv4-address" }
+     }
+     updates += [ (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={L3_VNI_EVI}]', l3_vxlan_if ) ]
+     ip_vrf['vxlan-interface'] = [ { "name": f"vxlan0.{L3_VNI_EVI}", 
+                                     "_annotate": "This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes" } ]
+     ip_vrf['protocols'] = {
+      "bgp-evpn": {
+       "bgp-instance": [
+       {
+        "id": 1,
+        "admin-state": "enable",
+        "vxlan-interface": f"vxlan0.{L3_VNI_EVI}",
+        "evi": L3_VNI_EVI,
+        "ecmp": 8
+       }
+       ]
+      },
+      "bgp-vpn": {
+       "bgp-instance": [ { "id": 1, "_annotate": "Required to make bgp-evpn oper-state=up" } ]
+      }
+     }
+   else:
+     ip_vrf['_annotate'] = "This is asymmetric IRB, no BGP-EVPN or vxlan interface in this ip-vrf"
+
+   # TODO BGP in overlay
+
+   logging.info(f"Configure_EVPN gNMI SET updates={updates}" )
    try:
-     gnmiConnection( lambda c: c.set( encoding='json_ietf', delete=deletes, update=updates ) )
+     gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
    except Exception as ex:
-       # Dont quit agent. Usually means 'overlay' didn't get created
-       logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
+     # Dont quit agent. Usually means 'overlay' didn't get created
+     logging.error( f"Exception in Configure_EVPN gNMI set: {ex} state={state}" )
 
 def Update_EVPN_RR_Neighbors(state,first_time=False):
 
@@ -903,9 +980,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 
    # should already be clear of subinterfaces? Nope
    deletes = [ f'/interface[name=ethernet-1/{port}]/subinterface[index=*]' ]
-   if state.enable_bfd == "true":
-      # XXX this should have been done when converting to LAG
-      deletes += [ f'/bfd/subinterface[id=ethernet-1/{port}.0]' ]
+   # if state.enable_bfd == "true":
+   # XXX this should have been done when converting to LAG
+   #   deletes += [ f'/bfd/subinterface[id=ethernet-1/{port}.0]' ]
    logging.info(f"Convert_lag_to_mc_lag gNMI SET deletes={deletes} updates={updates}" )
    gnmi_client.set( encoding='json_ietf', delete=deletes, update=updates )
 
@@ -913,9 +990,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 # Configures the default network instance to use BGP unnumbered between
 # spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
 ##
-def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id):
-   logging.info(f"Configure_BGP_unnumbered :: port={port} peer_router_id={peer_router_id}")
-   eth = f'name=ethernet-1/{port}'
+def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,lag_interface):
+   logging.info(f"Configure_BGP_unnumbered :: port={port} peer_router_id={peer_router_id} lag={lag_interface}")
+   eth = f'name={lag_interface}' if lag_interface else f'name=ethernet-1/{port}'
 
    # This gets updated every time an interface is added
    if state.igp == "bgp_unnumbered_frr":
@@ -1202,17 +1279,18 @@ def Handle_Notification(obj, state):
                 return state.role is not None
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
-        logging.info(f"process LLDP notification : op='{obj.lldp_neighbor.op}' peer='{obj.lldp_neighbor.data.system_name}'")
+        # logging.info(f"process LLDP notification on port {obj.lldp_neighbor.key.interface_name}: op='{obj.lldp_neighbor.op}' peer='{obj.lldp_neighbor.data.system_name}'")
 
         # Since 21.6 there are 'Delete' events too
         if obj.lldp_neighbor.op == 2: # Delete, class 'int'
             return False
 
-        my_port = obj.lldp_neighbor.key.interface_name  # ethernet-1/x or swp[x] for Cumulus
-        to_port = obj.lldp_neighbor.data.port_id
+        my_port = obj.lldp_neighbor.key.interface_name
+        to_port = obj.lldp_neighbor.data.port_id # ethernet-1/x or swp[x] for Cumulus
         peer_sys_name = obj.lldp_neighbor.data.system_name
 
         if my_port != 'mgmt0' and to_port != 'mgmt0' and hasattr(state,'peerlinks'):
+          logging.info(f"process LLDP notification on port {my_port}: op='{obj.lldp_neighbor.op}' peer='{peer_sys_name}'")
           my_port_id = re.split("/",re.split("-",my_port)[1])[1]
           m = re.match("^(ethernet-1/|swp)(\d+)$", to_port) # 'swp' for Cumulus
           # Allow SRL-based emulated hosts called h1, h2...
@@ -1452,21 +1530,28 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      )
      setattr( state, link_name, _ip )
 
-     # For access ports or L2-only leaves, convert to L2 service if requested
-     if ((peer_type=='host' and state.host_use_irb) or (state.evpn=='l2_only_leaves' and
-         (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')] and not leaf_pair_link)):
+     # For access ports, inter-leaf links or L2-only leaves towards spines, convert to potential LAG
+     lag_interface = None
+     if ((peer_type=='host' and state.host_use_irb) 
+          or (state.evpn=='l2_only_leaves' and (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')])
+          or (state.get_role()=='leaf' and peer_type=='leaf')
+        ):
         peer_data = {
           'name': lldp_peer_name,
           'type': peer_type,
-          'port': lldp_peer_port
+          'port': lldp_peer_port,
+          'pair': leaf_pair_link, # Part of same pair, e.g. leaf1a and leaf1b
         }
-        Convert_to_lag( state, lldp_my_port, _ip, peer_data ) # No EVPN MC-LAG yet
+        lag_interface = Convert_to_lag( state, lldp_my_port, peer_data ) # No EVPN MC-LAG yet
      else:
         logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
+     if peer_type=='host' and state.evpn_admin_state != 'disabled':
+        Configure_EVPN( state, lldp_my_port, lag_interface or f'ethernet-1/{lldp_my_port}', _ip )
+
      if state.use_bgp_unnumbered:
         if (peer_type!='host' and state.get_role() != 'endpoint'):
-           Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as, peer_router_id )
+           Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as, peer_router_id, lag_interface )
 
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
@@ -1694,7 +1779,7 @@ class State(object):
                    return True
         return False
 
-    def useIRB(self,evi=None): # TODO per service logic
+    def useIRB(self): # TODO per service logic
         """
         Determine whether to use an IRB interface (mac-vrf <-> ip-vrf)
         """
