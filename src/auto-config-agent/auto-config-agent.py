@@ -352,10 +352,13 @@ class EVPNRouteMonitoringThread(Thread):
                    # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                    try:
                       Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_ports, gnmi_client )
-                      self.state.local_lldp[ mac ] = (lag_port,True)
+                      # self.state.local_lldp[ mac ] = (lag_port,True)
                    except Exception as ex:
                       traceback_str = ''.join(traceback.format_tb(ex.__traceback__))
                       logging.error( f"checkIPv6Routes: {ex} ~ {traceback_str}" )
+
+                   # Outside of exception, dont repeat errors
+                   self.state.local_lldp[ mac ] = (lag_port,True)
 
 ############################################################
 ## Function to populate state of agent config
@@ -900,7 +903,10 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 
    # should already be clear of subinterfaces? Nope
    deletes = [ f'/interface[name=ethernet-1/{port}]/subinterface[index=*]' ]
-   logging.info(f"Convert_lag_to_mc_lag gNMI SET updates={updates}" )
+   if state.enable_bfd == "true":
+      # XXX this should have been done when converting to LAG
+      deletes += [ f'/bfd/subinterface[id=ethernet-1/{port}.0]' ]
+   logging.info(f"Convert_lag_to_mc_lag gNMI SET deletes={deletes} updates={updates}" )
    gnmi_client.set( encoding='json_ietf', delete=deletes, update=updates )
 
 ###
@@ -1196,7 +1202,7 @@ def Handle_Notification(obj, state):
                 return state.role is not None
     elif obj.HasField('lldp_neighbor'):
         # Update the config based on LLDP info, if needed
-        logging.info(f"process LLDP notification : op='{obj.lldp_neighbor.op}'")
+        logging.info(f"process LLDP notification : op='{obj.lldp_neighbor.op}' peer='{obj.lldp_neighbor.data.system_name}'")
 
         # Since 21.6 there are 'Delete' events too
         if obj.lldp_neighbor.op == 2: # Delete, class 'int'

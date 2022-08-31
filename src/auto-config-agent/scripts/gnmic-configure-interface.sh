@@ -792,9 +792,12 @@ cat > $temp_file << EOF
  "detection-multiplier" : 3
 }
 EOF
+echo "Enabling BFD for ${INTF}.0 ..."
 $GNMIC set --replace-path /bfd/subinterface[id=${INTF}.0] --replace-file $temp_file
 exitcode+=$?
 fi # "$PEER_TYPE" != "host"
+else
+echo "NOT enabling BFD for ${INTF}.0 PEER_TYPE=${PEER_TYPE}"
 fi # enable_bfd
 fi # $ROLE != "endpoint"
 
