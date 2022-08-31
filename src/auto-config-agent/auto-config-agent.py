@@ -971,7 +971,7 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
            'system-priority': mac_id # lower = higher priority
         }
        }
-       if state.lacp_fallback!=0:
+       if state.lacp_fallback!=0 and state.pair_role!=2: # Only enable on one leaf out of any pair
            lag['lag']['lacp-fallback-mode'] = 'static'
            lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
