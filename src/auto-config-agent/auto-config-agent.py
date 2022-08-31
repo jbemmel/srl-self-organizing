@@ -588,17 +588,17 @@ def Convert_to_lag(state,port,peer_data):
      }
 
    if use_vlans:
-       lag['subinterface'][0]["srl_nokia-interfaces-vlans:vlan"] = {
-         # Routed interface cannot be untagged, and cannot use VLAN 0
-         # Implies bridge interface must have matching vlan tag too
-         # when fabric-facing (and multiple services are to be provided)
-         "encap": { "single-tagged": { "vlan-id": 4094 } } if peer_data['type']!='host' or is_routed
-                  else { "untagged": { } }
-       }
+     lag['subinterface'][0]["srl_nokia-interfaces-vlans:vlan"] = {
+      # Routed interface cannot be untagged, and cannot use VLAN 0
+      # Implies bridge interface must have matching vlan tag too
+      # when fabric-facing (and multiple services are to be provided)
+      "encap": { "single-tagged": { "vlan-id": 4094 } } if peer_data['type']!='host' or is_routed
+               else { "untagged": { } }
+     }
 
    if spine_mc_lag and enable_lacp:
-       lag['lag']['lag-type'] = "lacp"
-       lag['lag']['lacp'] = {
+     lag['lag']['lag-type'] = "lacp"
+     lag['lag']['lacp'] = {
         'interval' : state.lacp_rate, # or FAST
         'lacp-mode': "ACTIVE", # state.lacp.upper(), # ACTIVE or PASSIVE
 
@@ -606,15 +606,17 @@ def Convert_to_lag(state,port,peer_data):
         'system-id-mac': f"02:00:00:00:01:{_lag_id:02x}",
         'admin-key': _lag_id, # range 1..65535, must be unique across all lags
         'system-priority': 0  # state.id_from_hostname, # range 0..65535, lower wins
-       }
-       # Note: Could also provision /system/lacp/system-id and -priority global
+     }
+     # Note: Could also provision /system/lacp/system-id and -priority global
 
-       # Provision LACP fallback only host-facing
-       #if state.lacp_fallback!=0:
-       #   lag['lag']['lacp-fallback-mode'] = 'static'
-       #   lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
+     # Provision LACP fallback only host-facing
+     #if state.lacp_fallback!=0:
+     #   lag['lag']['lacp-fallback-mode'] = 'static'
+     #   lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
    updates += [ (f'/interface[name={_lag}]',lag) ]
+   if peer_data['type']!='host':
+     updates += [ (f'/network-instance[name=default]/interface[name={_lag}.0]', {} )]
 
    logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
    try:
@@ -702,7 +704,7 @@ def Configure_EVPN(state,port,interface,ip):
      "type": "mac-vrf",
      "admin-state": "enable",
      # Update, may already have other interfaces
-     "interface": [ { "name": f"{interface}.0" }, { "name": _vxlan_if_l2 } ],
+     "interface": [ { "name": f"{interface}.0" } ],
      "vxlan-interface": [ { "name": _vxlan_if_l2 } ],
      "protocols": {
       "bgp-evpn": {
@@ -1340,17 +1342,15 @@ def Handle_Notification(obj, state):
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
               return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
-          configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
-            peer_sys_name, desc if m else 'host', router_id_changed )
+          lag_created = configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
+                                             peer_sys_name, desc if m else 'host', router_id_changed )
 
           if router_id_changed:
              for intf in state.pending_peers:
                _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
-               configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
-               if state.get_role() == "leaf":
-                 # Only create LAGs on spine-facing ports if gateway is on spines
-                 if not re.match("^spine.*$", _peer_sys_name) or state.gateway['location'] == "spine":
-                   Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
+               _is_lag = configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+               if _is_lag:
+                  Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
 
              if state.get_role()=="leaf":
                 Update_EVPN_RR_Neighbors( state, first_time=True )
@@ -1360,9 +1360,8 @@ def Handle_Notification(obj, state):
                    EVPNRouteMonitoringThread(state).start()
 
           # Could also announce communities for spines
-          if state.get_role() == "leaf" and hasattr(state,"router_id"):
-            if not re.match("^spine.*$", peer_sys_name) or state.gateway['location'] == "spine":
-              Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
+          if lag_created: # state.get_role() == "leaf" and hasattr(state,"router_id"):
+             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
           else:
              logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
@@ -1412,7 +1411,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
     # state.max_spine_ports default = 6
     if lldp_my_port > state.max_spine_ports:
         logging.error( f"max-spine-ports configured too low({state.max_spine_ports}), will result in duplicate link IPs" )
-        return
+        return False
 
     if spineId: # This node is a superspine
        link_index = state.max_spine_ports * (node_id - 1) + lldp_peer_port - 1
@@ -1526,15 +1525,15 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          state.peerlinks_prefix,
          peer_type,
          peer_router_id,
-         str( state.vrf_id(lldp_my_port) ) if peer_type=='host' else "1", # vrf_id
      )
      setattr( state, link_name, _ip )
 
-     # For access ports, inter-leaf links or L2-only leaves towards spines, convert to potential LAG
+     # For access ports L2-only leaves towards spines, convert to potential LAG
+     # Note that SRL does not support LAG interfaces in the default VRF when VXLAN interfaces are used
      lag_interface = None
      if ((peer_type=='host' and state.host_use_irb) 
           or (state.evpn=='l2_only_leaves' and (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')])
-          or (state.get_role()=='leaf' and peer_type=='leaf')
+          # or (state.get_role()=='leaf' and peer_type=='leaf')
         ):
         peer_data = {
           'name': lldp_peer_name,
@@ -1544,25 +1543,28 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
         }
         lag_interface = Convert_to_lag( state, lldp_my_port, peer_data ) # No EVPN MC-LAG yet
      else:
-        logging.info( f"Not a host/leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
+        logging.info( f"Not a host/l2 leaf facing port ({peer_type}) or configured to not use IRB: {intf_name}" )
 
-     if peer_type=='host' and state.evpn_admin_state != 'disabled':
+     if peer_type=='host' and state.evpn != 'disabled':
         Configure_EVPN( state, lldp_my_port, lag_interface or f'ethernet-1/{lldp_my_port}', _ip )
 
      if state.use_bgp_unnumbered:
         if (peer_type!='host' and state.get_role() != 'endpoint'):
            Configure_BGP_unnumbered( state, lldp_my_port, min_peer_as, max_peer_as, peer_router_id, lag_interface )
 
+     return lag_interface is not None
+
   else:
      logging.info(f"Link {link_name} already configured local_port={lldp_my_port} peer_port={lldp_peer_port}")
+     return False
 
 ###########################
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
-def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid,vrf_id):
+def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
     logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'first_run={first_run} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
-                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max} vrf_id={vrf_id}' )
+                 f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
@@ -1571,7 +1573,7 @@ def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,pee
                                        state.get_role(),name,ip,peer,peer_ip,first_run,
                                        str(peer_as_min),str(peer_as_max),peer_links,
                                        peer_type, peer_rid, state.igp,
-                                       state.evpn, state.overlay_bgp_admin_state, vrf_id],
+                                       state.evpn, state.overlay_bgp_admin_state],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
        stdoutput, stderroutput = script_proc.communicate()

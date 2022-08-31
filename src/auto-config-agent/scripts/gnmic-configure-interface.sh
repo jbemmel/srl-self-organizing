@@ -18,10 +18,6 @@ PEER_ROUTER_ID="${11}" # '?' if not set
 IGP="${12}" # 'bgp' or 'isis' or 'ospf'
 USE_EVPN_OVERLAY="${13}" # 'disabled', 'symmetric_irb' or 'asymmetric_irb'
 OVERLAY_BGP_ADMIN_STATE="${14}" # 'disable' or 'enable'
-OVERLAY_VRF_ID="${15}" # Overlay instance starting from 1
-
-VRF_ID=$(( 10000 + OVERLAY_VRF_ID ))
-VRF_NAME="overlay-${OVERLAY_VRF_ID}"
 
 echo "DEBUG: PEER='$PEER' PEER_IP='$PEER_IP' PEER_TYPE='$PEER_TYPE' PEER_ROUTER_ID='$PEER_ROUTER_ID'"
 # echo "DEBUG: EVPN overlay AS=${evpn_overlay_as}"
@@ -603,9 +599,9 @@ if [[ "$ROLE" == "leaf" ]]; then
   if [[ "$PEER_ROUTER_ID" == "?" ]]; then
    VRF="none"
   fi
- elif [[ "${USE_EVPN_OVERLAY}" != "disabled" && "${PEER_TYPE}" == "host" ]]; then
-  echo "Peer type 'host' -> overlay"
-  VRF="${VRF_NAME}"
+ elif [[ "${PEER_TYPE}" == "host" ]]; then
+  echo "Peer type 'host' -> handled elsewhere"
+  VRF="none"
  fi
 fi
 echo "Selected VRF: ${VRF} for INTF=${INTF}.0 towards ${PEER_TYPE}"
