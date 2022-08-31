@@ -11,8 +11,8 @@ iface lo inet loopback
 
 auto bond0
 iface bond0 inet static
-  address 100.127.10.101
-  netmask 255.255.255.0
+  address 192.168.127.33
+  netmask 255.255.255.254
   # gateway 100.127.10.2
 
   # bond0 uses standard IEEE 802.3ad LACP bonding protocol

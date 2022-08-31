@@ -263,8 +263,9 @@ module auto_config_agent {
                   default true;
                 }
                 leaf ipv4 {
-                   description "IPv4 gateway address to provision";
-                   type srl_nokia-comm:ipv4-prefix-with-host-bits;
+                   description "IPv4 gateway address to provision, can use '{vrf}' parameter";
+                   // type srl_nokia-comm:ipv4-prefix-with-host-bits;
+                   type string;
                 }
                 leaf location {
                    description "Location for the L3 gateway, default on each leaf";
