@@ -1448,17 +1448,19 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       if leaf_pair:
          peer_type = 'leaf'
          peer_id = int( leaf_pair.groups()[0] )
+         peer_role = leaf_pair.groups()[1] # 'a' or 'b' if present
          same_pair = (state.id_from_hostname == peer_id) # XXX todo 'auto'
-         if state.pair_role!=0 and leaf_pair.groups()[1] and same_pair:
-            leaf_pair_link = True
-            logging.info( f"Detected leaf pair link: peer_id={peer_id}")
-            peer_node_id = node_id + (1 if state.pair_role==1 else -1)
-            peer_router_id = state.determine_router_id( peer_type, peer_node_id )
-            _r = state.pair_role - 1  # a = .0, b = .1
-         elif peer_id == node_id:
-            logging.info( f"Detected leaf self loop on ports {lldp_my_port} and {lldp_peer_port}" )
-            peer_router_id = state.router_id
-            _r = 0 if lldp_my_port<lldp_peer_port else 1
+         if state.pair_role!=0 and peer_role and same_pair:
+            if (state.pair_role==1 and peer_role=='a') or (state.pair_role==2 and peer_role=='b'):
+              logging.info( f"Detected leaf self loop on ports {lldp_my_port} and {lldp_peer_port}" )
+              peer_router_id = state.router_id
+              _r = 0 if lldp_my_port<lldp_peer_port else 1
+            else:
+              leaf_pair_link = True
+              logging.info( f"Detected leaf pair link: peer_id={peer_id}")
+              peer_node_id = node_id + (1 if state.pair_role==1 else -1)
+              peer_router_id = state.determine_router_id( peer_type, peer_node_id )
+              _r = state.pair_role - 1  # a = .0, b = .1
          else:
             _r = 0 if state.id_from_hostname<peer_id else 1
 
