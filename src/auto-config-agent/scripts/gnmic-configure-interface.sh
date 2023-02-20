@@ -63,7 +63,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 EOF
 
 # Can add --debug
-GNMIC="/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p admin --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
+GNMIC="/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p 'NokiaSrl1!' --log-file /tmp/gnmic.log --skip-verify -e json_ietf"
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
@@ -285,7 +285,7 @@ IFS='' read -r -d '' DYNAMIC_EBGP_NEIGHBORS << EOF
 {
   "prefix": "$LINK_PREFIX",
   "peer-group": "${DYNAMIC_EBGP_GROUP}",
-  "allowed-peer-as": [ "$PEER_AS_MIN..$PEER_AS_MAX" ]  
+  "allowed-peer-as": [ "$PEER_AS_MIN..$PEER_AS_MAX" ]
 }
 EOF
 EBGP_NEIGHBORS_COMMA=","
