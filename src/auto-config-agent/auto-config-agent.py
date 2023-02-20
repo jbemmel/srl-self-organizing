@@ -521,7 +521,7 @@ def Convert_to_lag(state,port,peer_data):
                 else:
                   pair[ _ab ][ 'self' ] = [ { 'local': port, 'remote': peer_data['port'] } ]
                 return f"ethernet-1/{port}" # TODO create 2 local lags, one for each side
-             else:   
+             else:
                 pair[ _ab ] = { 'local': port, 'remote': peer_data['port'] }
 
                 if len(pair)==2 and int(_pk) != state.id_from_hostname: # XXX Could have up to 4 ports
@@ -672,7 +672,7 @@ def Configure_EVPN(state,port,interface,ip):
     }
     ]
    }
-   
+
    if is_routed and state.host_enable_ipv6:
        # TODO could add ipv6 link IP too
        logging.info( f"Enabling ipv6 towards host on port {port}" )
@@ -806,7 +806,7 @@ def Configure_EVPN(state,port,interface,ip):
        "egress": { "source-ip": "use-system-ipv4-address" }
      }
      updates += [ (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index={L3_VNI_EVI}]', l3_vxlan_if ) ]
-     ip_vrf['vxlan-interface'] = [ { "name": f"vxlan0.{L3_VNI_EVI}", 
+     ip_vrf['vxlan-interface'] = [ { "name": f"vxlan0.{L3_VNI_EVI}",
                                      "_annotate": "This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes" } ]
      ip_vrf['protocols'] = {
       "bgp-evpn": {
@@ -1037,7 +1037,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
        }
       }
       bgp_evpn = {
-       "advertise-ipv6-next-hops": True, 
+       "advertise-ipv6-next-hops": True,
       }
       ip_forwarding = {
        "receive-ipv4-check": False
@@ -1453,6 +1453,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          if state.pair_role!=0 and peer_role and same_pair:
             if (state.pair_role==1 and peer_role=='a') or (state.pair_role==2 and peer_role=='b'):
               logging.info( f"Detected leaf self loop on ports {lldp_my_port} and {lldp_peer_port}" )
+              if not hasattr(state,'router_id'):
+                return False
               peer_router_id = state.router_id
               _r = 0 if lldp_my_port<lldp_peer_port else 1
             else:
@@ -1533,7 +1535,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
      # For access ports L2-only leaves towards spines, convert to potential LAG
      # Note that SRL does not support LAG interfaces in the default VRF when VXLAN interfaces are used
      lag_interface = None
-     if ((peer_type=='host' and state.host_use_irb) 
+     if ((peer_type=='host' and state.host_use_irb)
           or (state.evpn=='l2_only_leaves' and (state.get_role(),peer_type) in [('spine','leaf'),('leaf','spine'),('leaf','leaf')])
           # or (state.get_role()=='leaf' and peer_type=='leaf')
         ):
