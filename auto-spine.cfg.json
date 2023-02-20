@@ -1153,6 +1153,7 @@
       },
       "server-group": [
         {
+          "name": "local",
           "type": "local"
         }
       ]

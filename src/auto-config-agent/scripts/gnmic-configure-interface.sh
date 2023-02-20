@@ -63,7 +63,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 EOF
 
 # Can add --debug
-GNMIC='/usr/bin/sudo /sbin/ip netns exec srbase-mgmt /usr/local/bin/gnmic -a 127.0.0.1:57400 -u admin -p "NokiaSrl1!" --log-file /tmp/gnmic.log --skip-verify -e json_ietf'
+GNMIC='/usr/bin/sudo /usr/local/bin/gnmic -a unix:///opt/srlinux/var/run/sr_gnmi_server --insecure --log-file /tmp/gnmic.log -e json_ietf'
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
@@ -697,6 +697,6 @@ fi
 
 fi # VRF != "none"
 
-echo "Done, cleaning up ${temp_file}..."
+echo "Done, cleaning up ${temp_file}...gnmic=${GNMIC}"
 rm -f $temp_file
 exit $exitcode

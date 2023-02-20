@@ -47,7 +47,7 @@ stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
 # Requires Unix socket to be enabled in config
 gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                  username="admin",password="admin",insecure=True,use_lock=True)
+                  username="admin",password="NokiaSrl1!",insecure=True,use_lock=True)
 gnmiConnected = False
 
 def gnmiConnection( callback ):
@@ -1319,51 +1319,56 @@ def Handle_Notification(obj, state):
           desc = obj.lldp_neighbor.data.system_description or "?"
           logging.info( f"LLDP system desc: {desc}" )
 
+          def delay_config():
+            state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
+              peer_sys_name, obj.lldp_neighbor.key.chassis_id, desc )
+            return False; # Unable to continue configuration
+
           # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
-             node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
-             if node_id == 0:
-                state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
-                  peer_sys_name, obj.lldp_neighbor.key.chassis_id, desc )
-                return False; # Unable to continue configuration
-             state._determine_local_as(node_id) # XXX todo reorganize
+            node_id = determine_local_node_id( state, int(my_port_id), int(to_port_id), peer_sys_name)
+            if node_id == 0:
+              return delay_config()
+            state._determine_local_as(node_id) # XXX todo reorganize
 
           router_id_changed = False
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
             state.router_id = state.determine_router_id( state.get_role(), state.node_id )
             router_id_changed = True
             if state.role != "endpoint":
-               Set_Default_Systemname( state )
+              Set_Default_Systemname( state )
           elif level_updated:
-               Set_Default_Systemname( state ) # Update system name to reflect
-               if state.get_role()=="leaf":
-                  Update_EVPN_RR_Neighbors( state )
+            Set_Default_Systemname( state ) # Update system name to reflect
+            if state.get_role()=="leaf":
+              Update_EVPN_RR_Neighbors( state )
+          elif not hasattr(state,'router_id'): # Need own router ID before configuring host ports
+            return delay_config()
 
           if obj.lldp_neighbor.op == 1: # Change, class 'int'
-              return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
+            return HandleLLDPChange( state, peer_sys_name, my_port, to_port )
 
           lag_created = configure_peer_link( state, my_port, int(my_port_id), int(to_port_id),
                                              peer_sys_name, desc if m else 'host', router_id_changed )
 
           if router_id_changed:
-             for intf in state.pending_peers:
-               _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
-               _is_lag = configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
-               if _is_lag:
-                  Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
+            for intf in state.pending_peers:
+              _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
+              _is_lag = configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
+              if _is_lag:
+                Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
 
-             if state.get_role()=="leaf":
-                Update_EVPN_RR_Neighbors( state, first_time=True )
+            if state.get_role()=="leaf":
+              Update_EVPN_RR_Neighbors( state, first_time=True )
 
                 # XXX assumes router_id wont change after this point
-                if state.evpn_auto_lags != "disabled":
-                   EVPNRouteMonitoringThread(state).start()
+              if state.evpn_auto_lags != "disabled":
+                EVPNRouteMonitoringThread(state).start()
 
           # Could also announce communities for spines
           if lag_created: # state.get_role() == "leaf" and hasattr(state,"router_id"):
-             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
+            Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
           else:
-             logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
+            logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 
 
     else:
@@ -1564,7 +1569,7 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
 # JvB: Invokes gnmic client to update interface configuration, via bash script
 ###########################
 def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,peer_as_max,peer_links,peer_type,peer_rid):
-    logging.info(f'Calling update script: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
+    logging.info(f'Calling update script NEW: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} ' +
                  f'first_run={first_run} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} ' +
                  f'peer_as_min={peer_as_min} peer_as_max={peer_as_max}' )
     try:
