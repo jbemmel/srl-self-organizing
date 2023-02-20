@@ -1453,8 +1453,6 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
          if state.pair_role!=0 and peer_role and same_pair:
             if (state.pair_role==1 and peer_role=='a') or (state.pair_role==2 and peer_role=='b'):
               logging.info( f"Detected leaf self loop on ports {lldp_my_port} and {lldp_peer_port}" )
-              if not hasattr(state,'router_id'):
-                return False
               peer_router_id = state.router_id
               _r = 0 if lldp_my_port<lldp_peer_port else 1
             else:
