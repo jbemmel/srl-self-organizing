@@ -267,14 +267,8 @@ module auto_config_agent {
                    // type srl_nokia-comm:ipv4-prefix-with-host-bits;
                    type string;
                 }
-                leaf location {
-                   description "Location for the L3 gateway, default on each leaf";
-                   type enumeration {
-                     enum leaf;
-                     enum spine;
-                   }
-                   default leaf;
-                }
+
+                // location is implied: leaf if (a)symmetric irb, else spine
             }
 
             leaf bridging-supported {

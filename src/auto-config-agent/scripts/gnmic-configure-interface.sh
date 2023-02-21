@@ -116,7 +116,7 @@ $GNMIC set --replace-path /bfd/subinterface[id=${LOOPBACK_IF}0.0] --replace-file
 exitcode+=$?
 fi
 
-$GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::string:::''
+$GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::json:::'{}'
 exitcode+=$?
 
 # Need a generic BGP policy to advertise loopbacks; apply specifically
@@ -140,33 +140,33 @@ cat > $temp_file << EOF
   "policy": [
     {
       "name": "select-loopbacks",
-      "default-action": { "reject": { } },
+      "default-action": { "policy-result": "reject" },
       "statement": [
         {
           "sequence-id": 10,
           "match": {
             "prefix-set": "loopbacks"
           },
-          "action": { "accept": { } }
+          "action": { "policy-result": "accept" }
         }
       ]
     },
     {
       "name": "reject-link-routes",
-      "default-action": { "accept": { } },
+      "default-action": { "policy-result": "accept" },
       "statement": [
         {
           "sequence-id": 10,
           "match": {
             "prefix-set": "links"
           },
-          "action": { "reject": { } }
+          "action": { "policy-result": "reject" }
         }
       ]
     },
     {
       "name": "accept-all",
-      "default-action": { "accept": { } }
+      "default-action": { "policy-result": "accept" }
     }
   ]
 }
@@ -382,7 +382,7 @@ cat > $temp_file << EOF
         {
           "sequence-id": 10,
           "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
-          "action": { "accept": { "bgp": { "communities": { "add": "CUSTOMER1" } } } }
+          "action": { "policy-result": "accept", "bgp": { "communities": { "add": "CUSTOMER1" } } }
         }
       ]
     }
@@ -609,7 +609,7 @@ echo "Selected VRF: ${VRF} for INTF=${INTF}.0 towards ${PEER_TYPE}"
 # Add it to the correct instance - host (lag) interfaces managed in Python code
 if [[ "$VRF" != "none" ]]; then
  echo "Adding interface ${INTF}.0 to VRF '${VRF}' - assumes ip-vrf exists"
- $GNMIC set --update /network-instance[name=${VRF}]/interface[name=${INTF}.0]:::string:::''
+ $GNMIC set --update /network-instance[name=${VRF}]/interface[name=${INTF}.0]:::json:::'{}'
  exitcode+=$?
 
 # Add it to OSPF (if enabled)

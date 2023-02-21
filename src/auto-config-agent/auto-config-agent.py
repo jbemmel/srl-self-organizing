@@ -645,55 +645,62 @@ def Configure_EVPN(state,port,interface,ip):
 
    is_routed = (state.get_role()=="leaf" and state.evpn!="l2_only_leaves") or state.is_spine()
 
-   l3_if = {
+   if_base = {
     "admin-state": "enable",
     "subinterface": [
-    {
+     {
       "index": _svc_id, # Port independent, per service
       "admin-state": "enable",
-      "ipv4": {
-        "address": [
-          {
-            "ip-prefix": ip, # /31 link IP (or .1 out of /24-30)
-            "primary": '[null]'  # type 'empty', used as source for bcast
-          }
-        ],
-        "arp": {
-          # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
-          # Could make this depend on EVPN support
-          "evpn": { "advertise": [ {
-            "route-type": "dynamic" # TODO only for asymmetric model?
-          } ] },
-          "host-route": {
-            "populate": [ { "route-type": "dynamic" } ]
-          },
-        },
-      }
-    }
+      "type": "routed" if is_routed else "bridged"
+     }
     ]
    }
+   if is_routed:
+       if_base["subinterface"][0]["ipv4"] = {
+         "address": [
+           {
+             "ip-prefix": ip, # /31 link IP (or .1 out of /24-30)
+             "primary": '[null]'  # type 'empty', used as source for bcast
+           }
+         ],
+         "arp": {
+           "host-route": {
+             "populate": [ { "route-type": "dynamic" } ]
+           },
+         },
+       }
 
-   if is_routed and state.host_enable_ipv6:
-       # TODO could add ipv6 link IP too
-       logging.info( f"Enabling ipv6 towards host on port {port}" )
-       l3_if['subinterface'][0]['ipv6'] = { }
-   else:
-       logging.info( f"NOT enabling ipv6 on port {port}" )
+       if use_irb:
+         # Only supported on IRB interfaces, not lag
+         if_base["subinterface"][0]["ipv4"]["arp"]["evpn"] = {
+         # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
+         # Could make this depend on EVPN support
+          "advertise": [ {
+           "route-type": "dynamic" # TODO only for asymmetric model?
+          } ],
+         }
 
-   if is_routed and state.gateway['ipv4']:
-       gw = state.gateway
-       if gw['location'] == state.get_role():
+       if state.host_enable_ipv6:
+         # TODO could add ipv6 link IP too
+         logging.info( f"Enabling ipv6 towards host on port {port}" )
+         if_base['subinterface'][0]['ipv6'] = { }
+       else:
+         logging.info( f"NOT enabling ipv6 on port {port}" )
+
+       if state.gateway['ipv4']:
+         gw = state.gateway
+         if gw['location'] == state.get_role():
           addr = { "ip-prefix": state.gateway['ipv4'].format( vrf=_vrf_id ) }
           if gw['anycast'] and use_irb: # Some platforms like ixr6 don't support this
-            l3_if['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
+            if_base['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
             addr[ 'anycast-gw' ] = True
-          if 'ipv4' in l3_if['subinterface'][0]:
-            l3_if['subinterface'][0]['ipv4']['address'].append( addr )
+          if 'ipv4' in if_base['subinterface'][0]:
+            if_base['subinterface'][0]['ipv4']['address'].append( addr )
           else:
-            l3_if['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
+            if_base['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
 
    if_name = 'irb0' if use_irb else interface
-   updates += [ (f'/interface[name={if_name}]', l3_if) ]
+   updates += [ (f'/interface[name={if_name}]', if_base) ]
 
    # EVPN L2 VXLAN interface
    L2_VNI_EVI = 4095 + _svc_id # Cannot use 0
@@ -778,12 +785,12 @@ def Configure_EVPN(state,port,interface,ip):
       IRB_ARP_ND_TIMEOUT = 300 - 30
       ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
 
-      l3_if['subinterface'][0]['ipv4']['arp'] = {
+      if_base['subinterface'][0]['ipv4']['arp'] = {
         'timeout': IRB_ARP_ND_TIMEOUT,
         '_annotate_timeout': ANNOTATION
       }
-      if 'ipv6' in l3_if['subinterface'][0]:
-          l3_if['subinterface'][0]['ipv6']['neighbor-discovery'] = {
+      if 'ipv6' in if_base['subinterface'][0]:
+          if_base['subinterface'][0]['ipv6']['neighbor-discovery'] = {
             'stale-time': IRB_ARP_ND_TIMEOUT,
             '_annotate_stale-time': ANNOTATION
           }
@@ -1136,7 +1143,8 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
          {
           "name": policy_name,
           "default-action": {
-            "accept": { "bgp": { "communities": { "add": "LLDP" } } }
+            "policy-result": "accept",
+            "bgp": { "communities": { "add": "LLDP" } }
           }
          }
         ]
@@ -1259,7 +1267,7 @@ def Handle_Notification(obj, state):
                   state.gateway = {
                     'ipv4': gw['ipv4']['value'] if 'ipv4' in gw else False,
                     'location': ('spine' if state.evpn == 'l2_only_leaves'
-                                 else gw['location'][9:]), # default 'leaf'
+                                 else 'leaf'), # default 'leaf'
                     'anycast': 'anycast_supported' in gw and gw['use_anycast_if_supported']['value'],
                   }
 
