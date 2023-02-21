@@ -651,7 +651,6 @@ def Configure_EVPN(state,port,interface,ip):
      {
       "index": _svc_id, # Port independent, per service
       "admin-state": "enable",
-      "type": "routed" if is_routed else "bridged"
      }
     ]
    }
@@ -679,6 +678,8 @@ def Configure_EVPN(state,port,interface,ip):
            "route-type": "dynamic" # TODO only for asymmetric model?
           } ],
          }
+       else:
+         if_base["subinterface"][0]["type"] = "routed"
 
        if state.host_enable_ipv6:
          # TODO could add ipv6 link IP too
@@ -698,6 +699,8 @@ def Configure_EVPN(state,port,interface,ip):
             if_base['subinterface'][0]['ipv4']['address'].append( addr )
           else:
             if_base['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
+   else:
+       if_base["subinterface"][0]["type"] = "bridged"
 
    if_name = 'irb0' if use_irb else interface
    updates += [ (f'/interface[name={if_name}]', if_base) ]
