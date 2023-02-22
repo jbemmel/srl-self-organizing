@@ -44,7 +44,7 @@ This example uses:
 * (optional) eBGP v4/v6 towards Linux hosts
 * iBGP EVPN between leaves and (super)spine route-reflector(s), with VXLAN overlay
 * (super)spines share a private base AS for EBGP, each leaf gets a unique leaf AS
-* Interfaces use /31 IPv4 link addresses (required for VXLAN v4), OSPFv3 uses IPv6 link-local addresses
+* Interfaces use /31 IPv4 link addresses or IPv6 unnumbered, OSPFv3 uses IPv6 link-local addresses
 * (Super)spine side uses dynamic neighbors, such that the spines only need to know a subnet prefix for leaves
 * Routing policy to only import/export loopback IPs
 * Global AS set to overlay AS, such that EVPN auto route-targets work; not added to EBGP routes
@@ -53,7 +53,7 @@ This example uses:
 * [NEW] EVPN auto LAG discovery based on LLDP and either Large Communities (RFC8092) or IPv6-encoding
 
 ## EVPN overlay
-The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN, and illustrates how VLAN interfaces can automatically be added based on (for example) Kubernetes container startup events.
+The [SR Linux EVPN User guide](https://documentation.nokia.com/cgi-bin/dbaccessfilename.cgi/3HE16831AAAATQZZA01_V1_SR%20Linux%20R21.3%20EVPN-VXLAN%20User%20Guide.pdf) describes how to setup EVPN overlay services. The agent auto-configures spines to be iBGP route reflectors for EVPN.
 
 The agent supports both *asymmetric* and *symmetric* IRB configuration models, and will annotate the configuration to highlight the difference.
 One can use 
