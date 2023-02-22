@@ -663,21 +663,28 @@ def Configure_EVPN(state,port,interface,ip):
            }
          ],
          "arp": {
-           "host-route": {
-             "populate": [ { "route-type": "dynamic" } ]
-           },
-         },
+          "learn-unsolicited": True
+         }
        }
 
        if use_irb:
+         # if_base["subinterface"][0]["ipv4"]["arp"]["learn-unsolicited"] = True
+
          # Only supported on IRB interfaces, not lag
          if_base["subinterface"][0]["ipv4"]["arp"]["evpn"] = {
          # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
          # Could make this depend on EVPN support
-          "advertise": [ {
-           "route-type": "dynamic" # TODO only for asymmetric model?
-          } ],
+          "advertise": [
+           { "route-type": "dynamic" }, # TODO only for asymmetric model?
+           { "route-type": "static" },  # Advertise irb interface IPs too
+          ],
          }
+
+         if state.evpn == "symmetric_irb":
+           if_base["subinterface"][0]["ipv4"]["arp"]["host-route"] = {
+             "populate": [ { "route-type": "dynamic" } ]
+           }
+
        else:
          if_base["subinterface"][0]["type"] = "routed"
 
@@ -691,7 +698,7 @@ def Configure_EVPN(state,port,interface,ip):
        if state.gateway['ipv4']:
          gw = state.gateway
          if gw['location'] == state.get_role():
-          addr = { "ip-prefix": state.gateway['ipv4'].format( vrf=_vrf_id ) }
+          addr = { "ip-prefix": state.gateway['ipv4'].format( vrf=_vrf_id,port=port ) }
           if gw['anycast'] and use_irb: # Some platforms like ixr6 don't support this
             if_base['subinterface'][0]['anycast-gw'] = {} # Only supported on IRB interfaces
             addr[ 'anycast-gw' ] = True
@@ -788,10 +795,10 @@ def Configure_EVPN(state,port,interface,ip):
       IRB_ARP_ND_TIMEOUT = 300 - 30
       ANNOTATION = "30 seconds lower than age-time in mac-vrf, to avoid transient packet loss when MAC address of ARP/ND entry is removed"
 
-      if_base['subinterface'][0]['ipv4']['arp'] = {
-        'timeout': IRB_ARP_ND_TIMEOUT,
-        '_annotate_timeout': ANNOTATION
-      }
+      # Dont remove other ARP flags
+      if_base['subinterface'][0]['ipv4']['arp']['timeout'] = IRB_ARP_ND_TIMEOUT
+      if_base['subinterface'][0]['ipv4']['arp']['_annotate_timeout'] = ANNOTATION
+
       if 'ipv6' in if_base['subinterface'][0]:
           if_base['subinterface'][0]['ipv6']['neighbor-discovery'] = {
             'stale-time': IRB_ARP_ND_TIMEOUT,
