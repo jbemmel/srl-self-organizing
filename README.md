@@ -17,7 +17,7 @@ What is demonstrated:
 * If not: All LLDP neighbors advertise the same port -> rank == port (starting from ethernet-1/1 = Leaf/Spine 1, etc)
 * Could auto-determine role: Some links connected but no LLDP or MAC address instead of SRL port name -> assume this is a leaf node, otherwise spine
 
-YANG model provides parameters:
+YANG model (included in single initial config) provides parameters:
 * AS base: Superspine EBGP AS number, each Leaf gets <base + 1 + rank>
 * Link prefix: IP/mask to use for generating peer-2-peer /31 link addresses 
   ( For example: 192.168.0.0/24, spine1=192.168.0.0/31 and leaf1=192.168.0.1/31 )
