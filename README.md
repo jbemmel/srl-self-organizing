@@ -26,7 +26,7 @@ YANG model (included in single initial config) provides parameters:
 * Max number of spines/leaves/hosts-per-leaf in the topology
 * Whether to enable EVPN, and what model (symmetric/asymmetric IRB)
 * Whether to enable EVPN based auto provisioning of MC-LAGs (default: true)
-* Whether to use OSPFv3, ISIS, regular BGPv4 or BGP Unnumbered (based on FRR agent)
+* Whether to use OSPFv3, ISIS, regular BGPv4 or BGP Unnumbered
 
 ## Deploy lab
 ```
