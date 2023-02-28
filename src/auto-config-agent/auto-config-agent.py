@@ -1431,7 +1431,8 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
   if state.is_spine(): # (super)spines
 
     # Could dynamically determine # of active spine ports, and use less addresses
-    # state.max_spine_ports default = 6
+    # state.max_spine_ports default = 8
+    # XXX this assumes ports are used starting at index 1, not 49
     if lldp_my_port > state.max_spine_ports:
         logging.error( f"max-spine-ports configured too low({state.max_spine_ports}), will result in duplicate link IPs" )
         return False

@@ -1394,17 +1394,13 @@
       {
         "name": "accept-all",
         "default-action": {
-          "accept": {
-
-          }
+          "policy-result": "accept"
         }
       },
       {
         "name": "export-hosts",
         "default-action": {
-          "accept": {
-
-          }
+          "policy-result": "accept"
         },
         "statement": [
           {
@@ -1418,9 +1414,7 @@
               }
             },
             "action": {
-              "reject": {
-
-              }
+              "policy-result": "reject"
             }
           },
           {
@@ -1429,9 +1423,7 @@
               "prefix-set": "p2plinks"
             },
             "action": {
-              "reject": {
-
-              }
+              "policy-result": "reject"
             }
           },
           {
@@ -1440,11 +1432,10 @@
               "prefix-set": "loopbacks"
             },
             "action": {
-              "accept": {
-                "bgp": {
-                  "communities": {
-                    "add": "no-export"
-                  }
+              "policy-result": "accept",
+              "bgp": {
+                "communities": {
+                  "add": "no-export"
                 }
               }
             }
