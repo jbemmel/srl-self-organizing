@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    
+
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
@@ -1177,7 +1177,8 @@
       },
       "server-group": [
         {
-          "name": "local"
+          "name": "local",
+          "type": "local"
         }
       ]
     },
