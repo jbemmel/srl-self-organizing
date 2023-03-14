@@ -1,5 +1,8 @@
 name: evpn-lab # Auto-configuring CLOS fabric with EVPN VXLAN overlay and EVPN MC-LAG
 
+mgmt:
+  network: netlab_mgmt # To connect Netbox to this network
+
 topology:
   kinds:
     srl:
@@ -19,11 +22,11 @@ topology:
 
   nodes:
     leaf1:  { kind: srl, group: leaves }
-    leaf2:  { kind: srl, group: leaves }
+    leaf2:  { kind: srl, type: ixrd2l, group: leaves }
     leaf3:  { kind: srl, group: leaves }
     # Can use "i-" in name for iBGP peering
     spine1: { kind: srl, type: ixrd3, group: spines }
-    spine2: { kind: srl, type: ixrd3, group: spines }
+    spine2: { kind: srl, type: ixrd3l, group: spines }
 
     h1: { kind: srl, group: hosts, startup-config: auto-host-with-vip.cfg.json }
     h2: { kind: srl, group: hosts, startup-config: auto-host.cfg.json }
@@ -34,7 +37,7 @@ topology:
     - endpoints: ["leaf3:e1-49","spine1:e1-3"]
     - endpoints: ["leaf1:e1-50","spine2:e1-1"]
     - endpoints: ["leaf2:e1-50","spine2:e1-2"]
-    - endpoints: ["leaf3:e1-50","spine2:e1-3"]
+    - endpoints: ["leaf3:e1-57","spine2:e1-3"] # 10G port, for testing SFP+
 
     - endpoints: ["h1:e1-1","leaf1:e1-3"] # This currently assigns router ID .3, based on leaf port
     - endpoints: ["h2:e1-1","leaf2:e1-3"] # MC-LAG
