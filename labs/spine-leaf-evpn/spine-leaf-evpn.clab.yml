@@ -4,6 +4,9 @@
 
 name: spine-leaf-evpn
 
+mgmt:
+  network: netlab_mgmt # To connect Netbox to this network
+
 topology:
   kinds:
     srl:

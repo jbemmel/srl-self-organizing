@@ -14,13 +14,11 @@ import json
 import signal
 import subprocess
 import traceback
-import requests
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
 import lldp_service_pb2
 import config_service_pb2
-import sdk_common_pb2
 
 from logging.handlers import RotatingFileHandler
 
@@ -340,7 +338,7 @@ class EVPNRouteMonitoringThread(Thread):
              if mac in self.state.local_lldp:
                  lag_port, provisioned = self.state.local_lldp[ mac ]
                  if not provisioned:
-                   peer_router_id = encoded_parts[2:4] # 2 x 16 bits
+                   # peer_router_id = encoded_parts[2:4] # 2 x 16 bits
                    peer_port = int(encoded_parts[4],16) # 16 bits, can be multiple ports
 
                    peer_ports = [ peer_port & 0xff ] # Lower 8 bits = min base port
@@ -772,7 +770,7 @@ def Configure_EVPN(state,port,interface,ip):
      }
     ]
    }
-   updates += [ ( f'/interface[name=lo0]', loopback_if) ]
+   updates += [ ( '/interface[name=lo0]', loopback_if) ]
    ip_vrf = {
      "type": "ip-vrf",
      "admin-state": "enable",
@@ -974,8 +972,9 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
    if state.lacp != "disabled":
        leaf_pair_lag = port in state.leaf_pairs
        # Both members on the split side need same ID, also when spine facing
-       # Cannot only use lag_id, in case of leaf-pair both using same #lag
-       mac_id = _lag_id + state.id_from_hostname # if leaf_pair_lag else 0
+       # Cannot only use lag_id, in case of leaf-pair both using same #lag?
+       # This is MC lag case, need same MAC on both members
+       mac_id = _lag_id # + state.id_from_hostname # if leaf_pair_lag else 0
        member_count = len( mc_lag ) + 1
        lag['lag'] = {
         'lag-type': 'lacp',
@@ -1027,7 +1026,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
       # BGP unnumbered interfaces must have ipv6 enabled
 
       bgp_u = { "peer-as": "external" }
-      updates=[ (f'/network-instance[name=default]/protocols/experimental-frr', frr),
+      updates=[ ('/network-instance[name=default]/protocols/experimental-frr', frr),
                 (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
               ]
@@ -1140,9 +1139,9 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
      }
    }
 
-   updates=[ (f'/interface[name=lo0]', lo0_1_if),
-             (f'/tunnel-interface[name=vxlan0]/vxlan-interface[index=65535]', vxlan_if ),
-             (f'/network-instance[name=evpn-lag-discovery]', ip_vrf),
+   updates=[ ('/interface[name=lo0]', lo0_1_if),
+             ('/tunnel-interface[name=vxlan0]/vxlan-interface[index=65535]', vxlan_if ),
+             ('/network-instance[name=evpn-lag-discovery]', ip_vrf),
            ]
 
    if state.evpn_auto_lags == "large_communities":
@@ -1178,7 +1177,7 @@ def Handle_Notification(obj, state):
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
-                logging.info(f"Delete auto-config-agent cli scenario")
+                logging.info("Delete auto-config-agent cli scenario")
                 # if file_name != None:
                 #    Update_Result(file_name, action='delete')
                 response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
@@ -1340,7 +1339,7 @@ def Handle_Notification(obj, state):
           def delay_config():
             state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
               peer_sys_name, obj.lldp_neighbor.key.chassis_id, desc )
-            return False; # Unable to continue configuration
+            return False # Unable to continue configuration
 
           # First figure out this node's relative id in its group. May depend on hostname
           if not hasattr(state,"node_id"):
@@ -1817,7 +1816,7 @@ class State(object):
             return False
 
         if self.evpn=="l2_only_leaves" and self.get_role()=="leaf":
-            logging.info( f"useIRB: l2_only_leaves with self.role==leaf => False" )
+            logging.info( "useIRB: l2_only_leaves with self.role==leaf => False" )
             return False # XXX Would also be caught by gw location
 
         # TODO generalized services config
