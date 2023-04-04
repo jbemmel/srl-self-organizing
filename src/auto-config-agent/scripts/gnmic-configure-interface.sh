@@ -81,6 +81,14 @@ if [[ "$FIRST_RUN" == "1" ]]; then
 
 if [[ "$ROLE" == "leaf" ]]; then
 LOOPBACK_IF="system"
+ADD_NO_ADVERTISE='' read -r -d '' HOSTS_GROUP << EOF
+,"bgp": {
+   "communities": {
+     "add": "no-advertise"
+   }
+ }
+EOF
+
 else
 LOOPBACK_IF="lo"
 fi
@@ -156,12 +164,8 @@ cat > $temp_file << EOF
             "prefix-set": "loopbacks"
           },
           "action": {
-           "policy-result": "accept",
-           "bgp": {
-              "communities": {
-                "add": "no-advertise"
-              }
-            }
+           "policy-result": "accept"
+           ${ADD_NO_ADVERTISE}
           }
         }
       ]
