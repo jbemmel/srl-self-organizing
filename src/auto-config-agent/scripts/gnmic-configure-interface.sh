@@ -137,9 +137,37 @@ cat > $temp_file << EOF
       ]
     }
   ],
+  "community-set": [
+    {
+      "name": "no-advertise",
+      "member": [
+        "no-advertise"
+      ]
+    }
+  ],
   "policy": [
     {
-      "name": "select-loopbacks",
+      "name": "import-loopbacks",
+      "default-action": { "policy-result": "reject" },
+      "statement": [
+        {
+          "sequence-id": 10,
+          "match": {
+            "prefix-set": "loopbacks"
+          },
+          "action": {
+           "policy-result": "accept",
+           "bgp": {
+              "communities": {
+                "add": "no-advertise"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "export-loopbacks",
       "default-action": { "policy-result": "reject" },
       "statement": [
         {
