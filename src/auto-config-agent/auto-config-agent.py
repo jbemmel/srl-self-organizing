@@ -1696,6 +1696,7 @@ class State(object):
        else:
            logging.warning( f"_determine_role: Unable to determine role/id based on hostname: {hostname}, switching to 'auto' mode" )
            self.role = "auto"
+           self.pair_role = 0
            self.id_from_hostname = self.effective_id = 0
 
     def _determine_local_as(self,node_id):
