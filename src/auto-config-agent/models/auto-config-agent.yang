@@ -53,6 +53,12 @@ module auto_config_agent {
                 default 0; // could also vary this by port offset
             }
 
+            leaf dhcp {
+              description "Enable auto-provisioned DHCP server and relay";
+              type boolean;
+              default true;
+            }
+
             container peerlinks {
                leaf prefix {
                  description "IPv4 prefix range to use for auto-assigned peering links /31";

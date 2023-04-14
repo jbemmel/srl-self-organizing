@@ -220,7 +220,7 @@ class EVPNRouteMonitoringThread(Thread):
        self.state = state
 
    def run(self):
-
+    logging.info( "EVPNRouteMonitoringThread run()" )
     if self.state.evpn_auto_lags == "large_communities":
         # Really inefficient, but ipv4 route events don't work
         path = '/network-instance[name=default]/protocols/bgp/evpn'
@@ -298,16 +298,19 @@ class EVPNRouteMonitoringThread(Thread):
                    for p in lldp_ports:
                        parts = p.split(':')
                        key = parts[1] + ':' + parts[2] # 48-bit MAC in 2 parts
+
+                       # extract_mac
+                       m = int(parts[1]) << 24 + int(parts[2])
+                       mac = []
+                       for i in range(0,6):
+                         mac += [ f'{(m&0xff):02X}' ]
+                         m >>= 8
+                       mac = ":".join(mac)
+
                        if key in self.state.local_lldp:
                            lag_port, provisioned = self.state.local_lldp[ key ]
                            logging.info( f"Found MC-LAG port match: {lag_port} peer={peer_id} provisioned={provisioned}" )
                            if not provisioned:
-                             m = int(parts[1]) << 24 + int(parts[2])
-                             mac = []
-                             for i in range(0,6):
-                                 mac += [ f'{(m&0xff):02X}' ]
-                                 m >>= 8
-                             mac = ":".join(mac)
                              try:
                                 # XXX only supports single port
                                 Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, [ int(parts[0],16) ], gnmi_client )
@@ -315,6 +318,8 @@ class EVPNRouteMonitoringThread(Thread):
                                 self.state.local_lldp[ key ] = (lag_port, True)
                              except Exception as ex:
                                 logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
+                       elif self.state.is_spine() and self.state.dhcp:
+                           AddDHCPClient( mac, peer_id, [ int(parts[0],16) ], gnmi_client )
 
    def checkIPv6Routes(self,gnmi_client):
      """
@@ -335,18 +340,20 @@ class EVPNRouteMonitoringThread(Thread):
                                for b in encoded_parts[5:]
                                for i in [int(b,16) if b!='' else 0 ] ] )
              logging.info( f"Process {encoded_lldp} from {peer_id}: {mac}" )
+
+             # peer_router_id = encoded_parts[2:4] # 2 x 16 bits
+             peer_port = int(encoded_parts[4],16) # 16 bits, can be multiple ports
+             peer_ports = [ peer_port & 0xff ] # Lower 8 bits = min base port
+             other_ports = peer_port>>8
+             if other_ports!=0:
+                 for bit in range(0,8): # base port + [1..9]
+                     if other_ports&(1<<bit):
+                         peer_ports += [ peer_ports[0] + (bit+1) ]
+
              if mac in self.state.local_lldp:
                  lag_port, provisioned = self.state.local_lldp[ mac ]
                  if not provisioned:
-                   # peer_router_id = encoded_parts[2:4] # 2 x 16 bits
-                   peer_port = int(encoded_parts[4],16) # 16 bits, can be multiple ports
 
-                   peer_ports = [ peer_port & 0xff ] # Lower 8 bits = min base port
-                   other_ports = peer_port>>8
-                   if other_ports!=0:
-                       for bit in range(0,8): # base port + [1..9]
-                           if other_ports&(1<<bit):
-                              peer_ports += [ peer_ports[0] + (bit+1) ]
                    # TODO update ipv6 route (tag or community or IP) to reflect count of peers
                    try:
                       Convert_lag_to_mc_lag( self.state, mac, lag_port, peer_id, peer_ports, gnmi_client )
@@ -357,6 +364,9 @@ class EVPNRouteMonitoringThread(Thread):
 
                    # Outside of exception, dont repeat errors
                    self.state.local_lldp[ mac ] = (lag_port,True)
+
+             elif self.state.is_spine() and self.state.dhcp:
+                 AddDHCPClient( mac, peer_id, peer_ports, gnmi_client )
 
 ############################################################
 ## Function to populate state of agent config
@@ -1004,6 +1014,12 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
    logging.info(f"Convert_lag_to_mc_lag gNMI SET deletes={deletes} updates={updates}" )
    gnmi_client.set( encoding='json_ietf', delete=deletes, update=updates )
 
+#
+# Called when an EVPN community match is discovered on spine, for DHCP provisioning
+#
+def AddDHCPClient(mac,peer_id,peer_port_list,gnmi_client):
+   logging.info(f"AddDHCPClient :: mac={mac} peer-id={peer_id} peer_port_list={peer_port_list}")
+
 ###
 # Configures the default network instance to use BGP unnumbered between
 # spines and leaves, using FRR agent https://github.com/jbemmel/srl-frr-agent
@@ -1222,6 +1238,8 @@ def Handle_Notification(obj, state):
                     state.ports_per_service = int( data['ports_per_service']['value'] )
                 if 'vrf_per_service' in data:
                     state.vrf_per_service = bool( data['vrf_per_service']['value'] )
+                if 'dhcp' in data:
+                    state.dhcp = bool( data['dhcp']['value'] )
 
                 state.evpn_overlay_as = 0
                 state.evpn = state.evpn_auto_lags = 'disabled'
@@ -1377,9 +1395,11 @@ def Handle_Notification(obj, state):
             if state.get_role()=="leaf":
               Update_EVPN_RR_Neighbors( state, first_time=True )
 
-                # XXX assumes router_id wont change after this point
+              # XXX assumes router_id wont change after this point
               if state.evpn_auto_lags != "disabled":
                 EVPNRouteMonitoringThread(state).start()
+            elif state.is_spine() and state.dhcp:
+              EVPNRouteMonitoringThread(state).start() # Needed for populating DHCP
 
           # Could also announce communities for spines
           if lag_created: # state.get_role() == "leaf" and hasattr(state,"router_id"):
@@ -1643,6 +1663,7 @@ class State(object):
         self.bridging_supported = False
         self.evpn = ""
         self.gateway = { 'ipv4': False }
+        self.dhcp = True
 
     def svc_id(self,port):
         """
@@ -1678,6 +1699,7 @@ class State(object):
        Determine this node's role and relative ID based on the hostname
        """
        hostname = socket.gethostname()
+       # Could make ID optional and assume '1' if not provided
        role_id = re.match( "^(\w+)[-]?(\d+)(a|b)?.*$", hostname ) # Ignore trailing router ID, if set
        if role_id:
            self.role = role_id.groups()[0]
