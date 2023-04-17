@@ -1081,7 +1081,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
 
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
                 (f'/network-instance[name=default]/protocols/bgp/group[group-name={group_name}]', bgp_group ),
-                ('/network-instance[name=default]/protocols/bgp/evpn', bgp_evpn ),
+                ('/network-instance[name=default]/protocols/bgp/afi-safi[afi-safi-name=evpn]/evpn', bgp_evpn ),
                 ('/network-instance[name=default]/ip-forwarding', ip_forwarding ),
                 (f'/interface[{eth}]/subinterface[index=0]/ipv6', ipv6_ra ),
               ]
