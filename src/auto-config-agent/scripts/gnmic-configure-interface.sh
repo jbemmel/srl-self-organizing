@@ -63,7 +63,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 EOF
 
 # Can add --debug
-GNMIC='/usr/bin/sudo /usr/local/bin/gnmic -a unix:///opt/srlinux/var/run/sr_gnmi_server --insecure --log-file /tmp/gnmic.log -e json_ietf'
+GNMIC='/usr/bin/sudo /usr/local/bin/gnmic -a unix:///opt/srlinux/var/run/sr_gnmi_server -u admin --insecure --log-file /tmp/gnmic.log -e json_ietf'
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
