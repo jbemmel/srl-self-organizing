@@ -39,7 +39,7 @@ IFS='' read -r -d '' HOSTS_GROUP << EOF
   "group-name": "hosts",
   "admin-state": "$OVERLAY_BGP_ADMIN_STATE",
   "ipv6-unicast" : { "admin-state" : "enable" },
-  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
+  "local-as": { "as-number": ${evpn_overlay_as} },
   "send-default-route": {
     "ipv4-unicast": true,
     "ipv6-unicast": true
@@ -298,7 +298,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
     "export-policy": "select-loopbacks",
     "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
     "timers": { "connect-retry": 10 },
-    "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
+    "local-as": { "as-number": ${local_as}, "prepend-global-as": false },
     "peer-as": ${PEER_AS_MIN}
   }
 EOF
@@ -330,7 +330,7 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   ${AS_PATH_OPTIONS}
-  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ]
+  "local-as": { "as-number": ${local_as}, "prepend-global-as": false }
 }
 ${EBGP_PEER_GROUP_SUPERSPINES},
 EOF
@@ -465,7 +465,7 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "import-policy": "accept-all",
   "export-policy": "${EVPN_EXPORT_POLICY}",
   "peer-as": ${evpn_overlay_as},
-  "local-as": [ { "as-number": ${evpn_overlay_as} } ],
+  "local-as": { "as-number": ${evpn_overlay_as} },
   "afi-safi": [
     {
       "afi-safi-name": "evpn",
@@ -504,7 +504,7 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
-  "local-as": [ { "as-number": ${local_as}, "prepend-global-as": false } ],
+  "local-as": { "as-number": ${local_as}, "prepend-global-as": false },
   "ipv4-unicast": { "admin-state": "enable" },
   "ipv6-unicast": { "admin-state": "enable" }
 }

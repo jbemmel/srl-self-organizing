@@ -1061,7 +1061,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
       dyn_n = { "peer-group": group_name,
                 "allowed-peer-as": [ f"{min_peer_as}..{max_peer_as}" ] }
       bgp_group = {
-       "local-as": [ { "as-number": local_as, "prepend-global-as": False } ],
+       "local-as": { "as-number": local_as, "prepend-global-as": False },
        "import-policy": "import-loopbacks",
        "export-policy": "export-loopbacks",
        "afi-safi": [
