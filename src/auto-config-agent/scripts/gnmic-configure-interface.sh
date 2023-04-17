@@ -79,8 +79,10 @@ if [[ "$FIRST_RUN" == "1" ]]; then
 #  /sbin/ip netns exec srbase-default sudo sysctl -w net.ipv4.icmp_ratemask=4120
 # fi
 
-if [[ "$ROLE" == "leaf" ]]; then
+# Also for spines, could use "lo" but adds complexity
 LOOPBACK_IF="system"
+
+if [[ "$ROLE" == "leaf" ]]; then
 ADD_NO_ADVERTISE='' read -r -d '' HOSTS_GROUP << EOF
 ,"bgp": {
    "communities": {
@@ -88,9 +90,6 @@ ADD_NO_ADVERTISE='' read -r -d '' HOSTS_GROUP << EOF
    }
  }
 EOF
-
-else
-LOOPBACK_IF="lo"
 fi
 
 cat > $temp_file << EOF
@@ -106,6 +105,7 @@ cat > $temp_file << EOF
   ]
 }
 EOF
+
 # Cannot do 'replace' here, other subinterfaces used
 $GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
@@ -348,7 +348,11 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
   "admin-state": "enable",
   "peer-as": ${evpn_overlay_as},
   "_annotate_peer-as": "iBGP with leaves",
-  "evpn": { "admin-state": "enable", "advertise-ipv6-next-hops": ${use_ipv6_nexthops} },
+  "afi-safi": [
+    { "afi-safi-name": "evpn",
+      "admin-state": "enable",
+      "evpn": { "advertise-ipv6-next-hops": ${use_ipv6_nexthops} }
+    } ],
   "ipv4-unicast": { "admin-state": "disable" },
   "ipv6-unicast": { "admin-state": "disable" },
   "route-reflector": {
@@ -375,11 +379,16 @@ $EBGP_NEIGHBORS_COMMA {
 EOF
 
 IFS='' read -r -d '' EVPN_SECTION << EOF
-"evpn": {
- "rapid-update": true,
- "advertise-ipv6-next-hops": ${use_ipv6_nexthops},
- "keep-all-routes": true,
- "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
+"afi-safi": [
+    {
+      "afi-safi-name": "evpn",
+      "evpn": {
+       "rapid-update": true,
+       "advertise-ipv6-next-hops": ${use_ipv6_nexthops},
+       "keep-all-routes": true,
+       "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
+      }
+    } ]
 },
 EOF
 fi
@@ -457,7 +466,12 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
   "export-policy": "${EVPN_EXPORT_POLICY}",
   "peer-as": ${evpn_overlay_as},
   "local-as": [ { "as-number": ${evpn_overlay_as} } ],
-  "evpn": { "admin-state": "enable", "advertise-ipv6-next-hops": ${use_ipv6_nexthops} },
+  "afi-safi": [
+    {
+      "afi-safi-name": "evpn",
+      "admin-state": "enable",
+      "evpn": { "advertise-ipv6-next-hops": ${use_ipv6_nexthops} }
+    } ],
   "transport" : { "local-address" : "${TRANSPORT}" },
   "timers": { "connect-retry": 10 },
   "ipv4-unicast": { "admin-state": "disable" },
@@ -511,11 +525,16 @@ IBGP_PREFERENCE='"preference": { "ibgp": 171, "_annotate_ibgp": "Lower than BGP 
 fi
 
 IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
-"evpn": {
-  "rapid-update": true,
-  "keep-all-routes": true,
-  "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
-},
+"afi-safi": [
+    {
+      "afi-safi-name": "evpn",
+      "evpn": {
+       "rapid-update": true,
+       "keep-all-routes": true,
+       "_annotate_keep-all-routes": "to avoid route-refresh messages attracting all EVPN routes when policy changes or bgp-evpn is enabled"
+      }
+    }
+],
 "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
 ${IBGP_PREFERENCE}
 $DEFAULT_DYNAMIC_HOST_PEERING

@@ -1367,12 +1367,14 @@ def Handle_Notification(obj, state):
             state._determine_local_as(node_id) # XXX todo reorganize
 
           router_id_changed = False
+          logging.info( f"Handle_Notification: m={m} has_router_id={hasattr(state,'router_id')}" )
           if m and not hasattr(state,"router_id"): # Only for valid to_port, if not set
             state.router_id = state.determine_router_id( state.get_role(), state.node_id )
             router_id_changed = True
             if state.role != "endpoint":
               Set_Default_Systemname( state )
           elif level_updated:
+            logging.info( "Updating system name after level update" )
             Set_Default_Systemname( state ) # Update system name to reflect
             if state.get_role()=="leaf":
               Update_EVPN_RR_Neighbors( state )
