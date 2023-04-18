@@ -201,7 +201,8 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
 
        encoded_ipv6 = f'fdad::{router_id}:{enc_port:04x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
-                   "_annotate": f"for EVPN auto-lag discovery on {portlist}" } ] } ) ]
+                   "_annotate": f"for EVPN auto-lag discovery on {portlist}" } ],
+                   "admin-state" : "enable" } ) ]
 
        state.local_lldp[ chassis_mac ] = (base_port, False) # MAC uses CAPITALS
     else:
@@ -319,7 +320,7 @@ class EVPNRouteMonitoringThread(Thread):
                              except Exception as ex:
                                 logging.error( f"Convert_lag_to_mc_lag BUG: {ex}" )
                        elif self.state.is_spine() and self.state.dhcp:
-                           AddDHCPClient( mac, peer_id, [ int(parts[0],16) ], gnmi_client )
+                           AddDHCPClient( mac, peer_id, [ int(parts[0],16) ], self.state, gnmi_client )
 
    def checkIPv6Routes(self,gnmi_client):
      """
@@ -366,7 +367,7 @@ class EVPNRouteMonitoringThread(Thread):
                    self.state.local_lldp[ mac ] = (lag_port,True)
 
              elif self.state.is_spine() and self.state.dhcp:
-                 AddDHCPClient( mac, peer_id, peer_ports, gnmi_client )
+                 AddDHCPClient( mac, peer_id, peer_ports, self.state, gnmi_client )
 
 ############################################################
 ## Function to populate state of agent config
@@ -1017,8 +1018,46 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 #
 # Called when an EVPN community match is discovered on spine, for DHCP provisioning
 #
-def AddDHCPClient(mac,peer_id,peer_port_list,gnmi_client):
+def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
    logging.info(f"AddDHCPClient :: mac={mac} peer-id={peer_id} peer_port_list={peer_port_list}")
+
+   peer_node = int( peer_id.split(".")[-1] )
+   id = (peer_node-1) * state.max_hosts_per_leaf + (peer_port_list[0]-1)
+   gw = ipaddress.ip_network(state.gateway['ipv4'],False)
+
+   dhcp_server = {
+    "admin-state": "enable",
+    "network-instance": [
+    {
+      "name": "evpn-lag-discovery",
+      "dhcpv4": {
+        "admin-state": "enable",
+        "static-allocation": {
+          "host": [
+            {
+              "mac": mac,
+              "ip-address": gw[id] + '/' + gw.prefixlen,
+              "options": {
+                "router": gw[0]
+              }
+            }
+          ]
+        }
+      }
+    }
+   ]
+   }
+   irb_ipv4 = {
+      "admin-state": "enable",
+      "dhcp-server": { "admin-state": "enable" }
+   }
+   irb_if = { "interface": [ { "name" : "irb0.0" } ] }
+
+   updates = [ ('/system/dhcp-server', dhcp_server),
+               ('/interface[interface-name=irb0]/subinterface[index=0]/ipv4', irb_ipv4),
+               ('/network-instance[instance-name=evpn-lag-discovery]', irb_if)]
+   gnmi_client.set( encoding='json_ietf', update=updates )
+
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -1106,6 +1145,9 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
      {
       "index": 0,
       "admin-state": "enable",
+      "ipv4": {
+       "admin-state": "enable"
+      }
      }
     ]
    }
