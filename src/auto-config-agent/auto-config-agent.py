@@ -775,8 +775,8 @@ def Configure_EVPN(state,port,interface,ip):
       "index": _vrf_id,
       "description": "Overlay loopback",
       "admin-state": "enable",
-      "ipv4": { "address": [ { "ip-prefix": f"{state.router_id}/32" } ] },
-      "ipv6": { "address": [ { "ip-prefix": f"2001::{state.router_id.replace('.',':')}/128" } ] }
+      "ipv4": { "address": [ { "ip-prefix": f"{state.router_id}/32" } ], "admin-state": "enable" },
+      "ipv6": { "address": [ { "ip-prefix": f"2001::{state.router_id.replace('.',':')}/128" } ], "admin-state": "enable" }
      }
     ]
    }
@@ -1044,7 +1044,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
       bgp_u = { "peer-as": "external" }
       updates=[ ('/network-instance[name=default]/protocols/experimental-frr', frr),
                 (f'/network-instance[name=default]/interface[{eth}.0]/bgp-unnumbered', bgp_u ),
-                (f'/interface[{eth}]/subinterface[index=0]/ipv6', {} ),
+                (f'/interface[{eth}]/subinterface[index=0]/ipv6', { "admin-state": "enable" } ),
               ]
    else:
       if state.router_id == peer_router_id:
@@ -1081,7 +1081,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
       ip_forwarding = {
        "receive-ipv4-check": False
       }
-      ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } } }
+      ipv6_ra = { "router-advertisement": { "router-role": { "admin-state": "enable" } }, "admin-state": "enable" }
 
       updates=[ (f'/network-instance[name=default]/protocols/bgp/dynamic-neighbors/interface[interface-{eth}.0]', dyn_n),
                 (f'/network-instance[name=default]/protocols/bgp/group[group-name={group_name}]', bgp_group ),

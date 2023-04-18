@@ -393,8 +393,8 @@ IFS='' read -r -d '' EVPN_SECTION << EOF
        "keep-all-routes": true,
        "_annotate_keep-all-routes": "implicitly enabled for route-reflectors"
       }
-    } ]
-},
+    }
+],
 EOF
 fi
 
@@ -499,7 +499,7 @@ IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
      "max-paths-level-2": 8
     }
   }
-]
+],
 EOF
 
 if [[ "$IGP" == "bgp" ]]; then
@@ -585,6 +585,9 @@ fi
 cat > $temp_file << EOF
 {
   "admin-state": "enable",
+  "afi-safi": [
+   { "afi-safi-name": "ipv4-unicast", "admin-state": "enable" }
+  ],
   "autonomous-system": ${evpn_overlay_as},
   "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
   "router-id": "$router_id", "_annotate_router-id": "${router_id##*.}",
@@ -594,7 +597,6 @@ cat > $temp_file << EOF
     "rapid-withdrawal": true
   }
 }
-
 EOF
 
 # $GNMIC --debug --log-file /tmp/debug.log set --update-path /network-instance[name=default]/protocols/bgp --update-file $temp_file
