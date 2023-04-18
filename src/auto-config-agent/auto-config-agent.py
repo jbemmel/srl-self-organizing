@@ -665,6 +665,7 @@ def Configure_EVPN(state,port,interface,ip):
    }
    if is_routed:
        if_base["subinterface"][0]["ipv4"] = {
+         "admin-state": "enable",
          "address": [
            {
              "ip-prefix": ip, # /31 link IP (or .1 out of /24-30)
@@ -714,7 +715,7 @@ def Configure_EVPN(state,port,interface,ip):
           if 'ipv4' in if_base['subinterface'][0]:
             if_base['subinterface'][0]['ipv4']['address'].append( addr )
           else:
-            if_base['subinterface'][0]['ipv4'] = { 'address': [ addr ] }
+            if_base['subinterface'][0]['ipv4'] = { 'address': [ addr ], "admin-state": "enable" }
    else:
        if_base["subinterface"][0]["type"] = "bridged"
 
@@ -1021,8 +1022,17 @@ def Convert_lag_to_mc_lag(state,mac,port,peer_leaf,peer_port_list,gnmi_client):
 def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
    logging.info(f"AddDHCPClient :: mac={mac} peer-id={peer_id} peer_port_list={peer_port_list}")
 
+   # Need to track LAGs and pick lowest router ID + corresponding port
+   # Note: assumes LAGs are connected to different routers
    peer_node = int( peer_id.split(".")[-1] )
-   id = (peer_node-1) * state.max_hosts_per_leaf + (peer_port_list[0]-1) + 10 # XXX hardcoded offset 10
+   if mac in state.dhcp_macs:
+      state.dhcp_macs[mac].update( { peer_node: peer_port_list[0] } )
+   else:
+      state.dhcp_macs[mac] = { peer_node: peer_port_list[0] }
+
+   min_leaf_id = min( state.dhcp_macs[mac].keys() )
+   port = state.dhcp_macs[mac][min_leaf_id]
+   id = (min_leaf_id-1) * state.max_hosts_per_leaf + (port-1) + 10 # XXX hardcoded offset 10
    gw = ipaddress.ip_network(state.gateway['ipv4'],False)
 
    dhcp_server = {
@@ -1048,17 +1058,33 @@ def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
     }
    ]
    }
-   irb_ipv4 = {
-      "admin-state": "enable",
+   lo_ipv4 = {
       "dhcp-server": { "admin-state": "enable" }
    }
-   irb_if = { "interface": [ { "name" : "irb0.0" } ] }
 
    updates = [ ('/system/dhcp-server', dhcp_server),
-               ('/interface[name=irb0]/subinterface[index=0]/ipv4', irb_ipv4),
-               ('/network-instance[name=evpn-lag-discovery]', irb_if)]
+               ('/interface[name=lo0]/subinterface[index=0]/ipv4', lo_ipv4),
+             ]
    gnmi_client.set( encoding='json_ietf', update=updates )
 
+
+#
+# Adds a spine as a DHCP relay server
+#
+def AddDHCPRelay(port,router_id,state):
+    # _lag_id = lag_id( state.leaf_pairs[port] if port in state.leaf_pairs else port )
+    _svc_id = state.svc_id( port )
+    dhcp_relay = {
+          "admin-state": "enable",
+          "gi-address": state.router_id,
+          "network-instance": "evpn-lag-discovery",
+          "server": [
+            router_id
+          ]
+        }
+    updates = [ ('/network-instance[name=evpn-lag-discovery]', { 'type' : 'ip-vrf' } ),
+                (f'/interface[name=irb0]/subinterface[index={_svc_id}]/ipv4/dhcp-relay',dhcp_relay)]
+    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -1147,7 +1173,13 @@ def CreateEVPNCommunicationVRF(state, gnmiclient):
       "index": 0,
       "admin-state": "enable",
       "ipv4": {
-       "admin-state": "enable"
+       "admin-state": "enable",
+       "address": [
+         {
+           "ip-prefix": state.router_id + "/32",
+           "primary": '[null]'  # type 'empty', used as source for bcast
+         }
+       ]
       }
      }
     ]
@@ -1534,6 +1566,9 @@ def configure_peer_link( state, intf_name, lldp_my_port, lldp_peer_port,
       peer_type = 'spine'
       peer_router_id = state.determine_router_id( peer_type, int(spineId.groups()[0]) )
       min_peer_as = max_peer_as = state.base_as + 1 # EBGP spine AS
+
+      if state.dhcp: # Add spine as DHCP relay server
+         AddDHCPRelay( lldp_my_port, peer_router_id, state )
     else:
       # Reuse underlay address space, optionally allocate unique IPs per leaf
       link_index = (lldp_my_port - 1)
@@ -1716,6 +1751,7 @@ class State(object):
         self.evpn = ""
         self.gateway = { 'ipv4': False }
         self.dhcp = True
+        self.dhcp_macs = {}  # Mapping of MAC to dict of router_id : port
 
     def svc_id(self,port):
         """
