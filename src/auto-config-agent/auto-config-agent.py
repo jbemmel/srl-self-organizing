@@ -1039,7 +1039,7 @@ def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
               "mac": mac,
               "ip-address": str(gw[id]) + '/' + str(gw.prefixlen),
               "options": {
-                "router": ipaddress.ip_address(state.gateway['ipv4'])
+                "router": ipaddress.ip_interface(state.gateway['ipv4']).ip
               }
             }
           ]
