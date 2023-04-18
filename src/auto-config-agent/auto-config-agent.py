@@ -1068,6 +1068,10 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
         {
          "afi-safi-name": "evpn",
          "admin-state" : evpn_admin_state
+        },
+        {
+         "afi-safi-name": "ipv4-unicast",
+         "admin-state" : "enable"
         }
        ]
       }

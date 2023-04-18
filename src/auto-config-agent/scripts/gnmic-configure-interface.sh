@@ -99,8 +99,8 @@ cat > $temp_file << EOF
     {
       "index": 0,
       "admin-state": "enable",
-      "ipv4": { "address": [ { "ip-prefix": "$LOOPBACK_IP4" } ] },
-      "ipv6": { "address": [ { "ip-prefix": "$LOOPBACK_IP6" } ] }
+      "ipv4": { "address": [ { "ip-prefix": "$LOOPBACK_IP4" } ], "admin-state": "enable" },
+      "ipv6": { "address": [ { "ip-prefix": "$LOOPBACK_IP6" } ], "admin-state": "enable" }
     }
   ]
 }
@@ -159,7 +159,7 @@ cat > $temp_file << EOF
       "default-action": { "policy-result": "reject" },
       "statement": [
         {
-          "sequence-id": 10,
+          "name": "10",
           "match": {
             "prefix-set": "loopbacks"
           },
@@ -175,7 +175,7 @@ cat > $temp_file << EOF
       "default-action": { "policy-result": "reject" },
       "statement": [
         {
-          "sequence-id": 10,
+          "name": "10",
           "match": {
             "prefix-set": "loopbacks"
           },
@@ -188,7 +188,7 @@ cat > $temp_file << EOF
       "default-action": { "policy-result": "accept" },
       "statement": [
         {
-          "sequence-id": 10,
+          "name": "10",
           "match": {
             "prefix-set": "links"
           },
@@ -294,6 +294,9 @@ IFS='' read -r -d '' EBGP_PEER_GROUP_SUPERSPINES << EOF
   ,{
     "group-name": "ebgp-superspines",
     "admin-state": "enable",
+    "afi-safi": [
+     { "afi-safi-name": "ipv4-unicast", "admin-state": "enable" }
+    ],
     "import-policy": "select-loopbacks",
     "export-policy": "select-loopbacks",
     "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
@@ -326,6 +329,9 @@ IFS='' read -r -d '' EBGP_PEER_GROUP << EOF
 {
   "group-name": "${DYNAMIC_EBGP_GROUP}",
   "admin-state": "enable",
+  "afi-safi": [
+   { "afi-safi-name": "ipv4-unicast", "admin-state": "enable" }
+  ],
   "import-policy": "select-loopbacks",
   "export-policy": "select-loopbacks",
   "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
@@ -353,8 +359,6 @@ IFS='' read -r -d '' EVPN_LEAVES_GROUP << EOF
       "admin-state": "enable",
       "evpn": { "advertise-ipv6-next-hops": ${use_ipv6_nexthops} }
     } ],
-  "ipv4-unicast": { "admin-state": "disable" },
-  "ipv6-unicast": { "admin-state": "disable" },
   "route-reflector": {
     "client": true,
     "cluster-id": "$router_id"
@@ -382,6 +386,7 @@ IFS='' read -r -d '' EVPN_SECTION << EOF
 "afi-safi": [
     {
       "afi-safi-name": "evpn",
+      "admin-state": "enable",
       "evpn": {
        "rapid-update": true,
        "advertise-ipv6-next-hops": ${use_ipv6_nexthops},
@@ -421,7 +426,7 @@ cat > $temp_file << EOF
       "name": "overlay-export-as-to-community",
       "statement": [
         {
-          "sequence-id": 10,
+          "name": "10",
           "match": { "bgp": { "as-path-set": "CUSTOMER1" } },
           "action": { "policy-result": "accept", "bgp": { "communities": { "add": "CUSTOMER1" } } }
         }
@@ -473,26 +478,28 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
       "evpn": { "advertise-ipv6-next-hops": ${use_ipv6_nexthops} }
     } ],
   "transport" : { "local-address" : "${TRANSPORT}" },
-  "timers": { "connect-retry": 10 },
-  "ipv4-unicast": { "admin-state": "disable" },
-  "ipv6-unicast": { "admin-state": "disable" }
+  "timers": { "connect-retry": 10 }
 }
 EOF
 fi
 
 IFS='' read -r -d '' BGP_IP_UNDERLAY << EOF
-"ipv4-unicast": {
-  "multipath": {
-    "max-paths-level-1": 8,
-    "max-paths-level-2": 8
+"afi-safi": [
+  {
+    "afi-safi-name": "ipv4-unicast",
+    "multipath": {
+     "max-paths-level-1": 8,
+     "max-paths-level-2": 8
+    }
+  },
+  {
+    "afi-safi-name": "ipv6-unicast",
+    "multipath": {
+     "max-paths-level-1": 8,
+     "max-paths-level-2": 8
+    }
   }
-},
-"ipv6-unicast": {
-  "multipath": {
-    "max-paths-level-1": 8,
-    "max-paths-level-2": 8
-  }
-},
+]
 EOF
 
 if [[ "$IGP" == "bgp" ]]; then
@@ -505,8 +512,15 @@ IFS='' read -r -d '' SPINES_GROUP << EOF
   "failure-detection": { "enable-bfd" : ${enable_bfd}, "fast-failover" : true },
   "timers": { "connect-retry": 10 },
   "local-as": { "as-number": ${local_as}, "prepend-global-as": false },
-  "ipv4-unicast": { "admin-state": "enable" },
-  "ipv6-unicast": { "admin-state": "enable" }
+  "afi-safi": [
+    {
+      "afi-safi-name": "ipv4-unicast",
+      "admin-state": "enable"
+    },{
+      "afi-safi-name": "ipv6-unicast",
+      "admin-state": "enable"
+    }
+  ]
 }
 EOF
 else
@@ -528,6 +542,7 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
 "afi-safi": [
     {
       "afi-safi-name": "evpn",
+      "admin-state": "enable",
       "evpn": {
        "rapid-update": true,
        "keep-all-routes": true,
@@ -551,7 +566,12 @@ IFS='' read -r -d '' DYNAMIC_NEIGHBORS << EOF
       "group-name": "leaf-ibgp",
       "admin-state": "enable",
       "export-policy": "select-loopbacks",
-      "ipv6-unicast" : { "admin-state" : "enable" },
+      "afi-safi": [
+        {
+          "afi-safi-name": "ipv6-unicast",
+          "admin-state": "enable"
+        }
+      ],
       "peer-as": $PEER_AS_MIN
     }
 ],
@@ -613,8 +633,8 @@ else
 _IP127="2001:1::${IP_PREFIX//\/[23][0-9]/\/64}"
 fi
 IFS='' read -r -d '' _IP_ADDRESSING << EOF
-,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ] },
- "ipv6": { "address": [ { "ip-prefix": "${_IP127//\./:}" } ] }
+,"ipv4": { "address": [ { "ip-prefix": "$IP_PREFIX" } ], "admin-state": "enable" },
+ "ipv6": { "address": [ { "ip-prefix": "${_IP127//\./:}" } ], "admin-state": "enable" }
 EOF
 # else
 # Enable IPv4+IPv6 but don't put addresses (yet)
