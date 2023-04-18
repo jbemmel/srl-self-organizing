@@ -1022,7 +1022,7 @@ def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
    logging.info(f"AddDHCPClient :: mac={mac} peer-id={peer_id} peer_port_list={peer_port_list}")
 
    peer_node = int( peer_id.split(".")[-1] )
-   id = (peer_node-1) * state.max_hosts_per_leaf + (peer_port_list[0]-1)
+   id = (peer_node-1) * state.max_hosts_per_leaf + (peer_port_list[0]-1) + 10 # XXX hardcoded offset 10
    gw = ipaddress.ip_network(state.gateway['ipv4'],False)
 
    dhcp_server = {
@@ -1035,10 +1035,11 @@ def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
         "static-allocation": {
           "host": [
             {
+              "_annotate": f"Leaf {peer_id} port(s) {peer_port_list}",
               "mac": mac,
-              "ip-address": gw[id] + '/' + gw.prefixlen,
+              "ip-address": str(gw[id]) + '/' + str(gw.prefixlen),
               "options": {
-                "router": gw[0]
+                "router": ipaddress.ip_address(state.gateway['ipv4'])
               }
             }
           ]
@@ -1054,8 +1055,8 @@ def AddDHCPClient(mac,peer_id,peer_port_list,state,gnmi_client):
    irb_if = { "interface": [ { "name" : "irb0.0" } ] }
 
    updates = [ ('/system/dhcp-server', dhcp_server),
-               ('/interface[interface-name=irb0]/subinterface[index=0]/ipv4', irb_ipv4),
-               ('/network-instance[instance-name=evpn-lag-discovery]', irb_if)]
+               ('/interface[name=irb0]/subinterface[index=0]/ipv4', irb_ipv4),
+               ('/network-instance[name=evpn-lag-discovery]', irb_if)]
    gnmi_client.set( encoding='json_ietf', update=updates )
 
 
