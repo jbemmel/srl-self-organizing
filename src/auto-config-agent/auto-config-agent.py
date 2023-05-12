@@ -156,7 +156,7 @@ def Add_Discovered_Node(state, leaf_ip, port, lldp_peer_name):
 #
 # Can also have LAGs to spines ( options: routed(default), static LAG, LACP )
 #
-def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
+def Announce_LLDP_using_EVPN(state,chassis_mac,portlist,is_port=False):
     logging.info(f"Announce_LLDP_using_EVPN({state.evpn_auto_lags}) :: {portlist}={chassis_mac}")
     bytes = chassis_mac.split(':')
 
@@ -199,9 +199,9 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist):
                if p!=base_port:
                    enc_port |= (1<<(8+p-base_port))
 
-       encoded_ipv6 = f'fdad::{router_id}:{enc_port:04x}:{":".join(pairs)}/128'
+       encoded_ipv6 = f'fda{ "d" if is_port else "1"  }::{router_id}:{enc_port:04x}:{":".join(pairs)}/128'
        updates = [ (ip_path, { 'address': [ { 'ip-prefix': encoded_ipv6,
-                   "_annotate": f"for EVPN auto-lag discovery on {portlist}" } ],
+                   "_annotate": f"for {'DHCP' if is_port else 'EVPN auto-lag discovery'} on {portlist}" } ],
                    "admin-state" : "enable" } ) ]
 
        state.local_lldp[ chassis_mac ] = (base_port, False) # MAC uses CAPITALS
@@ -351,7 +351,7 @@ class EVPNRouteMonitoringThread(Thread):
                      if other_ports&(1<<bit):
                          peer_ports += [ peer_ports[0] + (bit+1) ]
 
-             if mac in self.state.local_lldp:
+             if mac in self.state.local_lldp and encoded_parts[0]=="fda1": # 0xfda1 prefix for LAG macs (as opposed to DHCP macs)
                  lag_port, provisioned = self.state.local_lldp[ mac ]
                  if not provisioned:
 
@@ -366,8 +366,11 @@ class EVPNRouteMonitoringThread(Thread):
                    # Outside of exception, dont repeat errors
                    self.state.local_lldp[ mac ] = (lag_port,True)
 
-             elif self.state.is_spine() and self.state.dhcp:
+             elif self.state.is_spine() and self.state.dhcp and encoded_parts[0]=="fdad":
                  AddDHCPClient( mac, peer_id, peer_ports, self.state, gnmi_client )
+
+             else:
+                 logging.info( f"Unrecognized encoded prefix: {encoded_parts[0]}" )
 
 ############################################################
 ## Function to populate state of agent config
@@ -1077,7 +1080,8 @@ def AddDHCPRelay(port,router_id,state):
     dhcp_relay = {
           "admin-state": "enable",
           "gi-address": state.router_id,
-          "network-instance": "evpn-lag-discovery",
+          "use-gi-addr-as-src-ip-addr": True,
+          "network-instance": "evpn-lag-discovery", # or default?
           "server": [
             router_id
           ]
@@ -1438,7 +1442,8 @@ def Handle_Notification(obj, state):
 
           def delay_config():
             state.pending_peers[ my_port ] = ( int(my_port_id), int(to_port_id),
-              peer_sys_name, obj.lldp_neighbor.key.chassis_id, desc )
+              peer_sys_name, obj.lldp_neighbor.key.chassis_id,
+              obj.lldp_neighbor.data.port_id if obj.lldp_neighbor.key.chassis_id!=obj.lldp_neighbor.data.port_id else None, desc )
             return False # Unable to continue configuration
 
           # First figure out this node's relative id in its group. May depend on hostname
@@ -1471,10 +1476,12 @@ def Handle_Notification(obj, state):
 
           if router_id_changed:
             for intf in state.pending_peers:
-              _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_desc = state.pending_peers[intf]
+              _my_port_id, _to_port_id, _peer_sys_name, _lldp_id, _lldp_port, _lldp_desc = state.pending_peers[intf]
               _is_lag = configure_peer_link( state, intf, _my_port_id, _to_port_id, _peer_sys_name, _lldp_desc )
               if _is_lag:
                 Announce_LLDP_using_EVPN( state, _lldp_id, [int(_my_port_id)] )
+              if state.dhcp and _lldp_port:
+                Announce_LLDP_using_EVPN( state, _lldp_port, [int(_my_port_id)], True )
 
             if state.get_role()=="leaf":
               Update_EVPN_RR_Neighbors( state, first_time=True )
@@ -1488,6 +1495,9 @@ def Handle_Notification(obj, state):
           # Could also announce communities for spines
           if lag_created: # state.get_role() == "leaf" and hasattr(state,"router_id"):
             Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.key.chassis_id, [int(my_port_id)] )
+            if state.dhcp and obj.lldp_neighbor.key.chassis_id!=obj.lldp_neighbor.data.port_id:
+                # sets flag bit
+                Announce_LLDP_using_EVPN( state, obj.lldp_neighbor.data.port_id, [int(my_port_id)], True )
           else:
             logging.info( f"Not (yet) creating LLDP Community for port {my_port_id} peer={peer_sys_name}" )
 

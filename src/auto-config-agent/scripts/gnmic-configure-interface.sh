@@ -476,7 +476,11 @@ IFS='' read -r -d '' EVPN_PEER_GROUP << EOF
       "afi-safi-name": "evpn",
       "admin-state": "enable",
       "evpn": { "advertise-ipv6-next-hops": ${use_ipv6_nexthops} }
-    } ],
+    },
+    {
+      "afi-safi-name": "ipv4-unicast",
+      "admin-state": "disable"
+    }],
   "transport" : { "local-address" : "${TRANSPORT}" },
   "timers": { "connect-retry": 10 }
 }
