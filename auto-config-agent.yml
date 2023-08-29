@@ -16,7 +16,4 @@ auto_config_agent:
            - "auto-config-agent"
        source-directories:
            - "/opt/demo-agents/auto-config-agent/models/"
-           - "/opt/srlinux/models/srl_nokia/models/common/"
-           - "/opt/srlinux/models/srl_nokia/models/interfaces/"
-           # Pulls in QoS
-           - "/opt/srlinux/models/srl_nokia/models/qos/"
+           - "/opt/srlinux/models/srl_nokia/models/"
