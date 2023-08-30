@@ -4,16 +4,16 @@ vrrp_instance MAIN {
   virtual_router_id 2
   priority 200
   advert_int 1
-  unicast_src_ip 10.0.1.102
+  unicast_src_ip 10.0.0.102
   unicast_peer {
-    10.0.1.103
+    10.0.0.103
   }
   authentication {
     auth_type PASS
     auth_pass pwd1
   }
   virtual_ipaddress {
-    10.0.1.100/24 dev bond0
+    10.0.0.100/24 dev bond0
   }
   track_interface {
     bond0

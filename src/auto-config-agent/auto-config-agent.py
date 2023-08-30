@@ -14,6 +14,7 @@ import json
 import signal
 import subprocess
 import traceback
+import threading
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
@@ -47,16 +48,18 @@ stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
                   username="admin",password="NokiaSrl1!",insecure=True,use_lock=True)
 gnmiConnected = False
+gnmi_global_lock = threading.Lock()
 
 def gnmiConnection( callback ):
-  global gnmi, gnmiConnected
+  global gnmi, gnmiConnected, gnmi_global_lock
   if not gnmiConnected:
       logging.info( "Connecting global gNMI connection..." )
       gnmi.connect()
       gnmiConnected = True
       logging.info( "global gNMI connection CONNECTED(?)" )
-  logging.info( "Returning global gNMI connection..." )
-  callback( gnmi )
+  logging.info( "Returning global gNMI connection, using global lock" )
+  with gnmi_global_lock:
+      callback( gnmi )
 
 # from threading import Lock
 # gnmiLock = Lock() # Results in deadlock from subscription
