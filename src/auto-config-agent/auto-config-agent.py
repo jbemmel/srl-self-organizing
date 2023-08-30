@@ -211,7 +211,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist,is_port=False):
         return False
 
     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
-    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates, delete=deletes ) )
+    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates, delete=deletes ) )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
 from threading import Thread
@@ -632,7 +632,7 @@ def Convert_to_lag(state,port,peer_data):
 
    logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}" )
    try:
-     gnmiConnection( lambda c: c.set( encoding='json_ietf', delete=deletes, update=updates ) )
+     gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', delete=deletes, update=updates ) )
    except Exception as ex:
      # Dont quit agent. Usually means 'overlay' didn't get created
      logging.error( f"Exception in Convert_to_lag gNMI set: {ex} state={state}" )
@@ -861,7 +861,7 @@ def Configure_EVPN(state,port,interface,ip):
 
    logging.info(f"Configure_EVPN gNMI SET updates={updates}" )
    try:
-     gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
+     gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates ) )
    except Exception as ex:
      # Dont quit agent. Usually means 'overlay' didn't get created
      logging.error( f"Exception in Configure_EVPN gNMI set: {ex} state={state}" )
@@ -898,7 +898,7 @@ def Update_EVPN_RR_Neighbors(state,first_time=False):
       updates.append( (_p, _v) )
 
    try:
-       gnmiConnection( lambda c: c.set( encoding='json_ietf', delete=deletes, update=updates ) )
+       gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', delete=deletes, update=updates ) )
    except Exception as ex:
        # Dont quit agent. Usually means 'overlay' didn't get created
        logging.error( f"Exception in Update_EVPN_RR_Neighbors gNMI set: {ex} state={state}" )
@@ -1088,7 +1088,7 @@ def AddDHCPRelay(port,router_id,state):
         }
     updates = [ ('/network-instance[name=evpn-lag-discovery]', { 'type' : 'ip-vrf' } ),
                 (f'/interface[name=irb0]/subinterface[index={_svc_id}]/ipv4/dhcp-relay',dhcp_relay)]
-    gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
+    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates ) )
 
 ###
 # Configures the default network instance to use BGP unnumbered between
@@ -1161,7 +1161,7 @@ def Configure_BGP_unnumbered(state,port,min_peer_as,max_peer_as,peer_router_id,l
               ]
 
    logging.info(f"gNMI SET updates={updates}" )
-   gnmiConnection( lambda c: c.set( encoding='json_ietf', update=updates ) )
+   gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates ) )
 
 #
 # Creates a special IP-VRF to announce a loopback RT5 route with extended
@@ -1972,7 +1972,7 @@ class State(object):
             s['created'] = svc
         if updates!=[]:
             logging.info( f"About to create: {updates}" )
-            gnmiConnection( lambda c : c.set( encoding='json_ietf', update=updates ) )
+            gnmiConnection( lambda c : c.set_with_retry( encoding='json_ietf', update=updates ) )
 
 
 ##################################################################################################
