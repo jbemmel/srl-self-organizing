@@ -1,4 +1,4 @@
-set /system gnmi-server unix-socket admin-state enable
+set /system gnmi-server unix-socket admin-state enable use-authentication false
 set /system gnmi-server rate-limit 65000
 set /auto-config-agent gateway ipv4 10.0.{port}.1/24
 set /auto-config-agent lacp active # reload-delay-secs 0

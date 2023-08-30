@@ -1,6 +1,6 @@
 vrrp_instance MAIN {
   state MASTER
-  interface eth1
+  interface bond0
   virtual_router_id 2
   priority 200
   advert_int 1
@@ -13,9 +13,9 @@ vrrp_instance MAIN {
     auth_pass pwd1
   }
   virtual_ipaddress {
-    10.0.1.100/24 dev eth1
+    10.0.1.100/24 dev bond0
   }
   track_interface {
-    eth1
+    bond0
   }
 }

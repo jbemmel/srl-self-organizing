@@ -33,11 +33,11 @@ topology:
     spine1:
       kind: srl
       group: spines
-      #type: ixr6
+      type: ixrd3
     spine2:
       kind: srl
       group: spines
-      #type: ixr6
+      type: ixrd3
 
     client:
       kind: linux

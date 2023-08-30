@@ -16,5 +16,8 @@ ifup -a
 # Run LLDP daemon, this runs in background by default
 /usr/sbin/lldpd
 
+# Run keepalived if config file exists
+[ -f /etc/keepalived/keepalived.conf ] && keepalived --vrrp
+
 # Run shell
 /bin/sh
