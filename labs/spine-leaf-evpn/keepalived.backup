@@ -1,0 +1,21 @@
+vrrp_instance MAIN {
+  state BACKUP
+  interface eth1
+  virtual_router_id 2
+  priority 100
+  advert_int 1
+  unicast_src_ip 10.0.1.103
+  unicast_peer {
+    10.0.1.102
+  }
+  authentication {
+    auth_type PASS
+    auth_pass pwd1
+  }
+  virtual_ipaddress {
+    10.0.1.100/24 dev eth1
+  }
+  track_interface {
+    eth1
+  }
+}

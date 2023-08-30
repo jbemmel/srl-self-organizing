@@ -18,7 +18,7 @@ topology:
         srl-agents: [ ../../auto-config-agent.yml ]
     linux:
       # image: ghcr.io/hellt/network-multitool
-      image: alpine-with-lldp:latest # Custom built image with lldpad
+      image: alpine-with-lldp:latest # Custom built image with lldpad and keepalived
   nodes:
     leaf1:
       kind: srl
@@ -39,24 +39,26 @@ topology:
       group: spines
       #type: ixr6
 
-    client1:
+    client:
       kind: linux
       group: hosts
       binds:
       - /lib/modules:/lib/modules:ro # for bonding module
       - interfaces.client1:/etc/network/interfaces
-    client2:
+    vrrp1:
       kind: linux
-      group: hosts
+      group: vrrp
       binds:
       - /lib/modules:/lib/modules:ro
       - interfaces.client2:/etc/network/interfaces
-    client3:
+      - keepalived.master:/etc/keepalived/keepalived.conf
+    vrrp2:
       kind: linux
-      group: hosts
+      group: vrrp
       binds:
       - /lib/modules:/lib/modules:ro
       - interfaces.client3:/etc/network/interfaces
+      - keepalived.backup:/etc/keepalived/keepalived.conf
 
   links:
     - endpoints: ["leaf1:e1-49", "spine1:e1-1"]
@@ -65,11 +67,11 @@ topology:
     - endpoints: ["leaf2:e1-50", "spine2:e1-2"]
 
     # LAG to pair of leaves
-    - endpoints: ["client1:eth1", "leaf1:e1-1"]
-    - endpoints: ["client1:eth2", "leaf2:e1-1"]
+    - endpoints: ["client:eth1", "leaf1:e1-1"]
+    - endpoints: ["client:eth2", "leaf2:e1-1"]
 
-    - endpoints: ["client2:eth1", "leaf2:e1-2"]
+    - endpoints: ["vrrp1:eth1", "leaf1:e1-2"]
     # - endpoints: ["client2:eth2", "leaf4:e1-3"]
 
-    - endpoints: ["client3:eth1", "leaf2:e1-3"]
+    - endpoints: ["vrrp2:eth1", "leaf2:e1-3"]
     # - endpoints: ["client3:eth2", "leaf4:e1-4"]
