@@ -107,7 +107,6 @@ cat > $temp_file << EOF
 EOF
 
 # Cannot do 'replace' here, other subinterfaces used
-# sleep 20 # Test: delay to let existing session finish?
 $GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
 
