@@ -79,17 +79,19 @@ class gNMIThread(threading.Thread):
               logging.info( "CONNECTING new global gNMI connection" )
               self.gnmi.connect()
               self.is_connected = True
-           
+
            # while True: # don't retry
            try:
              c = c + 1
              logging.info( f"GNMI callback {c}" )
              callback( self.gnmi )
            except Exception as e:
-             logging.error( f"GNMI exception: {e}" )
+             logging.error( f"GNMI callback exception: {e}" )
              # time.sleep( 2 )
 
            self.queue.task_done()
+      except Exception as e:
+         logging.error( f"Exception in gnmi loop: {e}" )
       finally:
          logging.info( "global gNMI thread exiting" )
 
@@ -262,7 +264,7 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist,is_port=False):
 # Upon changes in EVPN route counts, check for updated LAG communities
 class EVPNRouteMonitoringThread(threading.Thread):
    def __init__(self,state):
-       threading.Thread.__init__(self)
+       threading.Thread.__init__(self,name="RouteMonitor")
        self.state = state
 
    def run(self):
@@ -292,6 +294,7 @@ class EVPNRouteMonitoringThread(threading.Thread):
     gnmiConnection( lambda c: CreateEVPNCommunicationVRF( self.state, c ), note="Create EVPN VRF" )
 
     # Don't use gnmi thread loop here (!)
+    logging.info( "Starting GNMI subscription for route updates" )
     telemetry_stream = gnmiThread.gnmi.subscribe(subscribe=subscribe)
     try:
      for m in telemetry_stream:

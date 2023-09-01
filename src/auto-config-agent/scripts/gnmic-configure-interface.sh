@@ -63,7 +63,7 @@ IFS='' read -r -d '' DYNAMIC_HOST_PEERING << EOF
 EOF
 
 # Can add --debug
-GNMIC='/usr/bin/sudo /usr/local/bin/gnmic -a unix:///opt/srlinux/var/run/sr_gnmi_server -u admin --insecure --log-file /tmp/gnmic.log -e json_ietf'
+GNMIC='/usr/bin/sudo /usr/local/bin/gnmic -a unix:///opt/srlinux/var/run/sr_gnmi_server -u admin --insecure --log --log-file /tmp/gnmic.log -e json_ietf'
 
 temp_file=$(mktemp --suffix=.json)
 exitcode=0
@@ -107,6 +107,7 @@ cat > $temp_file << EOF
 EOF
 
 # Cannot do 'replace' here, other subinterfaces used
+# sleep 20 # Test: delay to let existing session finish?
 $GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
 
