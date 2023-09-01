@@ -50,7 +50,7 @@ class gNMIThread(threading.Thread):
    Separate thread to handle all gNMI communication, to avoid multi-threading issues
    """
    def __init__(self):
-       threading.Thread.__init__(self)
+       threading.Thread.__init__(self,name="gnmiThread")
        self.queue = queue.Queue()
        self.__reconnect__()
 
@@ -62,31 +62,46 @@ class gNMIThread(threading.Thread):
 
    def run(self):
       try:
+        c = 0
         while True:
-           callback, is_external = self.queue.get() # block, no timeout
-           if is_external and self.is_connected:
-              logging.info( "CLOSING global gNMI connection" )
-              self.gnmi.close()
-              self.is_connected = False
-              self.gnmi = None
-           elif not is_external and not self.is_connected:
+           callback, is_external, note = self.queue.get() # block, no timeout
+           logging.info( f"Got next callback external={is_external} note={note}" )
+           #
+           # Dont close connection - it's used for a subscription
+           #
+           # if is_external and self.is_connected:
+           #    logging.info( "CLOSING global gNMI connection, waiting 5s" )
+           #    self.gnmi.close()
+           #    time.sleep( 5 ) # Give some time to complete ongoing transactions
+           #    self.is_connected = False
+           #    self.gnmi = None
+           if not is_external and not self.is_connected:
               logging.info( "CONNECTING new global gNMI connection" )
               self.gnmi.connect()
               self.is_connected = True
-           callback( self.gnmi )
+           
+           # while True: # don't retry
+           try:
+             c = c + 1
+             logging.info( f"GNMI callback {c}" )
+             callback( self.gnmi )
+           except Exception as e:
+             logging.error( f"GNMI exception: {e}" )
+             # time.sleep( 2 )
+
            self.queue.task_done()
       finally:
          logging.info( "global gNMI thread exiting" )
 
-   def add_callback(self,callback,is_external=False):
-      self.queue.put( (callback,is_external) )
+   def add_callback(self,callback,is_external=False,note="?"):
+      self.queue.put( (callback,is_external,note) )
 
 gnmiThread = gNMIThread()
 gnmiThread.start()
 
-def gnmiConnection( callback ):
+def gnmiConnection( callback, note="?" ):
   global gnmiThread
-  gnmiThread.add_callback( callback )
+  gnmiThread.add_callback( callback, note=note )
 
 # from threading import Lock
 # gnmiLock = Lock() # Results in deadlock from subscription
@@ -241,7 +256,8 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist,is_port=False):
         return False
 
     logging.info( f"EVPN auto-lags: update={updates} delete={deletes}" )
-    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates, delete=deletes ) )
+    gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates, 
+                                                delete=deletes ), note="Announce_LLDP_using_EVPN" )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
 class EVPNRouteMonitoringThread(threading.Thread):
@@ -272,34 +288,31 @@ class EVPNRouteMonitoringThread(threading.Thread):
       'mode': 'stream',
       'encoding': 'json'
     }
-    #with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-    #                      username="admin",password="admin",
-    #                      insecure=True, debug=False) as c:
-    def with_gnmi_connection(gnmi_client):
-      CreateEVPNCommunicationVRF( self.state, gnmi_client )
-      telemetry_stream = gnmi_client.subscribe(subscribe=subscribe)
-      try:
-       for m in telemetry_stream:
-         if m.HasField('update'): # both update and delete events
-            # Filter out only toplevel events
-            parsed = telemetryParser(m)
-            logging.info(f"EVPNRouteMonitoringThread gNMI change event :: {parsed}")
-            update = parsed['update']
-            if update['update']:
-                logging.info( f"EVPNRouteMonitoringThread: {update['update']}")
-                # Assume routes changed, get attributes.
-                if self.state.evpn_auto_lags == "large_communities":
-                    self.checkCommunities(gnmi_client)
-                elif self.state.evpn_auto_lags == "encoded_ipv6":
-                    # TODO process ipv6 route prefix update directly
-                    self.checkIPv6Routes(gnmi_client)
-                else:
-                    logging.error( f"Unexpected value: {self.state.evpn_auto_lags}" )
-      except Exception as ex:
-       logging.error(ex)
-      logging.info("Leaving gNMI subscribe loop - closing gNMI connection")
 
-    gnmiConnection( with_gnmi_connection )
+    gnmiConnection( lambda c: CreateEVPNCommunicationVRF( self.state, c ), note="Create EVPN VRF" )
+
+    # Don't use gnmi thread loop here (!)
+    telemetry_stream = gnmiThread.gnmi.subscribe(subscribe=subscribe)
+    try:
+     for m in telemetry_stream:
+       if m.HasField('update'): # both update and delete events
+          # Filter out only toplevel events
+          parsed = telemetryParser(m)
+          logging.info(f"EVPNRouteMonitoringThread gNMI change event :: {parsed}")
+          update = parsed['update']
+          if update['update']:
+              logging.info( f"EVPNRouteMonitoringThread: {update['update']}")
+              # Assume routes changed, get attributes.
+              if self.state.evpn_auto_lags == "large_communities":
+                  gnmiConnection( lambda c: self.checkCommunities(c) )
+              elif self.state.evpn_auto_lags == "encoded_ipv6":
+                  # TODO process ipv6 route prefix update directly
+                  gnmiConnection( lambda c: self.checkIPv6Routes(c) )
+              else:
+                  logging.error( f"Unexpected value: {self.state.evpn_auto_lags}" )
+    except Exception as ex:
+     logging.error(ex)
+    logging.info("Leaving gNMI subscribe loop - closing gNMI connection")
 
    def checkCommunities(self,gnmi_client):
      """
