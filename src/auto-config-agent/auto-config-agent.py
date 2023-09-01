@@ -15,6 +15,7 @@ import signal
 import subprocess
 import traceback
 import threading
+import queue
 
 import sdk_service_pb2
 import sdk_service_pb2_grpc
@@ -44,22 +45,48 @@ channel = grpc.insecure_channel('127.0.0.1:50053')
 metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
-# Requires Unix socket to be enabled in config
-gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                  username="admin",password="NokiaSrl1!",insecure=True,use_lock=True)
-gnmiConnected = False
-gnmi_global_lock = threading.Lock()
+class gNMIThread(threading.Thread):
+   """
+   Separate thread to handle all gNMI communication, to avoid multi-threading issues
+   """
+   def __init__(self):
+       threading.Thread.__init__(self)
+       self.queue = queue.Queue()
+       self.__reconnect__()
+
+   def __reconnect__(self):
+       # Requires Unix socket to be enabled in config
+       self.gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="NokiaSrl1!",insecure=True,use_lock=True)
+       self.is_connected = False
+
+   def run(self):
+      try:
+        while True:
+           callback, is_external = self.queue.get() # block, no timeout
+           if is_external and self.is_connected:
+              logging.info( "CLOSING global gNMI connection" )
+              self.gnmi.close()
+              self.is_connected = False
+              self.gnmi = None
+           elif not is_external and not self.is_connected:
+              logging.info( "CONNECTING new global gNMI connection" )
+              self.gnmi.connect()
+              self.is_connected = True
+           callback( self.gnmi )
+           self.queue.task_done()
+      finally:
+         logging.info( "global gNMI thread exiting" )
+
+   def add_callback(self,callback,is_external=False):
+      self.queue.put( (callback,is_external) )
+
+gnmiThread = gNMIThread()
+gnmiThread.start()
 
 def gnmiConnection( callback ):
-  global gnmi, gnmiConnected, gnmi_global_lock
-  if not gnmiConnected:
-      logging.info( "Connecting global gNMI connection..." )
-      gnmi.connect()
-      gnmiConnected = True
-      logging.info( "global gNMI connection CONNECTED(?)" )
-  logging.info( "Returning global gNMI connection, using global lock" )
-  with gnmi_global_lock:
-      callback( gnmi )
+  global gnmiThread
+  gnmiThread.add_callback( callback )
 
 # from threading import Lock
 # gnmiLock = Lock() # Results in deadlock from subscription
@@ -217,10 +244,9 @@ def Announce_LLDP_using_EVPN(state,chassis_mac,portlist,is_port=False):
     gnmiConnection( lambda c: c.set_with_retry( encoding='json_ietf', update=updates, delete=deletes ) )
 
 # Upon changes in EVPN route counts, check for updated LAG communities
-from threading import Thread
-class EVPNRouteMonitoringThread(Thread):
+class EVPNRouteMonitoringThread(threading.Thread):
    def __init__(self,state):
-       Thread.__init__(self)
+       threading.Thread.__init__(self)
        self.state = state
 
    def run(self):
@@ -1713,7 +1739,6 @@ def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,pee
     try:
        my_env = { a: str(v) for a,v in state.__dict__.items() if type(v) in [str,int,bool] } # **kwargs
        my_env['PATH'] = '/usr/bin/'
-       logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
        script_proc = subprocess.Popen(['scripts/gnmic-configure-interface.sh',
                                        state.get_role(),name,ip,peer,peer_ip,first_run,
                                        str(peer_as_min),str(peer_as_max),peer_links,
@@ -1721,8 +1746,17 @@ def script_update_interface(state,name,ip,peer,peer_ip,first_run,peer_as_min,pee
                                        state.evpn, state.overlay_bgp_admin_state],
                                        env=my_env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-       stdoutput, stderroutput = script_proc.communicate()
-       logging.info(f'script_update_interface result: {stdoutput} \nerr={stderroutput}')
+       
+       def callback(gnmi):
+         try:
+           logging.info(f'Calling gnmic-configure-interface.sh env={my_env}')
+           stdoutput, stderroutput = script_proc.communicate()
+           logging.info(f'script_update_interface result: {stdoutput} \nerr={stderroutput}')
+         except Exception as e:
+           logging.error(f"Error in script update callback: {e}")
+      
+       global gnmiThread
+       gnmiThread.add_callback( callback, is_external=True )
     except Exception as e:
        logging.error(f'Exception caught in script_update_interface :: {e}')
 
