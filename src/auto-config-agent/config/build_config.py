@@ -1,4 +1,4 @@
-def routing_policy(is_leaf,link_prefix):
+def routing_policy(is_leaf, link_prefix):
     NO_ADVERTISE = {"bgp": {"communities": {"add": "no-advertise"}}} if is_leaf else {}
 
     return {
@@ -12,9 +12,7 @@ def routing_policy(is_leaf,link_prefix):
             },
             {
                 "name": "links",
-                "prefix": [
-                    {"ip-prefix": link_prefix, "mask-length-range": "28..31"}
-                ],
+                "prefix": [{"ip-prefix": link_prefix, "mask-length-range": "28..31"}],
             },
         ],
         "community-set": [{"name": "no-advertise", "member": ["no-advertise"]}],
@@ -129,7 +127,7 @@ def ebgp(
         "autonomous-system": evpn_overlay_as,
         "_annotate_autonomous-system": "this is the overlay AS, (also) used for auto-derived RT",
         "router-id": router_id,
-        "_annotate_router-id": router_id.split('.')[3],
+        "_annotate_router-id": router_id.split(".")[3],
         "route-advertisement": {"rapid-withdrawal": True},
         "group": [
             {
@@ -146,4 +144,41 @@ def ebgp(
                 ],
             }
         ],
+    }
+
+
+def interface(ip_prefix, peer_type, role):
+    def ipv6():
+        if peer_type != "host":
+            ip = ip_prefix.replace("/31", "/127")
+        else:
+            ip = ip_prefix.replace("/[23][0-9]", "/64")
+        return ip.replace(".", ":")
+
+    IP_ADDRESSING = (
+        {
+            "ipv4": {"address": [{"ip-prefix": ip_prefix}], "admin-state": "enable"},
+            "ipv6": {"address": [{"ip-prefix": ipv6()}], "admin-state": "enable"},
+        }
+        if ip_prefix
+        else {}
+    )
+
+    ROUTED = {"type": "routed"} if peer_type != "host" and role != "endpoint" else {}
+
+    return {
+        "description": "auto-config to $PEER",
+        "admin-state": "enable",
+        "subinterface": [
+            {"index": 0, **ROUTED, "admin-state": "enable", **IP_ADDRESSING}
+        ],
+    }
+
+
+def bfd():
+    return {
+        "admin-state": "enable",
+        "desired-minimum-transmit-interval": 250000,
+        "required-minimum-receive": 250000,
+        "detection-multiplier": 3,
     }

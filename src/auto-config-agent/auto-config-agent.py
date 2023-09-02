@@ -48,6 +48,7 @@ channel = grpc.insecure_channel("127.0.0.1:50053")
 metadata = [("agent_name", agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
+
 class gNMIThread(threading.Thread):
     """
     Separate thread to handle all gNMI communication, to avoid multi-threading issues
@@ -2276,18 +2277,16 @@ def script_update_interface(
                 ]
 
                 if state.enable_bfd:
-                    bfd = {
-                        "admin-state": "enable",
-                        "desired-minimum-transmit-interval": 250000,
-                        "required-minimum-receive": 250000,
-                        "detection-multiplier": 3,
-                    }
-                    replaces += [("/bfd/subinterface[id=system0.0]", bfd)]
+                    replaces += [
+                        ("/bfd/subinterface[id=system0.0]", build_config.bfd())
+                    ]
 
                 updates += [
                     (
                         "/routing-policy",
-                        build_config.routing_policy(state.role == "leaf",link_prefix=peer_links),
+                        build_config.routing_policy(
+                            state.role == "leaf", link_prefix=peer_links
+                        ),
                     )
                 ]
 
@@ -2305,7 +2304,7 @@ def script_update_interface(
                             build_config.isis(state.router_id),
                         )
                     ]
-                elif "bgp" in state.igp: # "bgp" or "bgp-unnumbered"
+                elif "bgp" in state.igp:  # "bgp" or "bgp-unnumbered"
                     updates += [
                         (
                             "/network-instance[name=default]/protocols/bgp",
@@ -2318,7 +2317,29 @@ def script_update_interface(
                         )
                     ]
 
-            return gnmi.set_with_retry(encoding="json_ietf", update=updates, replace=replaces)
+            # Interface config
+            replaces += [
+                (
+                    f"/interface[name={name}]",
+                    build_config.interface(ip, peer_type, state.get_role()),
+                )
+            ]
+            if state.role() != "leaf" or peer_type != "host":
+                # Other cases handled elsewhere, TODO l2-only leaves
+                updates += [
+                    (f"/network-instance[name=default]/interface[name={name}.0]", {}),
+                ]
+
+                # TODO add to OSPF/ISIS/BGP
+
+                if state.enable_bfd:
+                    replaces += [
+                        (f"/bfd/subinterface[id={name}.0]", build_config.bfd())
+                    ]
+
+            return gnmi.set_with_retry(
+                encoding="json_ietf", update=updates, replace=replaces
+            )
 
         global gnmiThread
         gnmiThread.add_callback(python_callback, is_external=False)
