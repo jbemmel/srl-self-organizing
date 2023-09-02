@@ -17,7 +17,6 @@ function main()
 {
     trap _term SIGTERM
     local virtual_env="/opt/srlinux/python/virtual-env/bin/activate"
-    local main_module="/opt/demo-agents/auto-config-agent/auto-config-agent.py"
 
     # source the virtual-environment, which is used to ensure the correct python packages are installed,
     # and the correct python version is used
@@ -29,12 +28,13 @@ function main()
     NDK="/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
     # since 21.6
     SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
-    export PYTHONPATH="$P1:$P2:$NDK:$SDK2:$PYTHONPATH"
+    APP="/opt/demo-agents/auto-config-agent"
+    export PYTHONPATH="$P1:$P2:$NDK:$SDK2:$APP:$PYTHONPATH"
 
     export http_proxy=""
     export https_proxy=""
     export no_proxy=""
-    python3 ${main_module} &
+    python3 /opt/demo-agents/auto-config-agent/auto-config-agent.py &
 
     child=$!
     wait "$child"

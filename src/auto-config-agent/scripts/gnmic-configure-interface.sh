@@ -109,6 +109,7 @@ EOF
 # Cannot do 'replace' here, other subinterfaces used
 $GNMIC set --update-path /interface[name=${LOOPBACK_IF}0] --update-file $temp_file
 exitcode+=$?
+echo "After configure system loopback: $exitcode"
 
 # Enable BFD for loopback
 if [[ "$enable_bfd" == "true" ]]; then
@@ -122,10 +123,12 @@ cat > $temp_file << EOF
 EOF
 $GNMIC set --replace-path /bfd/subinterface[id=${LOOPBACK_IF}0.0] --replace-file $temp_file
 exitcode+=$?
+echo "After enable BFD on system loopback: $exitcode"
 fi
 
 $GNMIC set --update /network-instance[name=default]/interface[name=${LOOPBACK_IF}0.0]:::json:::'{}'
 exitcode+=$?
+echo "After add system loopback to default NI: $exitcode"
 
 # Need a generic BGP policy to advertise loopbacks; apply specifically
 cat > $temp_file << EOF
@@ -207,6 +210,7 @@ EOF
 # Or replace to reset all to a known state?
 $GNMIC set --update-path /routing-policy --update-file $temp_file
 exitcode+=$?
+echo "After update route-policy : $exitcode"
 
 # Use ipv6 link local addresses to advertise ipv4 VXLAN system ifs via OSPFv3
 # Still requires static (link local) IPv4 addresses on each interface

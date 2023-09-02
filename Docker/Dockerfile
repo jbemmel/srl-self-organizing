@@ -27,7 +27,8 @@ COPY ./src /opt/demo-agents/
 # COPY ./srl-demo-agent/demo_* /home/appmgr/
 
 # run pylint to catch any obvious errors
-RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/auto-config-agent
+RUN PYTHONPATH=$AGENT_PYTHONPATH:/opt/demo-agents/auto-config-agent \
+    pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/auto-config-agent
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_AUTO_CONFIG_RELEASE="[custom build]"
