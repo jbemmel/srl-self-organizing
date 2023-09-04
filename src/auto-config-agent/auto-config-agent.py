@@ -89,7 +89,7 @@ class gNMIThread(threading.Thread):
                     result = callback(self.get_gnmi())
                     logging.info(f"GNMI callback {c} -> {result}")
                 except Exception as e:
-                    logging.error(f"GNMI callback exception: {e}")
+                    logging.exception(f"GNMI callback exception: {e}")
                     # time.sleep( 2 )
 
                 self.queue.task_done()
@@ -2250,7 +2250,8 @@ def script_update_interface(
 
         # Test: replace external script with Python logic
         def python_callback(gnmi):
-            updates = replaces = []
+            updates = []
+            replaces = []
             if first_run:
                 LOOPBACK_IP4 = f"{state.router_id}/32"
                 LOOPBACK_IP6 = f"2001::{state.router_id.replace('.',':')}/128"
@@ -2317,6 +2318,19 @@ def script_update_interface(
                         )
                     ]
 
+                # Add EVPN overlay, todo only if enabled and different for spines as R-R
+                updates += [
+                    (
+                        "/network-instance[name=default]/protocols/bgp/group[group-name=evpn-rr]",
+                        build_config.bgp_evpn(
+                            state.router_id,
+                            state.evpn_overlay_as,
+                            state.evpn_bgp_peering,
+                            state.use_ipv6_nexthops,
+                        ),
+                    )
+                ]
+
             # Interface config
             replaces += [
                 (
@@ -2324,7 +2338,7 @@ def script_update_interface(
                     build_config.interface(ip, peer_type, state.get_role()),
                 )
             ]
-            if state.role() != "leaf" or peer_type != "host":
+            if state.role != "leaf" or peer_type != "host":
                 # Other cases handled elsewhere, TODO l2-only leaves
                 updates += [
                     (f"/network-instance[name=default]/interface[name={name}.0]", {}),
@@ -2337,6 +2351,7 @@ def script_update_interface(
                         (f"/bfd/subinterface[id={name}.0]", build_config.bfd())
                     ]
 
+            logging.info( f"gnmi.set_with_retry update={updates} replace={replaces}" )
             return gnmi.set_with_retry(
                 encoding="json_ietf", update=updates, replace=replaces
             )

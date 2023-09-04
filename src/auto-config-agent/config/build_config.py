@@ -182,3 +182,29 @@ def bfd():
         "required-minimum-receive": 250000,
         "detection-multiplier": 3,
     }
+
+
+def bgp_evpn(router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
+    TRANSPORT = (
+        router_id
+        if evpn_bgp_peering == "ipv4"
+        else f"2001::{router_id.replace('.',':')}"
+    )
+    return {
+        "group-name": "evpn-rr",
+        "admin-state": "enable",
+        "import-policy": "accept-all",
+        "export-policy": "reject-link-routes",  # Reject overlay link routes
+        "peer-as": evpn_overlay_as,
+        "local-as": {"as-number": evpn_overlay_as},
+        "afi-safi": [
+            {
+                "afi-safi-name": "evpn",
+                "admin-state": "enable",
+                "evpn": {"advertise-ipv6-next-hops": use_ipv6_nexthops},
+            },
+            {"afi-safi-name": "ipv4-unicast", "admin-state": "disable"},
+        ],
+        "transport": {"local-address": TRANSPORT},
+        "timers": {"connect-retry": 10},
+    }
