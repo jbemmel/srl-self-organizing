@@ -2215,38 +2215,38 @@ def script_update_interface(
             a: str(v) for a, v in state.__dict__.items() if type(v) in [str, int, bool]
         }  # **kwargs
         my_env["PATH"] = "/usr/bin/"
-        script_proc = subprocess.Popen(
-            [
-                "scripts/gnmic-configure-interface.sh",
-                state.get_role(),
-                name,
-                ip,
-                peer,
-                peer_ip,
-                first_run,
-                str(peer_as_min),
-                str(peer_as_max),
-                peer_links,
-                peer_type,
-                peer_rid,
-                state.igp,
-                state.evpn,
-                state.overlay_bgp_admin_state,
-            ],
-            env=my_env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        # script_proc = subprocess.Popen(
+        #     [
+        #         "scripts/gnmic-configure-interface.sh",
+        #         state.get_role(),
+        #         name,
+        #         ip,
+        #         peer,
+        #         peer_ip,
+        #         first_run,
+        #         str(peer_as_min),
+        #         str(peer_as_max),
+        #         peer_links,
+        #         peer_type,
+        #         peer_rid,
+        #         state.igp,
+        #         state.evpn,
+        #         state.overlay_bgp_admin_state,
+        #     ],
+        #     env=my_env,
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
 
-        def callback(gnmi):
-            try:
-                logging.info(f"Calling gnmic-configure-interface.sh env={my_env}")
-                stdoutput, stderroutput = script_proc.communicate()
-                logging.info(
-                    f"script_update_interface result: {stdoutput} \nerr={stderroutput}"
-                )
-            except Exception as e:
-                logging.error(f"Error in script update callback: {e}")
+        # def callback(gnmi):
+        #     try:
+        #         logging.info(f"Calling gnmic-configure-interface.sh env={my_env}")
+        #         stdoutput, stderroutput = script_proc.communicate()
+        #         logging.info(
+        #             f"script_update_interface result: {stdoutput} \nerr={stderroutput}"
+        #         )
+        #     except Exception as e:
+        #         logging.error(f"Error in script update callback: {e}")
 
         # Test: replace external script with Python logic
         def python_callback(gnmi):
@@ -2319,17 +2319,34 @@ def script_update_interface(
                     ]
 
                 # Add EVPN overlay, todo only if enabled and different for spines as R-R
-                updates += [
-                    (
-                        "/network-instance[name=default]/protocols/bgp/group[group-name=evpn-rr]",
-                        build_config.bgp_evpn(
-                            state.router_id,
-                            state.evpn_overlay_as,
-                            state.evpn_bgp_peering,
-                            state.use_ipv6_nexthops,
-                        ),
-                    )
-                ]
+                if state.evpn != "disabled":
+                    if state.role == "leaf":
+                        updates += [
+                            (
+                                "/network-instance[name=default]/protocols/bgp/group[group-name=evpn-rr]",
+                                build_config.bgp_evpn(
+                                    state.router_id,
+                                    state.evpn_overlay_as,
+                                    state.evpn_bgp_peering,
+                                    state.use_ipv6_nexthops,
+                                ),
+                            )
+                        ]
+                    elif state.evpn_rr == state.role or (
+                        state.evpn_rr == "auto_top_nodes"
+                        and (state.is_spine() and state.max_level == 1)
+                    ):
+                        updates += [
+                            (
+                                "/network-instance[name=default]/protocols/bgp",
+                                build_config.bgp_evpn_rr_clients(
+                                    state.router_id,
+                                    state.evpn_overlay_as,
+                                    state.evpn_bgp_peering,
+                                    state.use_ipv6_nexthops,
+                                ),
+                            )
+                        ]
 
             # Interface config
             replaces += [
@@ -2344,14 +2361,35 @@ def script_update_interface(
                     (f"/network-instance[name=default]/interface[name={name}.0]", {}),
                 ]
 
-                # TODO add to OSPF/ISIS/BGP
+                # add to OSPF/ISIS/BGP
+                if state.igp == "ospf":
+                    replaces += [
+                        (
+                            f"/network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name={name}.0]",
+                            build_config.ospf_intf(state.enable_bfd),
+                        )
+                    ]
+                elif state.igp == "isis":
+                    replaces += [
+                        (
+                            f"/network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name={name}.0]",
+                            build_config.isis_intf(state.enable_bfd),
+                        )
+                    ]
+                elif state.igp == "bgp" and peer_ip != "*":
+                    replaces += [
+                        (
+                            f"/network-instance[name=default]/protocols/bgp/neighbor[peer-address={peer_ip}]",
+                            build_config.ebgp_intf(peer_as_min, peer),
+                        )
+                    ]
 
                 if state.enable_bfd:
                     replaces += [
                         (f"/bfd/subinterface[id={name}.0]", build_config.bfd())
                     ]
 
-            logging.info( f"gnmi.set_with_retry update={updates} replace={replaces}" )
+            logging.info(f"gnmi.set_with_retry update={updates} replace={replaces}")
             return gnmi.set_with_retry(
                 encoding="json_ietf", update=updates, replace=replaces
             )

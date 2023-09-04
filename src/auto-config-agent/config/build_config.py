@@ -208,3 +208,77 @@ def bgp_evpn(router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
         "transport": {"local-address": TRANSPORT},
         "timers": {"connect-retry": 10},
     }
+
+
+# Could merge with bgp_evpn
+def bgp_evpn_rr_clients(
+    router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops
+):
+    ip = router_id.split(".")
+    NBR_PREFIX = (
+        f"{ip[0]}.{ip[1]}.0.0/16" if evpn_bgp_peering == "ipv4" else "2001::/16"
+    )
+    TRANSPORT = (
+        router_id
+        if evpn_bgp_peering == "ipv4"
+        else f"2001::{router_id.replace('.',':')}"
+    )
+    return {
+        "dynamic-neighbors": {
+            "accept": {
+                "match": [
+                    {
+                        "prefix": NBR_PREFIX,
+                        "peer-group": "evpn-rr-clients",
+                        "allowed-peer-as": [evpn_overlay_as],
+                    }
+                ]
+            }
+        },
+        "group": [
+            {
+                "group-name": "evpn-rr-clients",
+                "admin-state": "enable",
+                "import-policy": "accept-all",
+                "export-policy": "accept-all",
+                "peer-as": evpn_overlay_as,
+                "local-as": {"as-number": evpn_overlay_as},
+                "afi-safi": [
+                    {
+                        "afi-safi-name": "evpn",
+                        "admin-state": "enable",
+                        "evpn": {"advertise-ipv6-next-hops": use_ipv6_nexthops},
+                    },
+                    {"afi-safi-name": "ipv4-unicast", "admin-state": "disable"},
+                ],
+                "transport": {"local-address": TRANSPORT},
+                "timers": {"connect-retry": 10},
+            }
+        ],
+    }
+
+
+def ospf_intf(enable_bfd):
+    return {
+        "admin-state": "enable",
+        "interface-type": "point-to-point",
+        "failure-detection": {"enable-bfd": enable_bfd},
+    }
+
+
+def isis_intf(enable_bfd):
+    return {
+        "admin-state": "enable",
+        "ipv4-unicast": {"admin-state": "disable"},
+        "ipv6-unicast": {"admin-state": "enable", "enable-bfd": enable_bfd},
+    }
+
+
+# bfd enabled at ebgp group level
+def ebgp_intf(peer_as, description):
+    return {
+        "admin-state": "enable",
+        "peer-group": "ebgp-peers",
+        "peer-as": peer_as,
+        "description": description,
+    }
