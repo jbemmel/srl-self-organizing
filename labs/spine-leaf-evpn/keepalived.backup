@@ -2,6 +2,8 @@ vrrp_instance MAIN {
   state BACKUP
   interface bond0
   virtual_router_id 2
+  use_vmac
+  # optional: vmac_xmit_base to use physical interface for VRRP messages
   priority 100
   advert_int 1
   unicast_src_ip 10.0.0.103
