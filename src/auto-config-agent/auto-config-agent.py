@@ -905,10 +905,10 @@ def Configure_EVPN(state, port, interface, ip):
                 ],
             }
 
-            if state.evpn == "symmetric_irb":
-                if_base["subinterface"][0]["ipv4"]["arp"]["host-route"] = {
-                    "populate": [{"route-type": "dynamic"}]
-                }
+            # if state.evpn == "symmetric_irb": also for asymmetric
+            if_base["subinterface"][0]["ipv4"]["arp"]["host-route"] = {
+                "populate": [{"route-type": "dynamic"}]
+            }
 
         else:
             if_base["subinterface"][0]["type"] = "routed"
@@ -1229,7 +1229,7 @@ def Convert_lag_to_mc_lag(state, mac, port, peer_leaf, peer_port_list, gnmi_clie
                 }
             ]
         },
-        "host-route": {"populate": [{"route-type": "dynamic"}]},
+        # "host-route": {"populate": [{"route-type": "dynamic"}]}, # Only for symmetric case?
     }
 
     updates = [

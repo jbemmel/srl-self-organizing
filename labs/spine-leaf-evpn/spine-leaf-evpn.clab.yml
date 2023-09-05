@@ -53,6 +53,7 @@ topology:
       - /lib/modules:/lib/modules:ro
       - interfaces.client2:/etc/network/interfaces
       - keepalived.master:/etc/keepalived/keepalived.conf
+      - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
     vrrp2:
       kind: linux
       group: vrrp
@@ -60,6 +61,7 @@ topology:
       - /lib/modules:/lib/modules:ro
       - interfaces.client3:/etc/network/interfaces
       - keepalived.backup:/etc/keepalived/keepalived.conf
+      - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
 
   links:
     - endpoints: ["leaf1:e1-49", "spine1:e1-1"]

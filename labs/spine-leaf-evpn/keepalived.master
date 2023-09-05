@@ -3,7 +3,7 @@ vrrp_instance MAIN {
   interface bond0
   virtual_router_id 2
   use_vmac
-  # optional: vmac_xmit_base to use physical interface for VRRP messages
+  vmac_xmit_base # to use physical interface for VRRP messages, avoiding vMAC churn
   priority 200
   advert_int 1
   unicast_src_ip 10.0.0.102
@@ -15,9 +15,10 @@ vrrp_instance MAIN {
     auth_pass pwd1
   }
   virtual_ipaddress {
-    10.0.0.100/24 dev bond0
+    10.0.0.100/24
   }
   track_interface {
     bond0
   }
+  notify_master "/etc/keepalived/keepalived-tweaks.sh"
 }
