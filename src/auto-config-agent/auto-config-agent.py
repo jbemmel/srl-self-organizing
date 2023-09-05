@@ -1229,7 +1229,7 @@ def Convert_lag_to_mc_lag(state, mac, port, peer_leaf, peer_port_list, gnmi_clie
                 }
             ]
         },
-        # "host-route": {"populate": [{"route-type": "dynamic"}]}, # Only for symmetric case?
+        "host-route": {"populate": [{"route-type": "dynamic"}]}, # Also for asymmetric
     }
 
     updates = [
