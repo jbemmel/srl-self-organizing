@@ -1,3 +1,6 @@
+import re
+
+
 def routing_policy(is_leaf, link_prefix):
     NO_ADVERTISE = {"bgp": {"communities": {"add": "no-advertise"}}} if is_leaf else {}
 
@@ -150,9 +153,9 @@ def ebgp(
 def interface(ip_prefix, peer_type, role):
     def ipv6():
         if peer_type != "host":
-            ip = ip_prefix.replace("/31", "/127")
-        else:
-            ip = ip_prefix.replace("/[23][0-9]", "/64")
+            ip = "2001::" + ip_prefix.replace("/31", "/127")
+        else:  # Avoid overlap with loopback range
+            ip = "2001:1::" + re.sub(r"/[1-3]?[0-9]", "/64", ip_prefix)
         return ip.replace(".", ":")
 
     IP_ADDRESSING = (
@@ -253,6 +256,7 @@ def bgp_evpn_rr_clients(
                 ],
                 "transport": {"local-address": TRANSPORT},
                 "timers": {"connect-retry": 10},
+                "route-reflector": {"client": True, "cluster-id": router_id},
             }
         ],
     }
