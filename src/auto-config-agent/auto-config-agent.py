@@ -891,6 +891,11 @@ def Configure_EVPN(state, port, interface, ip):
             "arp": {"learn-unsolicited": True},
         }
 
+        if state.gateway["ipv6"]:
+            if_base["subinterface"][0]["ipv6"] = {
+                "admin-state": "enable",
+            }
+
         if use_irb:
             # if_base["subinterface"][0]["ipv4"]["arp"]["learn-unsolicited"] = True
 
