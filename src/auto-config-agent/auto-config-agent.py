@@ -12,7 +12,6 @@ import re
 import ipaddress
 import json
 import signal
-import subprocess
 import traceback
 import threading
 import queue
@@ -895,8 +894,11 @@ def Configure_EVPN(state, port, interface, ip):
         if use_irb:
             # if_base["subinterface"][0]["ipv4"]["arp"]["learn-unsolicited"] = True
 
+          for af in ["ipv4","ipv6"]:
+           if state.gateway[af]:
             # Only supported on IRB interfaces, not lag
-            if_base["subinterface"][0]["ipv4"]["arp"]["evpn"] = {
+            field = "arp" if af=="ipv4" else "nd"
+            if_base["subinterface"][0][af][field]["evpn"] = {
                 # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
                 # Could make this depend on EVPN support
                 "advertise": [
@@ -906,7 +908,7 @@ def Configure_EVPN(state, port, interface, ip):
             }
 
             # if state.evpn == "symmetric_irb": also for asymmetric
-            if_base["subinterface"][0]["ipv4"]["arp"]["host-route"] = {
+            if_base["subinterface"][0][af][field]["host-route"] = {
                 "populate": [{"route-type": "dynamic"}]
             }
 
@@ -920,23 +922,20 @@ def Configure_EVPN(state, port, interface, ip):
         else:
             logging.info(f"NOT enabling ipv6 on port {port}")
 
-        if state.gateway["ipv4"]:
+        for af in ["ipv4","ipv6"]:
+          if state.gateway[af]:
             gw = state.gateway
             if gw["location"] == state.get_role():
                 addr = {
-                    "ip-prefix": state.gateway["ipv4"].format(vrf=_vrf_id, port=port)
+                    "ip-prefix": state.gateway[af].format(vrf=_vrf_id, port=port)
                 }
-                if (
-                    gw["anycast"] and use_irb
-                ):  # Some platforms like ixr6 don't support this
-                    if_base["subinterface"][0][
-                        "anycast-gw"
-                    ] = {}  # Only supported on IRB interfaces
+                if (gw["anycast"] and use_irb):  # Some platforms like ixr6 don't support this
+                    if_base["subinterface"][0]["anycast-gw"] = {}  # Only supported on IRB interfaces
                     addr["anycast-gw"] = True
-                if "ipv4" in if_base["subinterface"][0]:
-                    if_base["subinterface"][0]["ipv4"]["address"].append(addr)
+                if af in if_base["subinterface"][0]:
+                    if_base["subinterface"][0][af]["address"].append(addr)
                 else:
-                    if_base["subinterface"][0]["ipv4"] = {
+                    if_base["subinterface"][0][af] = {
                         "address": [addr],
                         "admin-state": "enable",
                     }
@@ -1729,6 +1728,7 @@ def Handle_Notification(obj, state):
                     gw = data["gateway"]
                     state.gateway = {
                         "ipv4": gw["ipv4"]["value"] if "ipv4" in gw else False,
+                        "ipv6": gw["ipv6"]["value"] if "ipv6" in gw else False,
                         "location": (
                             "spine" if state.evpn == "l2_only_leaves" else "leaf"
                         ),  # default 'leaf'

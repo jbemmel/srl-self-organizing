@@ -273,6 +273,10 @@ module auto_config_agent {
                    // type srl_nokia-comm:ipv4-prefix-with-host-bits;
                    type string;
                 }
+                leaf ipv6 {
+                   description "IPv6 gateway address to provision, can use '{vrf}' parameter";
+                   type string;
+                }
 
                 // location is implied: leaf if (a)symmetric irb, else spine
             }
