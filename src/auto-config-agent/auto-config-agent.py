@@ -897,7 +897,7 @@ def Configure_EVPN(state, port, interface, ip):
           for af in ["ipv4","ipv6"]:
            if state.gateway[af]:
             # Only supported on IRB interfaces, not lag
-            field = "arp" if af=="ipv4" else "nd"
+            field = "arp" if af=="ipv4" else "neighbor-discovery"
             if_base["subinterface"][0][af][field]["evpn"] = {
                 # TODO also for ipv6, also static (to support host route mobility, e.g. VM migrations)
                 # Could make this depend on EVPN support
@@ -2436,7 +2436,7 @@ class State(object):
 
         self.bridging_supported = False
         self.evpn = ""
-        self.gateway = {"ipv4": False}
+        self.gateway = {"ipv4": False, "ipv6": False}
         self.dhcp = True
         self.dhcp_macs = {}  # Mapping of MAC to dict of router_id : port
 
@@ -2622,7 +2622,7 @@ class State(object):
         Determine whether to use an IRB interface (mac-vrf <-> ip-vrf)
         """
         # It must be supported by this platform, and a gateway must be configured
-        if (not self.bridging_supported) or (not self.gateway["ipv4"]):
+        if (not self.bridging_supported) or not (self.gateway["ipv4"] or self.gateway["ipv6"]):
             logging.info(
                 f"useIRB: bridging_supported={self.bridging_supported} gw={self.gateway} => False"
             )
