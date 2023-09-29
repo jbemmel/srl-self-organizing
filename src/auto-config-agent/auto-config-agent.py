@@ -891,9 +891,11 @@ def Configure_EVPN(state, port, interface, ip):
             "arp": {"learn-unsolicited": True},
         }
 
-        if state.gateway["ipv6"]:
+        if state.gateway["ipv6"] or state.host_enable_ipv6:
             if_base["subinterface"][0]["ipv6"] = {
                 "admin-state": "enable",
+                "address": [],
+                "neighbor-discovery": {"learn-unsolicited": "global"}
             }
 
         if use_irb:
@@ -919,13 +921,6 @@ def Configure_EVPN(state, port, interface, ip):
 
         else:
             if_base["subinterface"][0]["type"] = "routed"
-
-        if state.host_enable_ipv6:
-            # TODO could add ipv6 link IP too
-            logging.info(f"Enabling ipv6 towards host on port {port}")
-            if_base["subinterface"][0]["ipv6"] = {}
-        else:
-            logging.info(f"NOT enabling ipv6 on port {port}")
 
         for af in ["ipv4","ipv6"]:
           if state.gateway[af]:
@@ -1046,10 +1041,9 @@ def Configure_EVPN(state, port, interface, ip):
         if_base["subinterface"][0]["ipv4"]["arp"]["_annotate_timeout"] = ANNOTATION
 
         if "ipv6" in if_base["subinterface"][0]:
-            if_base["subinterface"][0]["ipv6"]["neighbor-discovery"] = {
-                "stale-time": IRB_ARP_ND_TIMEOUT,
-                "_annotate_stale-time": ANNOTATION,
-            }
+            _nd = if_base["subinterface"][0]["ipv6"]["neighbor-discovery"]
+            _nd["stale-time"] = IRB_ARP_ND_TIMEOUT
+            _nd["_annotate_stale-time"] = ANNOTATION
 
     vxlan_if = {
         "type": "srl_nokia-interfaces:bridged",
