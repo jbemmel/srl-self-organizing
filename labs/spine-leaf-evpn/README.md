@@ -10,11 +10,15 @@ sudo clab deploy -t spine-leaf-evpn.clab.yml --reconfigure
 docker exec -it clab-spine-leaf-evpn-client ping -c3 10.0.0.100
 ```
 
+## Same for IPv6
+```
+docker exec -it clab-spine-leaf-evpn-client ping6 -c3 2001:1::100
+```
+
 # Force failover of VRRP1 (master) to VRRP2
 ```
 docker exec -it clab-spine-leaf-evpn-vrrp1 ip link set dev lo down
 ```
 
 ## Note on symmetric IRB
-When using asymmetric IRB (i.e. no VXLAN L3 interface inside IP VRF, not using EVPN RT5 routes) it was found that after failover to VRRP2, Leaf1 would not install
-the EVPN route to the VIP in its routing table
+When using asymmetric IRB (i.e. no VXLAN L3 interface inside IP VRF, not using EVPN RT5 routes) it was found that after failover to VRRP2, Leaf1 would not install the EVPN route to the VIP in its routing table
