@@ -60,6 +60,7 @@ topology:
       - interfaces.client2:/etc/network/interfaces
       - keepalived.master:/etc/keepalived/keepalived.conf
       - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
+
     vrrp2:
       kind: linux
       group: vrrp
@@ -67,6 +68,24 @@ topology:
       - /lib/modules:/lib/modules:ro
       - interfaces.client3:/etc/network/interfaces
       - keepalived.backup:/etc/keepalived/keepalived.conf
+      - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
+
+    vrrp3:
+      kind: linux
+      group: vrrp
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.vrrp3:/etc/network/interfaces
+      - keepalived.master.vrrp3:/etc/keepalived/keepalived.conf
+      - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
+
+    vrrp4:
+      kind: linux
+      group: vrrp
+      binds:
+      - /lib/modules:/lib/modules:ro
+      - interfaces.vrrp4:/etc/network/interfaces
+      - keepalived.backup.vrrp4:/etc/keepalived/keepalived.conf
       - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
 
   links:
@@ -78,12 +97,16 @@ topology:
     - endpoints: ["leaf2:e1-49", "spine1:e1-3"]
     - endpoints: ["leaf2:e1-50", "spine2:e1-3"]
 
-    # LAG to pair of leaves
+    # Client with LAG to pair of leaves
     - endpoints: ["client:eth1", "leaf1:e1-1"]
     - endpoints: ["client:eth2", "leaf2:e1-1"]
 
+    # Single connected VRRP server pair for 10.0.0.100/24 VRID 2
     - endpoints: ["vrrp1:eth1", "leaf1:e1-2"]
-    # - endpoints: ["client2:eth2", "leaf4:e1-3"]
+    - endpoints: ["vrrp2:eth1", "leaf2:e1-2"]
 
-    - endpoints: ["vrrp2:eth1", "leaf2:e1-3"]
-    # - endpoints: ["client3:eth2", "leaf4:e1-4"]
+    # LAG connected VRRP server pair for 10.0.0.200/24 VRID 3
+    - endpoints: ["vrrp3:eth1", "leaf1:e1-3"]
+    - endpoints: ["vrrp3:eth2", "leaf2:e1-3"]
+    - endpoints: ["vrrp4:eth1", "leaf1:e1-4"]
+    - endpoints: ["vrrp4:eth2", "leaf2:e1-4"]

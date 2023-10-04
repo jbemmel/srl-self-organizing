@@ -1,0 +1,52 @@
+vrrp_instance MAIN {
+  state MASTER
+  interface bond0
+  virtual_router_id 3 # Must not conflict with anycast gateway
+  use_vmac
+  vmac_xmit_base # to use physical interface for VRRP messages, avoiding vMAC churn
+  priority 200
+  advert_int 1
+  unicast_src_ip 10.0.0.133
+  unicast_peer {
+    10.0.0.144
+  }
+  authentication {
+    auth_type PASS
+    auth_pass pwd1
+  }
+  virtual_ipaddress {
+    10.0.0.200/24
+  }
+  track_interface {
+    bond0
+    eth1
+    lo # Such that we can take VRRP down by setting link down
+  }
+  notify_master "/etc/keepalived/keepalived-tweaks.sh"
+}
+
+vrrp_instance MAIN_v6 {
+  state MASTER
+  interface bond0
+  virtual_router_id 3 # Must not conflict with anycast gateway
+  use_vmac
+  vmac_xmit_base # to use physical interface for VRRP messages, avoiding vMAC churn
+  priority 200
+  advert_int 1
+  unicast_src_ip 2001:1::133
+  unicast_peer {
+    2001:1::144
+  }
+  authentication {
+    auth_type PASS
+    auth_pass pwd1
+  }
+  virtual_ipaddress {
+    2001:1::200/64
+  }
+  track_interface {
+    bond0
+    eth1
+    lo # Such that we can take VRRP down by setting link down
+  }
+}

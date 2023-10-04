@@ -1,0 +1,31 @@
+auto lo
+iface lo inet loopback
+
+#auto eth1
+#iface eth1 inet manual
+#	post-up ip link set $IFACE up
+
+#auto eth2
+#iface eth2 inet manual
+#	post-up ip link set $IFACE up
+
+auto bond0
+iface bond0 inet static
+  address 10.0.0.133
+  netmask 255.255.255.0
+  # gateway 10.0.1.1
+
+  # bond0 uses standard IEEE 802.3ad LACP bonding protocol
+  bond-mode 4
+  # bond-miimon 100
+  bond-lacp-rate slow
+  bond-xmit-hash-policy layer3+4
+  bond-slaves eth1 eth2
+  # post-up ip link set eth1 up; ip link set eth2 up
+  up ip route add 10.0.0.0/8 via 10.0.0.1 || true
+
+iface bond0 inet6 static
+  address 2001:1::133
+  netmask 64
+  # gateway 2001:100:127:10::2
+  pre-up echo 0 > /proc/sys/net/ipv6/conf/eth0/accept_ra
