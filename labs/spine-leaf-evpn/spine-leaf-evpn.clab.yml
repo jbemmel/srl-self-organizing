@@ -9,6 +9,9 @@ mgmt:
 
 topology:
   kinds:
+    vr-nokia_sros:
+      image: vrnetlab/vr-sros:latest
+      license: /Projects/SR_OS_VSR-SIM_license.txt
     srl:
       # image: ghcr.io/nokia/srlinux
       image: srl/auto-config-v2:latest
@@ -21,15 +24,8 @@ topology:
       # image: ghcr.io/hellt/network-multitool
       image: alpine-with-lldp:latest # Custom built image with lldpad and keepalived
   nodes:
-    leaf1:
-      kind: srl
-      group: leaves
-      type: ixrd2
-
-    leaf2:
-      kind: srl
-      group: leaves
-      type: ixrd2
+    gw:
+      kind: vr-nokia_sros
 
     spine1:
       kind: srl
@@ -39,6 +35,16 @@ topology:
       kind: srl
       group: spines
       type: ixrd3
+
+    leaf1:
+      kind: srl
+      group: leaves
+      type: ixrd2
+
+    leaf2:
+      kind: srl
+      group: leaves
+      type: ixrd2
 
     client:
       kind: linux
@@ -64,10 +70,13 @@ topology:
       - keepalived-tweaks.sh:/etc/keepalived/keepalived-tweaks.sh
 
   links:
-    - endpoints: ["leaf1:e1-49", "spine1:e1-1"]
-    - endpoints: ["leaf1:e1-50", "spine2:e1-1"]
-    - endpoints: ["leaf2:e1-49", "spine1:e1-2"]
-    - endpoints: ["leaf2:e1-50", "spine2:e1-2"]
+    - endpoints: ["gw:eth1", "spine1:e1-1"]
+    - endpoints: ["gw:eth2", "spine2:e1-1"]
+
+    - endpoints: ["leaf1:e1-49", "spine1:e1-2"]
+    - endpoints: ["leaf1:e1-50", "spine2:e1-2"]
+    - endpoints: ["leaf2:e1-49", "spine1:e1-3"]
+    - endpoints: ["leaf2:e1-50", "spine2:e1-3"]
 
     # LAG to pair of leaves
     - endpoints: ["client:eth1", "leaf1:e1-1"]

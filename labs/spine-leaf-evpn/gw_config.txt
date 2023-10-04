@@ -1,0 +1,703 @@
+# TiMOS-B-23.7.R2 both/x86_64 Nokia 7750 SR Copyright (c) 2000-2023 Nokia.
+# All rights reserved. All use subject to applicable license agreements.
+# Built on Tue Aug 29 13:26:59 PDT 2023 by builder in /builds/237B/R2/panos/main/sros
+# Configuration format version 23.7 revision 0
+
+# Generated 2023-10-04T17:42:10.8Z by admin from 200::
+# Commit ID 52
+#   Committed 2023-10-04T16:22:04.6Z by admin (MD-CLI) from 200::
+
+configure {
+    card 1 {
+        card-type iom-1
+        mda 1 {
+            mda-type me12-100gb-qsfp28
+        }
+    }
+    log {
+        filter "1001" {
+            named-entry "10" {
+                description "Collect only events of major severity or higher"
+                action forward
+                match {
+                    severity {
+                        gte major
+                    }
+                }
+            }
+        }
+        log-id "100" {
+            description "Default Serious Errors Log"
+            filter "1001"
+            source {
+                main true
+            }
+            destination {
+                memory {
+                    max-entries 500
+                }
+            }
+        }
+        log-id "99" {
+            description "Default System Log"
+            source {
+                main true
+            }
+            destination {
+                memory {
+                    max-entries 500
+                }
+            }
+        }
+    }
+    policy-options {
+        community "V6_PREFIXES" {
+            member "target:65534:6" { }
+        }
+        prefix-list "loopbacks" {
+            prefix 0.0.0.0/0 type range {
+                start-length 32
+                end-length 32
+            }
+            prefix ::/128 type range {
+                start-length 128
+                end-length 128
+            }
+        }
+        prefix-list "v4-prefixes" {
+            prefix 0.0.0.0/0 type longer {
+            }
+            prefix 0.0.0.0/0 type range {
+                start-length 0
+                end-length 32
+            }
+        }
+        prefix-list "v6-prefixes" {
+            prefix ::/0 type range {
+                start-length 0
+                end-length 128
+            }
+        }
+        policy-statement "drop-v4-prefixes" {
+            description "Prevent V4 EVPN Type 5 routes from being sent on V6 VNI"
+            entry 10 {
+                from {
+                    prefix-list ["v4-prefixes"]
+                    evpn-type ip-prefix
+                }
+                action {
+                    action-type reject
+                }
+            }
+            default-action {
+                action-type accept
+                community {
+                    add ["V6_PREFIXES"]
+                }
+            }
+        }
+        policy-statement "export-loopbacks" {
+            entry 10 {
+                from {
+                    prefix-list ["loopbacks"]
+                }
+                action {
+                    action-type accept
+                }
+            }
+            default-action {
+                action-type reject
+            }
+        }
+        policy-statement "export-v4-only" {
+            entry 10 {
+                from {
+                    prefix-list ["v4-prefixes"]
+                    evpn-type ip-prefix
+                    family [evpn]
+                }
+                action {
+                    action-type accept
+                }
+            }
+            default-action {
+                action-type reject
+            }
+        }
+        policy-statement "export-v6-only" {
+            entry 10 {
+                from {
+                    prefix-list ["v6-prefixes"]
+                }
+                action {
+                    action-type accept
+                }
+            }
+            default-action {
+                action-type reject
+            }
+        }
+        policy-statement "import-v4-only" {
+            entry 10 {
+                from {
+                    prefix-list ["v4-prefixes"]
+                }
+                action {
+                    action-type accept
+                }
+            }
+            default-action {
+                action-type reject
+            }
+        }
+        policy-statement "import-v6-only" {
+            entry 10 {
+                from {
+                    prefix-list ["v6-prefixes"]
+                }
+                action {
+                    action-type accept
+                }
+            }
+            default-action {
+                action-type reject
+            }
+        }
+    }
+    port 1/1/c1 {
+        admin-state enable
+        connector {
+            breakout c1-100g
+        }
+    }
+    port 1/1/c1/1 {
+        admin-state enable
+        ethernet {
+            lldp {
+                dest-mac nearest-bridge {
+                    receive true
+                    transmit true
+                    tx-tlvs {
+                        port-desc true
+                        sys-name true
+                    }
+                }
+            }
+        }
+    }
+    port 1/1/c2 {
+        admin-state enable
+        connector {
+            breakout c1-100g
+        }
+    }
+    port 1/1/c2/1 {
+        admin-state enable
+        ethernet {
+            lldp {
+                dest-mac nearest-bridge {
+                    receive true
+                    transmit true
+                    tx-tlvs {
+                        port-desc true
+                        sys-name true
+                    }
+                }
+            }
+        }
+    }
+    router "Base" {
+        autonomous-system 65534
+        router-id 1.1.2.1
+        interface "spine1" {
+            port 1/1/c1/1
+            ipv4 {
+                primary {
+                    address 192.168.0.0
+                    prefix-length 31
+                }
+            }
+        }
+        interface "spine2" {
+            port 1/1/c2/1
+            ipv4 {
+                primary {
+                    address 192.168.0.2
+                    prefix-length 31
+                }
+            }
+        }
+        interface "system" {
+            ipv4 {
+                primary {
+                    address 1.1.2.1
+                    prefix-length 32
+                }
+            }
+        }
+        bgp {
+            client-reflect true
+            ebgp-default-reject-policy {
+                import false
+                export false
+            }
+            group "ebgp" {
+                client-reflect false
+                type external
+                peer-as 4200000001
+                local-as {
+                    as-number 4200000000
+                    prepend-global-as false
+                }
+                export {
+                    policy ["export-loopbacks"]
+                }
+            }
+            group "evpn-rr" {
+                client-reflect false
+                peer-as 65534
+                local-address 1.1.2.1
+                split-horizon true
+                family {
+                    evpn true
+                }
+            }
+            group "gw-as-evpn-rr" {
+                admin-state enable
+                description "Allows this 7750 to act as Route Reflector, enabling use of multiple paths"
+                peer-as 65534
+                local-address 1.1.2.1
+                family {
+                    evpn true
+                }
+                cluster {
+                    cluster-id 1.1.2.1
+                }
+                dynamic-neighbor {
+                    match {
+                        prefix 1.1.0.0/16 {
+                            allowed-peer-as ["65534"]
+                        }
+                    }
+                }
+            }
+            neighbor "192.168.0.1" {
+                group "ebgp"
+            }
+            neighbor "192.168.0.3" {
+                group "ebgp"
+            }
+        }
+    }
+    service {
+        system {
+            bgp-auto-rd-range {
+                ip-address 1.1.2.1
+                community-value {
+                    start 10000
+                    end 11000
+                }
+            }
+        }
+        vpls "backend-v4" {
+            admin-state enable
+            service-id 4
+            customer "1"
+            vxlan {
+                instance 1 {
+                    vni 4
+                }
+            }
+            routed-vpls {
+                vxlan-ipv4-tep-ecmp true
+            }
+            bgp 1 {
+                route-distinguisher auto-rd
+                route-target {
+                    export "target:65534:4"
+                    import "target:65534:4"
+                }
+            }
+            bgp-evpn {
+                routes {
+                    mac-ip {
+                        advertise true
+                    }
+                    ip-prefix {
+                        advertise true
+                        include-direct-interface-host true
+                    }
+                }
+                vxlan 1 {
+                    admin-state enable
+                    vxlan-instance 1
+                    ecmp 2
+                }
+            }
+        }
+        vpls "backend-v6" {
+            admin-state enable
+            service-id 6
+            customer "1"
+            vxlan {
+                instance 1 {
+                    vni 6
+                }
+            }
+            routed-vpls {
+                vxlan-ipv4-tep-ecmp true
+            }
+            bgp 1 {
+                route-distinguisher auto-rd
+                vsi-export ["drop-v4-prefixes"]
+                route-target {
+                    import "target:65534:6"
+                }
+            }
+            bgp-evpn {
+                routes {
+                    mac-ip {
+                        advertise true
+                    }
+                    ip-prefix {
+                        advertise true
+                        include-direct-interface-host true
+                    }
+                }
+                vxlan 1 {
+                    admin-state enable
+                    vxlan-instance 1
+                    ecmp 2
+                }
+            }
+        }
+        vprn "internet" {
+            admin-state enable
+            service-id 2
+            customer "1"
+            interface "backend-v4" {
+                admin-state enable
+                vpls "backend-v4" {
+                    evpn-tunnel {
+                    }
+                }
+            }
+            interface "backend-v6" {
+                vpls "backend-v6" {
+                    evpn-tunnel {
+                        ipv6-gateway-address mac
+                    }
+                }
+                ipv6 {
+                }
+            }
+            interface "loopback" {
+                loopback true
+                ipv4 {
+                    primary {
+                        address 1.1.2.1
+                        prefix-length 32
+                    }
+                }
+                ipv6 {
+                    address 2001::1:1:2:1 {
+                        prefix-length 128
+                    }
+                }
+            }
+            static-routes {
+                route 0.0.0.0/0 route-type unicast {
+                    blackhole {
+                        admin-state enable
+                    }
+                }
+                route ::/0 route-type unicast {
+                    blackhole {
+                        admin-state enable
+                    }
+                }
+            }
+        }
+    }
+    system {
+        name "gw"
+        grpc {
+            admin-state enable
+            allow-unsecure-connection
+            gnmi {
+                auto-config-save true
+            }
+            rib-api {
+                admin-state enable
+            }
+        }
+        management-interface {
+            netconf {
+                admin-state enable
+                auto-config-save true
+            }
+            snmp {
+                packet-size 9216
+                streaming {
+                    admin-state enable
+                }
+            }
+        }
+        bluetooth {
+            advertising-timeout 30
+        }
+        login-control {
+            ssh {
+                inbound-max-sessions 30
+            }
+        }
+        security {
+            aaa {
+                local-profiles {
+                    profile "administrative" {
+                        default-action permit-all
+                        entry 10 {
+                            match "configure system security"
+                            action permit
+                        }
+                        entry 20 {
+                            match "show system security"
+                            action permit
+                        }
+                        entry 30 {
+                            match "tools perform security"
+                            action permit
+                        }
+                        entry 40 {
+                            match "tools dump security"
+                            action permit
+                        }
+                        entry 50 {
+                            match "admin system security"
+                            action permit
+                        }
+                        entry 100 {
+                            match "configure li"
+                            action deny
+                        }
+                        entry 110 {
+                            match "show li"
+                            action deny
+                        }
+                        entry 111 {
+                            match "clear li"
+                            action deny
+                        }
+                        entry 112 {
+                            match "tools dump li"
+                            action deny
+                        }
+                        netconf {
+                            base-op-authorization {
+                                action true
+                                cancel-commit true
+                                close-session true
+                                commit true
+                                copy-config true
+                                create-subscription true
+                                delete-config true
+                                discard-changes true
+                                edit-config true
+                                get true
+                                get-config true
+                                get-data true
+                                get-schema true
+                                kill-session true
+                                lock true
+                                validate true
+                            }
+                        }
+                    }
+                    profile "default" {
+                        entry 10 {
+                            match "exec"
+                            action permit
+                        }
+                        entry 20 {
+                            match "exit"
+                            action permit
+                        }
+                        entry 30 {
+                            match "help"
+                            action permit
+                        }
+                        entry 40 {
+                            match "logout"
+                            action permit
+                        }
+                        entry 50 {
+                            match "password"
+                            action permit
+                        }
+                        entry 60 {
+                            match "show config"
+                            action deny
+                        }
+                        entry 65 {
+                            match "show li"
+                            action deny
+                        }
+                        entry 66 {
+                            match "clear li"
+                            action deny
+                        }
+                        entry 67 {
+                            match "tools dump li"
+                            action deny
+                        }
+                        entry 68 {
+                            match "state li"
+                            action deny
+                        }
+                        entry 70 {
+                            match "show"
+                            action permit
+                        }
+                        entry 75 {
+                            match "state"
+                            action permit
+                        }
+                        entry 80 {
+                            match "enable-admin"
+                            action permit
+                        }
+                        entry 90 {
+                            match "enable"
+                            action permit
+                        }
+                        entry 100 {
+                            match "configure li"
+                            action deny
+                        }
+                    }
+                }
+            }
+            ssh {
+                server-cipher-list-v2 {
+                    cipher 190 {
+                        name aes256-ctr
+                    }
+                    cipher 192 {
+                        name aes192-ctr
+                    }
+                    cipher 194 {
+                        name aes128-ctr
+                    }
+                    cipher 200 {
+                        name aes128-cbc
+                    }
+                    cipher 205 {
+                        name 3des-cbc
+                    }
+                    cipher 225 {
+                        name aes192-cbc
+                    }
+                    cipher 230 {
+                        name aes256-cbc
+                    }
+                }
+                client-cipher-list-v2 {
+                    cipher 190 {
+                        name aes256-ctr
+                    }
+                    cipher 192 {
+                        name aes192-ctr
+                    }
+                    cipher 194 {
+                        name aes128-ctr
+                    }
+                    cipher 200 {
+                        name aes128-cbc
+                    }
+                    cipher 205 {
+                        name 3des-cbc
+                    }
+                    cipher 225 {
+                        name aes192-cbc
+                    }
+                    cipher 230 {
+                        name aes256-cbc
+                    }
+                }
+                server-mac-list-v2 {
+                    mac 200 {
+                        name hmac-sha2-512
+                    }
+                    mac 210 {
+                        name hmac-sha2-256
+                    }
+                    mac 215 {
+                        name hmac-sha1
+                    }
+                    mac 220 {
+                        name hmac-sha1-96
+                    }
+                    mac 225 {
+                        name hmac-md5
+                    }
+                    mac 240 {
+                        name hmac-md5-96
+                    }
+                }
+                client-mac-list-v2 {
+                    mac 200 {
+                        name hmac-sha2-512
+                    }
+                    mac 210 {
+                        name hmac-sha2-256
+                    }
+                    mac 215 {
+                        name hmac-sha1
+                    }
+                    mac 220 {
+                        name hmac-sha1-96
+                    }
+                    mac 225 {
+                        name hmac-md5
+                    }
+                    mac 240 {
+                        name hmac-md5-96
+                    }
+                }
+            }
+            user-params {
+                local-user {
+                    user "admin" {
+                        password "$2y$10$TQrZlpBDra86.qoexZUzQeBXDY1FcdDhGWdD9lLxMuFyPVSm0OGy6"
+                        access {
+                            console true
+                            ftp true
+                            snmp true
+                            netconf true
+                            grpc true
+                        }
+                        console {
+                            member ["administrative"]
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+persistent-indices {
+    description "Persistent indices are maintained by the system and must not be modified."
+    vrtr-id {
+        router-name "internet" vrtr-id 2
+    }
+    vrtr-if-id {
+        router-name "Base" interface-name "spine1" vrtr-id 1 if-index 2
+        router-name "Base" interface-name "spine2" vrtr-id 1 if-index 3
+        router-name "internet" interface-name "backend-v4" vrtr-id 2 if-index 6
+        router-name "internet" interface-name "backend-v6" vrtr-id 2 if-index 7
+        router-name "internet" interface-name "loopback" vrtr-id 2 if-index 5
+    }
+}
+
+# Finished 2023-10-04T17:42:10.8Z
