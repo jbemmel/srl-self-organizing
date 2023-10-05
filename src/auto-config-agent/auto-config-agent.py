@@ -340,7 +340,7 @@ class EVPNRouteMonitoringThread(threading.Thread):
         )
 
         # Don't use gnmi thread loop here (!)
-        logging.info("Starting GNMI subscription for route updates")
+        logging.info( f"Starting GNMI subscription for route updates: {path}")
         telemetry_stream = gnmiThread.get_gnmi().subscribe(subscribe=subscribe)
         try:
             for m in telemetry_stream:
@@ -520,9 +520,7 @@ class EVPNRouteMonitoringThread(threading.Thread):
                             )
 
                         else:
-                            logging.info(
-                                f"Unrecognized encoded prefix: {encoded_parts[0]}"
-                            )
+                            logging.info( f"Ignoring encoded prefix: {encoded_parts[0]}" )
 
 
 ############################################################
