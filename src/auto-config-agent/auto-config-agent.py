@@ -1315,7 +1315,8 @@ def AddDHCPClient(mac, peer_id, peer_port_list, state, gnmi_client):
     _svc_id = state.svc_id(port)
     _vrf_id = state.vrf_id(port)
     # gw IP may contain variables
-    gw = ipaddress.ip_network(_gw_ip(state,'ipv4',_vrf_id,_svc_id,port), False)
+    gw_ip = _gw_ip(state,'ipv4',_vrf_id,_svc_id,port)
+    gw = ipaddress.ip_network(gw_ip, False)
 
     dhcp_server = {
         "admin-state": "enable",
@@ -1332,7 +1333,7 @@ def AddDHCPClient(mac, peer_id, peer_port_list, state, gnmi_client):
                                 "ip-address": str(gw[id]) + "/" + str(gw.prefixlen),
                                 "options": {
                                     "router": str(
-                                        ipaddress.ip_interface(state.gateway["ipv4"]).ip
+                                        ipaddress.ip_interface(gw_ip).ip
                                     )
                                 },
                             }
