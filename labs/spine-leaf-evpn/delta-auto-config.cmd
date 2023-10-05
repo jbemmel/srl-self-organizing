@@ -4,8 +4,7 @@
 set /system gnmi-server unix-socket admin-state enable use-authentication false
 set /system gnmi-server rate-limit 65000
 set /auto-config-agent igp bgp-unnumbered evpn model symmetric-irb auto-lags encoded-ipv6 bgp-peering ipv4
-set /auto-config-agent gateway ipv4 10.0.0.1/24 ipv6 2001:1::1/64
 set /auto-config-agent lacp active # reload-delay-secs 0
 
 # Put each VRRP pair in a separate mac-vrf/ip-vrf
-set /auto-config-agent ports-per-service 2 vrf-per-service true
+set /auto-config-agent ports-per-service 2 vrf-per-service true gateway ipv4 10.{service}.0.1/24 ipv6 2001:{service}::1/64

@@ -150,7 +150,7 @@ def ebgp(
     }
 
 
-def interface(ip_prefix, peer_type, role):
+def interface(ip_prefix, peer_type, role, peer):
     def ipv6():
         if peer_type != "host":
             ip = "2001::" + ip_prefix.replace("/31", "/127")
@@ -170,7 +170,7 @@ def interface(ip_prefix, peer_type, role):
     ROUTED = {"type": "routed"} if peer_type != "host" and role != "endpoint" else {}
 
     return {
-        "description": "auto-config to $PEER",
+        "description": f"auto-config to {peer}",
         "admin-state": "enable",
         "subinterface": [
             {"index": 0, **ROUTED, "admin-state": "enable", **IP_ADDRESSING}

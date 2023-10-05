@@ -848,17 +848,20 @@ def Convert_to_lag(state, port, peer_data):
     return _lag  # Lag name e.g. "lag1" passed as 'interface' parameter to code below
 
 
+def _gw_ip(state,af,vrf,service,port):
+    return state.gateway[af].format(vrf=vrf,service=service,port=port)
+
 ###
 # Configure EVPN overlay for host facing ports (on leaves)
 # * L2 mac-vrf + VXLAN interface + (optional) IRB interface
 # * L3 ip-vrf + (optional) IRB interface + L3 VXLAN interface in case of symmetric irb
 ##
 def Configure_EVPN(state, port, interface, ip):
-    logging.info(f"Configure_EVPN :: port={port} interface={interface}")
 
     # Support multiple port-to-service mappings, 0 = all ports in service 1
     _svc_id = state.svc_id(port)
     _vrf_id = state.vrf_id(port)
+    logging.info(f"Configure_EVPN :: port={port} interface={interface} => service={_svc_id} vrf={_vrf_id}")
 
     use_irb = state.useIRB()
 
@@ -924,9 +927,7 @@ def Configure_EVPN(state, port, interface, ip):
           if state.gateway[af]:
             gw = state.gateway
             if gw["location"] == state.get_role():
-                addr = {
-                    "ip-prefix": state.gateway[af].format(vrf=_vrf_id, port=port)
-                }
+                addr = { "ip-prefix": _gw_ip(state,af,_vrf_id,_svc_id,port) }
                 if (gw["anycast"] and use_irb):  # Some platforms like ixr6 don't support this
                     if_base["subinterface"][0]["anycast-gw"] = {}  # Only supported on IRB interfaces
                     addr["anycast-gw"] = True
@@ -940,14 +941,14 @@ def Configure_EVPN(state, port, interface, ip):
     else:
         if_base["subinterface"][0]["type"] = "bridged"
 
-    if_name = "irb0" if use_irb else interface
+    if_name = f"irb{_vrf_id}" if use_irb else interface
     updates += [(f"/interface[name={if_name}]", if_base)]
 
     # EVPN L2 VXLAN interface
     L2_VNI_EVI = 4095 + _svc_id  # Cannot use 0
 
     # Could configure MAC table size here
-    _vxlan_if_l2 = f"vxlan0.{_svc_id}"  # vxlan0.vrf is routed in case of symmetric
+    _vxlan_if_l2 = f"vxlan{_vrf_id}.{_svc_id}"  # vxlan0.vrf is routed in case of symmetric
     mac_vrf = {
         "type": "mac-vrf",
         "admin-state": "enable",
@@ -990,7 +991,7 @@ def Configure_EVPN(state, port, interface, ip):
         }
         # bridge-table { mac-learning: { age-time: 300 } } leave as default value
     }
-    updates += [(f"/network-instance[name=overlay-l2-{_svc_id}]", mac_vrf)]
+    updates += [(f"/network-instance[name=overlay-{_vrf_id}-l2-{_svc_id}]", mac_vrf)]
 
     loopback_if = {
         "admin-state": "enable",
@@ -1022,8 +1023,8 @@ def Configure_EVPN(state, port, interface, ip):
     updates += [(f"/network-instance[name=overlay-{_vrf_id}]", ip_vrf)]
 
     if use_irb:
-        mac_vrf["interface"] += [{"name": f"irb0.{_svc_id}"}]
-        ip_vrf["interface"] += [{"name": f"irb0.{_svc_id}"}]
+        mac_vrf["interface"] += [{"name": f"irb{_vrf_id}.{_svc_id}"}]
+        ip_vrf["interface"] += [{"name": f"irb{_vrf_id}.{_svc_id}"}]
 
         # UG: When IRB subinterfaces are attached to MAC-VRF network-instances with all-active
         # multi-homing Ethernet Segments, the arp timeout / neighbor-discovery staletime settings on the
@@ -1049,7 +1050,7 @@ def Configure_EVPN(state, port, interface, ip):
         "egress": {"source-ip": "use-system-ipv4-address"},
     }
     updates += [
-        (f"/tunnel-interface[name=vxlan0]/vxlan-interface[index={_svc_id}]", vxlan_if),
+        (f"/tunnel-interface[name=vxlan{_vrf_id}]/vxlan-interface[index={_svc_id}]", vxlan_if),
         # ('/routing-policy', export_policy)
     ]
 
@@ -1062,13 +1063,13 @@ def Configure_EVPN(state, port, interface, ip):
         }
         updates += [
             (
-                f"/tunnel-interface[name=vxlan0]/vxlan-interface[index={L3_VNI_EVI}]",
+                f"/tunnel-interface[name=vxlan{_vrf_id}]/vxlan-interface[index={L3_VNI_EVI}]",
                 l3_vxlan_if,
             )
         ]
         ip_vrf["vxlan-interface"] = [
             {
-                "name": f"vxlan0.{L3_VNI_EVI}",
+                "name": f"vxlan{_vrf_id}.{L3_VNI_EVI}",
                 "_annotate": "This is symmetric IRB with a L3 VXLAN interface and EVPN RT5 routes",
             }
         ]
@@ -1078,7 +1079,7 @@ def Configure_EVPN(state, port, interface, ip):
                     {
                         "id": 1,
                         "admin-state": "enable",
-                        "vxlan-interface": f"vxlan0.{L3_VNI_EVI}",
+                        "vxlan-interface": f"vxlan{_vrf_id}.{L3_VNI_EVI}",
                         "evi": L3_VNI_EVI,
                         "ecmp": 8,
                     }
@@ -1310,7 +1311,11 @@ def AddDHCPClient(mac, peer_id, peer_port_list, state, gnmi_client):
     id = (
         (min_leaf_id - 1) * state.max_hosts_per_leaf + (port - 1) + 10
     )  # XXX hardcoded offset 10
-    gw = ipaddress.ip_network(state.gateway["ipv4"], False)
+    
+    _svc_id = state.svc_id(port)
+    _vrf_id = state.vrf_id(port)
+    # gw IP may contain variables
+    gw = ipaddress.ip_network(_gw_ip(state,'ipv4',_vrf_id,_svc_id,port), False)
 
     dhcp_server = {
         "admin-state": "enable",
@@ -2349,7 +2354,7 @@ def script_update_interface(
             replaces += [
                 (
                     f"/interface[name={name}]",
-                    build_config.interface(ip, peer_type, state.get_role()),
+                    build_config.interface(ip, peer_type, state.get_role(),peer),
                 )
             ]
             if state.role != "leaf" or peer_type != "host":
@@ -2452,7 +2457,7 @@ class State(object):
         """
         Support VRF-per-port and single VRF models
         """
-        return port if self.vrf_per_service and self.ports_per_service != 0 else 1
+        return int((port-1)/self.ports_per_service)+1 if self.vrf_per_service and self.ports_per_service != 0 else 1
 
     # Use single, globally shared gNMI connection? hard to make work correctly
     # def connectGNMI(self):
