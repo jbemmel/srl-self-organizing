@@ -7,4 +7,4 @@ set /auto-config-agent igp bgp-unnumbered evpn model symmetric-irb auto-lags enc
 set /auto-config-agent lacp active # reload-delay-secs 0
 
 # Put each VRRP pair in a separate mac-vrf/ip-vrf
-set /auto-config-agent ports-per-service 2 vrf-per-service true gateway ipv4 10.{service}.0.1/24 ipv6 2001:{service}::1/64
+set /auto-config-agent ports-per-service 2 vrf-per-service true gateway ipv4 10.{vrf}.0.1/24 ipv6 2001:{vrf}::1/64

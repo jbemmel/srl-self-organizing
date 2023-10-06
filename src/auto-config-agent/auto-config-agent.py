@@ -2452,13 +2452,14 @@ class State(object):
         elif self.ports_per_service == 1:
             return port
         else:
-            return port % self.ports_per_service + 1  # 1,2,3...8
+            # return port % self.ports_per_service + 1  # 1,2,3...8
+            return int((port-1)/self.ports_per_service)+1
 
     def vrf_id(self, port):
         """
         Support VRF-per-port and single VRF models
         """
-        return int((port-1)/self.ports_per_service)+1 if self.vrf_per_service and self.ports_per_service != 0 else 1
+        return self.svc_id(port) if self.vrf_per_service else 1
 
     # Use single, globally shared gNMI connection? hard to make work correctly
     # def connectGNMI(self):
