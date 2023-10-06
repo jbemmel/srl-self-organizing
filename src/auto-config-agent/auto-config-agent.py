@@ -2093,9 +2093,9 @@ def configure_peer_link(
         # TODO lag addressing is different
         link_index = (lldp_peer_port - 1) + (state.node_id - 1) * state.max_leaves
 
-    if link_index >= len(state.peerlinks):
+    if link_index >= min(len(state.peerlinks),len(state.hostlinks)):
         logging.error(
-            f"Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)}"
+            f"Out of IP peering link addresses: {link_index} >= {len(state.peerlinks)} or {len(state.hostlinks)} hostnets"
         )
         return False
 

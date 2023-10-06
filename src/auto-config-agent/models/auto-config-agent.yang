@@ -66,11 +66,11 @@ module auto_config_agent {
                  default "192.168.127.0/24"; // enough for 128 /31 links
                }
                leaf host-subnet-size {
-                 description "Size of subnet to use towards hosts, default /28";
+                 description "Size of subnet to use towards hosts, default /31 to have many";
                  type uint8 {
                    range "24 .. 31";
                  }
-                 default 28;
+                 default 31;
                }
                leaf host-enable-ipv6 {
                  description "Whether to enable IPv6 towards hosts, default True";
