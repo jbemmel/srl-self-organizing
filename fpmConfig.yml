@@ -1,0 +1,15 @@
+name: "auto-config-agent" # name of the rpm package
+arch: "amd64"     # architecture you are using
+version: "v1.0.1" # version of this rpm package
+maintainer: "Jeroen van Bemmel <jeroen.van_bemmel@nokia.com"
+description: Agent to automatically configure SR Linux routers based on topology discovery
+vendor: "Nokia"     # optional information about the creator of the package
+license: "Apache 2.0"
+contents:                              # contents to add to the package
+  - src: ./src
+    dst: /opt/     # destination path (including yang)
+    type: tree
+
+  - src: ./auto-config-agent.yml    # local path of agent yml
+    dst: /etc/opt/srlinux/appmgr/auto-config-agent.yml
+    type: config

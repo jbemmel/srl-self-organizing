@@ -10,6 +10,8 @@ ifndef SR_LINUX_RELEASE
 override SR_LINUX_RELEASE="latest"
 endif
 
+.PHONY: build all rpm
+
 build:
 	cd .. && sudo docker build --build-arg SRL_AUTO_CONFIG_RELEASE=${TAG} --build-arg http_proxy=${HTTP_PROXY} --build-arg https_proxy=${HTTP_PROXY} \
 	                           --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
@@ -33,3 +35,9 @@ build-alpine:
 
 lint-yang:
 	cd .. && sudo docker run --rm -v $$(pwd)/src/auto-config-agent/models:/work ghcr.io/hellt/yanglint auto-config-agent.yang
+
+rpm:
+	docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
+    --config /tmp/fpmConfig.yml \
+    --target /tmp \
+    --packager rpm
