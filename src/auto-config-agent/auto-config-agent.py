@@ -130,7 +130,7 @@ def gnmiConnection(callback, note="?"):
 ##                      Route, Network Instance, Config
 ############################################################
 def Subscribe(stream_id, option):
-    op = sdk_service_pb2.NotificationRegisterRequest.AddSubscription
+    op = sdk_service_pb2.NotificationRegisterRequest.Operation.AddSubscription
     if option == "lldp":
         entry = lldp_service_pb2.LldpNeighborSubscriptionRequest()
         request = sdk_service_pb2.NotificationRegisterRequest(
@@ -2688,7 +2688,7 @@ def Run():
     logging.info(f"Registration response : {response.status}")
 
     request = sdk_service_pb2.NotificationRegisterRequest(
-        op=sdk_service_pb2.NotificationRegisterRequest.Create
+        op=sdk_service_pb2.NotificationRegisterRequest.Operation.Create
     )
     create_subscription_response = stub.NotificationRegister(
         request=request, metadata=metadata

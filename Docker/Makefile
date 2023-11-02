@@ -46,6 +46,7 @@ copy-files-from-container: build
 	find rpmbuild/ -type l -delete # Purge (broken) symlinks
 	find rpmbuild/ -name test* | xargs rm -rf # Remove test code
 	find rpmbuild/ -name __pycache__ | xargs rm -rf # Remove Pycache code
+	find rpmbuild/ -name *.so | xargs strip # Strip binaries
 	# docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
     # --config /tmp/Docker/fpmConfig.yml \
     # --target /tmp \
