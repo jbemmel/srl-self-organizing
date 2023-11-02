@@ -185,12 +185,12 @@ module auto_config_agent {
                  }
              }
              leaf bgp-peering {
-                description "IP version to use for iBGP EVPN peering, default ipv6";
+                description "IP version to use for iBGP EVPN peering, default ipv4 to match OSPF";
                 type enumeration {
                   enum ipv4;
                   enum ipv6;
                 }
-                default "ipv6";
+                default "ipv4";
              }
 
              leaf ipv6-nexthops {
