@@ -2275,7 +2275,7 @@ def script_update_interface(
                         }
                     ],
                 }
-                updates += [
+                replaces += [
                     ("/interface[name=system0]]", lo),
                     ("/network-instance[name=default]/interface[name=system0.0]", {}),
                 ]
