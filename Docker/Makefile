@@ -45,8 +45,8 @@ rpm: build
 	docker rm ${CONTAINER_ID}
 	find rpmbuild/ -type l -delete # Purge (broken) symlinks
 	find rpmbuild/ -name test* | xargs rm -rf # Remove test code
-	docker run --rm -v ${PWD}:/tmp -w /tmp goreleaser/nfpm package \
-    --config /tmp/fpmConfig.yml \
+	docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
+    --config /tmp/Docker/fpmConfig.yml \
     --target /tmp \
     --packager rpm
 	# rm -rf rpmbuild
