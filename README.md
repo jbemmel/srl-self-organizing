@@ -39,8 +39,9 @@ tools system app-management application app_mgr reload
 After deploying the agent, configure it under /auto-config-agent:
 ```
 enter candidate
-/auto-config-agent 
-
+/auto-config-agent igp bgp-unnumbered evpn model symmetric-irb
+commit stay
+baseline update
 ```
 
 ## Deploy lab
