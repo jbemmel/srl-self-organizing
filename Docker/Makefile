@@ -36,11 +36,20 @@ build-alpine:
 lint-yang:
 	cd .. && sudo docker run --rm -v $$(pwd)/src/auto-config-agent/models:/work ghcr.io/hellt/yanglint auto-config-agent.yang
 
-rpm:
-	docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
+CREATE_CONTAINER := $(shell docker create ${LATEST})
+SET_CONTAINER_ID = $(eval CONTAINER_ID=$(CREATE_CONTAINER))
+rpm: build
+	mkdir -p rpmbuild
+	$(SET_CONTAINER_ID)
+	docker cp --follow-link ${CONTAINER_ID}:/opt/demo-agents/ rpmbuild/
+	docker rm ${CONTAINER_ID}
+	find rpmbuild/ -type l -delete # Purge (broken) symlinks
+	find rpmbuild/ -name test* | xargs rm -rf # Remove test code
+	docker run --rm -v ${PWD}:/tmp -w /tmp goreleaser/nfpm package \
     --config /tmp/fpmConfig.yml \
     --target /tmp \
     --packager rpm
+	# rm -rf rpmbuild
 
 fpm:
 	cd .. && fpm \

@@ -2326,7 +2326,7 @@ def script_update_interface(
                     if state.role == "leaf":
                         updates += [
                             (
-                                "/network-instance[name=default]/protocols/bgp/group[group-name=evpn-rr]",
+                                "/network-instance[name=default]/protocols/bgp",
                                 build_config.bgp_evpn(
                                     state.router_id,
                                     state.evpn_overlay_as,

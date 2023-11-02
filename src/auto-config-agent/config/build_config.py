@@ -186,15 +186,25 @@ def bfd():
         "detection-multiplier": 3,
     }
 
-
-def bgp_evpn(router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
+def _transport(router_id,evpn_bgp_peering):
     TRANSPORT = (
         router_id
         if evpn_bgp_peering == "ipv4"
         else f"2001::{router_id.replace('.',':')}"
     )
+    return { "transport": {"local-address": TRANSPORT}, }
+
+def _enable_bgp(router_id, evpn_overlay_as):
     return {
-        "group-name": "evpn-rr",
+      "router-id": router_id,
+      "autonomous-system": evpn_overlay_as,
+      # must enable at least 1 family globally
+      "afi-safi": [ { "afi-safi-name": "ipv4-unicast", "admin-state": "enable" } ],
+    }
+
+def _evpn_group(group_name, router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
+    return {
+        "group-name": group_name,
         "admin-state": "enable",
         "import-policy": "accept-all",
         "export-policy": "reject-link-routes",  # Reject overlay link routes
@@ -208,12 +218,19 @@ def bgp_evpn(router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
             },
             {"afi-safi-name": "ipv4-unicast", "admin-state": "disable"},
         ],
-        "transport": {"local-address": TRANSPORT},
+        **_transport(router_id,evpn_bgp_peering),
         "timers": {"connect-retry": 10},
+      }
+
+def bgp_evpn(router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops):
+    return {
+      ** _enable_bgp(router_id,evpn_overlay_as),
+      "group": [ {
+        ** _evpn_group("evpn-rr",router_id,evpn_overlay_as,evpn_bgp_peering,use_ipv6_nexthops),
+        "export-policy": "reject-link-routes",  # Reject overlay link routes
+      } ] 
     }
 
-
-# Could merge with bgp_evpn
 def bgp_evpn_rr_clients(
     router_id, evpn_overlay_as, evpn_bgp_peering, use_ipv6_nexthops
 ):
@@ -221,18 +238,15 @@ def bgp_evpn_rr_clients(
     NBR_PREFIX = (
         f"{ip[0]}.{ip[1]}.0.0/16" if evpn_bgp_peering == "ipv4" else "2001::/16"
     )
-    TRANSPORT = (
-        router_id
-        if evpn_bgp_peering == "ipv4"
-        else f"2001::{router_id.replace('.',':')}"
-    )
+    GROUP_NAME = "evpn-rr-clients"
     return {
+        ** _enable_bgp(router_id,evpn_overlay_as),
         "dynamic-neighbors": {
             "accept": {
                 "match": [
                     {
                         "prefix": NBR_PREFIX,
-                        "peer-group": "evpn-rr-clients",
+                        "peer-group": GROUP_NAME,
                         "allowed-peer-as": [evpn_overlay_as],
                     }
                 ]
@@ -240,22 +254,8 @@ def bgp_evpn_rr_clients(
         },
         "group": [
             {
-                "group-name": "evpn-rr-clients",
-                "admin-state": "enable",
-                "import-policy": "accept-all",
+                ** _evpn_group(GROUP_NAME,router_id,evpn_overlay_as,evpn_bgp_peering,use_ipv6_nexthops),
                 "export-policy": "accept-all",
-                "peer-as": evpn_overlay_as,
-                "local-as": {"as-number": evpn_overlay_as},
-                "afi-safi": [
-                    {
-                        "afi-safi-name": "evpn",
-                        "admin-state": "enable",
-                        "evpn": {"advertise-ipv6-next-hops": use_ipv6_nexthops},
-                    },
-                    {"afi-safi-name": "ipv4-unicast", "admin-state": "disable"},
-                ],
-                "transport": {"local-address": TRANSPORT},
-                "timers": {"connect-retry": 10},
                 "route-reflector": {"client": True, "cluster-id": router_id},
             }
         ],

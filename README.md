@@ -28,6 +28,21 @@ YANG model (included in single initial config) provides parameters:
 * Whether to enable EVPN based auto provisioning of MC-LAGs (default: true)
 * Whether to use OSPFv3, ISIS, regular BGPv4 or BGP Unnumbered
 
+## Installing the agent on a running SR Linux node
+
+Do this:
+```
+bash sudo rpm -i https://github.com/jbemmel/srl-self-organizing/raw/main/auto-config-agent-1.0.1-1.x86_64.rpm
+tools system app-management application app_mgr reload
+```
+
+After deploying the agent, configure it under /auto-config-agent:
+```
+enter candidate
+/auto-config-agent 
+
+```
+
 ## Deploy lab
 ```
 # Checkout the project from git:

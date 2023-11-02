@@ -16,20 +16,19 @@ _term (){
 function main()
 {
     trap _term SIGTERM
-    local virtual_env="/opt/srlinux/python/virtual-env/bin/activate"
+    local virtual_env="/opt/demo-agents/auto-config-agent/.venv"
 
     # source the virtual-environment, which is used to ensure the correct python packages are installed,
     # and the correct python version is used
-    source "${virtual_env}"
+    source "${virtual_env}/bin/activate"
 
-    # Include local paths where custom packages are installed
-    P1="/usr/local/lib/python3.6/site-packages"
-    P2="/usr/local/lib64/python3.6/site-packages"
+    VENV_LIB="${virtual_env}/lib/python3.6/site-packages"
+
     NDK="/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
     # since 21.6
     SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
     APP="/opt/demo-agents/auto-config-agent"
-    export PYTHONPATH="$P1:$P2:$NDK:$SDK2:$APP:$PYTHONPATH"
+    export PYTHONPATH="$VENV_LIB:$NDK:$SDK2:$APP:$PYTHONPATH"
 
     export http_proxy=""
     export https_proxy=""
