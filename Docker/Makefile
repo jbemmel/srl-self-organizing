@@ -54,4 +54,4 @@ fpm:
     --url "https://github.com/jbemmel/srl-self-organizing" \
     --maintainer "Jeroen van Bemmel <jeroen.van_bemmel at nokia dot com>" \
     auto-config-agent.yml=/etc/opt/srlinux/appmgr/auto-config-agent.yml \
-	src/auto-config-agent=/opt/auto-config-agent
+	src/auto-config-agent=/opt/
