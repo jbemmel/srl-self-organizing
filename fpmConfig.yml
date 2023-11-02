@@ -6,8 +6,8 @@ description: Agent to automatically configure SR Linux routers based on topology
 vendor: "Nokia"     # optional information about the creator of the package
 license: "Apache 2.0"
 contents:                              # contents to add to the package
-  - src: ./src
-    dst: /opt/     # destination path (including yang)
+  - src: ./src/auto-config-agent
+    dst: /opt/auto-config-agent        # destination path (including yang)
     type: tree
 
   - src: ./auto-config-agent.yml    # local path of agent yml
