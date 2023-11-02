@@ -38,20 +38,21 @@ lint-yang:
 
 CREATE_CONTAINER := $(shell docker create ${LATEST})
 SET_CONTAINER_ID = $(eval CONTAINER_ID=$(CREATE_CONTAINER))
-rpm: build
+copy-files-from-container: build
 	mkdir -p rpmbuild
 	$(SET_CONTAINER_ID)
 	docker cp --follow-link ${CONTAINER_ID}:/opt/demo-agents/ rpmbuild/
 	docker rm ${CONTAINER_ID}
 	find rpmbuild/ -type l -delete # Purge (broken) symlinks
 	find rpmbuild/ -name test* | xargs rm -rf # Remove test code
-	docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
-    --config /tmp/Docker/fpmConfig.yml \
-    --target /tmp \
-    --packager rpm
+	find rpmbuild/ -name __pycache__ | xargs rm -rf # Remove Pycache code
+	# docker run --rm -v ${PWD}/..:/tmp -w /tmp goreleaser/nfpm package \
+    # --config /tmp/Docker/fpmConfig.yml \
+    # --target /tmp \
+    # --packager rpm
 	# rm -rf rpmbuild
 
-fpm:
+fpm: copy-files-from-container
 	cd .. && fpm \
     -s dir -t rpm \
     -p auto-config-agent-1.0.1-1.x86_64.rpm \
@@ -63,4 +64,4 @@ fpm:
     --url "https://github.com/jbemmel/srl-self-organizing" \
     --maintainer "Jeroen van Bemmel <jeroen.van_bemmel at nokia dot com>" \
     auto-config-agent.yml=/etc/opt/srlinux/appmgr/auto-config-agent.yml \
-	src/=/opt/demo-agents/
+	Docker/rpmbuild/=/opt/
