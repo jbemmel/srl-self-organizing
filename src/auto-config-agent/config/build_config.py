@@ -158,9 +158,11 @@ def interface(ip_prefix, peer_type, role, peer, unnumbered_igp):
             ip = "2001:1::" + re.sub(r"/[1-3]?[0-9]", "/64", ip_prefix)
         return ip.replace(".", ":")
 
+    # TODO can do unnumbered also towards hosts?
+    use_ipv4_unnumbered = unnumbered_igp and peer_type != "host"
     IP_ADDRESSING = (
         {
-            "ipv4": { "unnumbered": { "admin-state": "enable", "interface": "system0.0" } } if unnumbered_igp
+            "ipv4": { "unnumbered": { "admin-state": "enable", "interface": "system0.0" } } if use_ipv4_unnumbered
                else {"address": [{"ip-prefix": ip_prefix}], "admin-state": "enable"},
             "ipv6": {"address": [{"ip-prefix": ipv6()}], "admin-state": "enable"},
         }
