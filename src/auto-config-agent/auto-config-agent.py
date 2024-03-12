@@ -2356,7 +2356,7 @@ def script_update_interface(
                 (
                     f"/interface[name={name}]",
                     build_config.interface(ip,peer_type,state.get_role(),peer,
-                                           state.igp in ["isis-unnumbered","ospf-unnumbered"]),
+                                           state.igp in ["isis_unnumbered","ospf_unnumbered"]),
                 )
             ]
             if state.role != "leaf" or peer_type != "host":
@@ -2366,14 +2366,14 @@ def script_update_interface(
                 ]
 
                 # add to OSPF/ISIS/BGP
-                if state.igp == "ospf":
+                if "ospf" in state.igp:
                     replaces += [
                         (
                             f"/network-instance[name=default]/protocols/ospf/instance[name=main]/area[area-id=0.0.0.0]/interface[interface-name={name}.0]",
                             build_config.ospf_intf(state.enable_bfd),
                         )
                     ]
-                elif state.igp == "isis":
+                elif "isis" in state.igp:
                     replaces += [
                         (
                             f"/network-instance[name=default]/protocols/isis/instance[name=main]/interface[interface-name={name}.0]",
