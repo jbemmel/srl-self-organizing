@@ -89,7 +89,7 @@ def ospf(router_id, is_spine):
 def isis(router_id):
     oc = router_id.split(".")
     NET_ID = "49.0001.9999.{:02x}{:02x}{:02x}{:02x}.00".format(
-        oc[0], oc[1], oc[2], oc[3]
+        int(oc[0]), int(oc[1]), int(oc[2]), int(oc[3])
     )
 
     return {
