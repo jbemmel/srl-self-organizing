@@ -150,7 +150,7 @@ def ebgp(
     }
 
 
-def interface(ip_prefix, peer_type, role, peer):
+def interface(ip_prefix, peer_type, role, peer, unnumbered_igp):
     def ipv6():
         if peer_type != "host":
             ip = "2001::" + ip_prefix.replace("/31", "/127")
@@ -160,7 +160,8 @@ def interface(ip_prefix, peer_type, role, peer):
 
     IP_ADDRESSING = (
         {
-            "ipv4": {"address": [{"ip-prefix": ip_prefix}], "admin-state": "enable"},
+            "ipv4": { "unnumbered": { "admin-state": "enable", "interface": "system0.0" } } if unnumbered_igp
+               else {"address": [{"ip-prefix": ip_prefix}], "admin-state": "enable"},
             "ipv6": {"address": [{"ip-prefix": ipv6()}], "admin-state": "enable"},
         }
         if ip_prefix

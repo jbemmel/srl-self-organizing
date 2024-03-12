@@ -2294,14 +2294,14 @@ def script_update_interface(
                     )
                 ]
 
-                if state.igp == "ospf":
+                if "ospf" in state.igp:
                     updates += [
                         (
                             "/network-instance[name=default]/protocols/ospf/instance[name=main]",
                             build_config.ospf(state.router_id, state.is_spine()),
                         )
                     ]
-                elif state.igp == "isis":
+                elif "isis" in state.igp:
                     updates += [
                         (
                             "/network-instance[name=default]/protocols/isis/instance[name=main]",
@@ -2355,7 +2355,8 @@ def script_update_interface(
             replaces += [
                 (
                     f"/interface[name={name}]",
-                    build_config.interface(ip, peer_type, state.get_role(),peer),
+                    build_config.interface(ip,peer_type,state.get_role(),peer,
+                                           state.igp in ["isis-unnumbered","ospf-unnumbered"]),
                 )
             ]
             if state.role != "leaf" or peer_type != "host":

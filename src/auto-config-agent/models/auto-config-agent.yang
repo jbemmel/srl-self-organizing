@@ -225,8 +225,12 @@ module auto_config_agent {
                   enum bgp-unnumbered-frr; // Using FRR agent
                   enum isis;
                   enum ospf; // could do both v2 and v3
+
+                  // NEW using 23.10 unnumbered IP feature
+                  enum isis-unnumbered;
+                  enum ospf-unnumbered;
                 }
-                default ospf; // v3
+                default isis-unnumbered; // v3
             }
             leaf enable-bfd {
                 description "Whether to enable BFD for IGP, default 'true'";
