@@ -1,7 +1,9 @@
+FROM alpine:latest
 # FROM alpine:3.15
-FROM ghcr.io/hellt/network-multitool
+# FROM ghcr.io/hellt/network-multitool
 
-RUN apk add --no-cache keepalived lldpd iperf3 bonding vlan tcpdump paris-traceroute sudo dhcpcd
+# ifupdown-ng breaks vlan
+RUN apk add --no-cache keepalived lldpd iperf3 bonding tcpdump paris-traceroute sudo dhcpcd ifupdown-ng
 # sed -i '3 i /usr/sbin/lldpd' /usr/lib/frr/docker-start
 # sed -i '3 i /sbin/ifup -a' /usr/lib/frr/docker-start
 
