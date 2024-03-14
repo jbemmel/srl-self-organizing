@@ -1,9 +1,12 @@
 # FROM alpine:3.15
 FROM ghcr.io/hellt/network-multitool
 
-RUN apk add --no-cache keepalived lldpd iperf3 bonding vlan tcpdump paris-traceroute sudo
+RUN apk add --no-cache keepalived lldpd iperf3 bonding vlan tcpdump paris-traceroute sudo dhcpcd
 # sed -i '3 i /usr/sbin/lldpd' /usr/lib/frr/docker-start
 # sed -i '3 i /sbin/ifup -a' /usr/lib/frr/docker-start
+
+# Enable ipv6 SLAAC? Doesn't work, systemd doesn't run
+# ADD Docker/alpine-sysctl.conf /etc/sysctl.d/accept_ra.conf
 
 # Remove default keepalived config file
 RUN rm -rf /etc/keepalived/keepalived.conf
