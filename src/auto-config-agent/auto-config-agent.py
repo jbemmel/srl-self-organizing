@@ -1108,16 +1108,17 @@ def Configure_EVPN(state, port, interface, ip):
 
 def Update_EVPN_RR_Neighbors(state, first_time=False):
     deletes = []
+
+    use_v6 = state.evpn_bgp_peering == "ipv6"
+
+    def fix_ip(i):
+      return ("2001::" + i.replace(".", ":")) if use_v6 else i
+
     if state.evpn_rr and state.evpn_rr[0].isdigit():
         if not first_time:
             return  # Skip
         rr_ids = state.evpn_rr.split(",")
     elif state.evpn_rr in ["superspine", "auto_top_nodes"]:
-        use_v6 = state.evpn_bgp_peering == "ipv6"
-
-        def fix_ip(i):
-            return ("2001::" + i.replace(".", ":")) if use_v6 else i
-
         rr_ids = [
             fix_ip(state._router_id_by_level(state.max_level, n))
             for n in range(1, state.top_count + 1)
@@ -1129,6 +1130,11 @@ def Update_EVPN_RR_Neighbors(state, first_time=False):
             deletes = [
                 f"/network-instance[name=default]/protocols/bgp/neighbor[peer-address={prefix}*]"
             ]
+    elif state.evpn_rr == "disabled" and state.max_leaves: # Build full mesh between leaves
+        rr_ids = [
+            fix_ip(state._router_id_by_level(0, n))
+            for n in range(1, state.max_leaves + 1) if n!=state.node_id
+        ]
     else:
         return  # 'spine' handled in gnmic-configure-interface.sh
 
@@ -1137,6 +1143,7 @@ def Update_EVPN_RR_Neighbors(state, first_time=False):
         _p = (
             f"/network-instance[name=default]/protocols/bgp/neighbor[peer-address={id}]"
         )
+        # TODO Configure peer-as for case without RR, may need multihop
         _v = {"admin-state": "enable", "peer-group": "evpn-rr"}
         updates.append((_p, _v))
 
@@ -1698,6 +1705,9 @@ def Handle_Notification(obj, state):
                         if "ipv6_nexthops" in evpn and evpn["ipv6_nexthops"]["value"]
                         else "false"
                     )
+                    if "ebgp" in evpn:
+                        state.evpn_use_ebgp = evpn["ebgp"]["value"]
+                        logging.info(f"Use eBGP for EVPN: {state.evpn_use_ebgp}")
 
                 if "igp" in data:
                     state.igp = data["igp"][4:]  # strip IGP_
@@ -2327,12 +2337,7 @@ def script_update_interface(
                         updates += [
                             (
                                 "/network-instance[name=default]/protocols/bgp",
-                                build_config.bgp_evpn(
-                                    state.router_id,
-                                    state.evpn_overlay_as,
-                                    state.evpn_bgp_peering,
-                                    state.use_ipv6_nexthops,
-                                ),
+                                build_config.bgp_evpn(state)
                             )
                         ]
                     elif state.evpn_rr == state.role or (
@@ -2345,8 +2350,11 @@ def script_update_interface(
                                 build_config.bgp_evpn_rr_clients(
                                     state.router_id,
                                     state.evpn_overlay_as,
+                                    state.evpn_overlay_as if not state.evpn_use_ebgp else None,
                                     state.evpn_bgp_peering,
                                     state.use_ipv6_nexthops,
+                                    (state.base_as+2) if state.evpn_use_ebgp else state.evpn_overlay_as,
+                                    (state.base_as+2+state.max_leaves) if state.evpn_use_ebgp else state.evpn_overlay_as,
                                 ),
                             )
                         ]
@@ -2435,6 +2443,7 @@ class State(object):
         self.loopbacks_prefix = []
         self.evpn_rr = None
         self.evpn_auto_lag_ports = []  # Default: all ports
+        self.evpn_use_ebgp = False
 
         self.services = {}  # Map of ESI->service config
 
@@ -2515,6 +2524,11 @@ class State(object):
         elif _role == "leaf":
             # Also leaf pairs have unique AS for EBGP
             self.local_as = self.base_as + 1 + self.node_id
+
+        # For EBGP, use local AS in overlay too
+        if self.evpn_use_ebgp:
+            self.evpn_overlay_as = self.local_as
+
         else:  # host
             self.local_as = self.base_as + 1 + self.max_leaves + self.node_id
 

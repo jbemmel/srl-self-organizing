@@ -164,6 +164,13 @@ module auto_config_agent {
                 }
                 default auto-top-nodes;
              }
+
+             leaf ebgp {
+              description "Use a full mesh eBGP between leaves for the EVPN overlay, instead of iBGP";
+              type boolean;
+              default false;
+             }
+
              leaf auto-lags {
                  description "Discover and provision LAGs on leaves, using LLDP and EVPN communities or IPv6";
                  type enumeration {

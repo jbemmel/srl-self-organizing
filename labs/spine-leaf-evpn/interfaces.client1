@@ -11,7 +11,7 @@ iface lo inet loopback
 
 auto bond0
 iface bond0 inet static
-  address 10.0.0.101/24
+  address 10.1.0.101/24
   # netmask 255.255.255.0
   # gateway 10.0.1.1
 
@@ -28,4 +28,4 @@ iface bond0 inet6 auto
   # address 2001:1::101
   # netmask 64
   ## gateway 2001:100:127:10::2
-  pre-up echo 2 > /proc/sys/net/ipv6/conf/bond0/accept_ra
+  # pre-up echo 0 > /proc/sys/net/ipv6/conf/eth1/accept_ra
