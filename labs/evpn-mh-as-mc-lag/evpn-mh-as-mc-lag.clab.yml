@@ -9,8 +9,7 @@ topology:
     srl:
       # image: ghcr.io/nokia/srlinux
       image: srl/auto-config-v2:latest
-      # startup-config: delta-auto-config.cmd
-      delta-config: delta-auto-config.cmd
+      startup-config: delta-auto-config.cmd
       extras:
         srl-agents: [ ../../auto-config-agent.yml ]
     linux:
@@ -61,8 +60,9 @@ topology:
       - interfaces.server3:/etc/network/interfaces
 
   links:
-    # Leaf interconnects for EVPN MC-LAG sync, 25G ports
+    # Leaf interconnects for EVPN MC-LAG sync, 25G ports, 1 LAG
     - endpoints: ["leaf1a:e1-3", "leaf1b:e1-3"]
+    - endpoints: ["leaf1a:e1-4", "leaf1b:e1-4"] # LAG
     - endpoints: ["leaf2a:e1-3", "leaf2b:e1-3"]
 
     # Leaf 3a/b to single spine, using 100G links

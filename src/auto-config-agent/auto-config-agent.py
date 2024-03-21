@@ -240,6 +240,10 @@ def Announce_LLDP_using_EVPN(state, chassis_mac, portlist, is_port=False):
     )
     bytes = chassis_mac.split(":")
 
+    # If not a MAC address, abort
+    if len(bytes)!=6:
+        return False
+
     deletes = []
     if state.evpn_auto_lags == "large_communities":
         port = min(portlist)  # Only support 1 port for now
@@ -653,8 +657,9 @@ def lag_id(port):
 
 ###
 # Converts an ethernet interface to a lag
+#  Note: 'ip' only used for leaf pair links with EVPN BGP session
 ##
-def Convert_to_lag(state, port, peer_data):
+def Convert_to_lag(state, port, peer_data, ip=None):
     logging.info(f"Convert_to_lag :: port={port} peer_data={peer_data}")
 
     # Support multiple port-to-service mappings, 0 = all ports in service 1
@@ -702,6 +707,7 @@ def Convert_to_lag(state, port, peer_data):
                 _pk, _ab = pair_key.groups()
                 if _pk in state.leaf_pairs:
                     pair = state.leaf_pairs[_pk]  # string type key
+                    logging.info( f"Found leaf_pair {pair} based on key={_pk}" )
 
                     # Handle self loops where 'a' or 'b' is already included
                     if _ab in pair and pair[_ab]["local"] != port:
@@ -831,8 +837,28 @@ def Convert_to_lag(state, port, peer_data):
         #   lag['lag']['lacp-fallback-timeout'] = state.lacp_fallback
 
     updates += [(f"/interface[name={_lag}]", lag)]
-    if peer_data["type"] != "host":
+    if peer_data["type"] != "host" and is_routed:
         updates += [(f"/network-instance[name=default]/interface[name={_lag}.0]", {})]
+    elif peer_data["type"]=="leaf": # Leaf-pair case, create mac-vrf with IRB for LAG
+        irb_subif = {
+          "admin-state": "enable",
+          "ipv4": {
+            "admin-state": "enable",
+            "address": [
+                {
+                    "ip-prefix": ip,  # /31 link IP (or .1 out of /24-30)
+                    "primary": "[null]",  # type 'empty', used as source for bcast
+                }
+            ],
+          }
+        }
+        updates += [("/interface[name=irb0]/subinterface[index=0]", irb_subif)]
+        updates += [("/network-instance[name=default]/interface[name=irb0.0]", {})]
+        mac_vrf = {
+            "type": "mac-vrf",
+            "interface": [ { "name": "irb0.0" }, { "name": f"{_lag}.0" } ]
+        }
+        updates += [("/network-instance[name=leaf-pair-link]", mac_vrf)]
 
     logging.info(f"Convert_to_lag gNMI SET deletes={deletes} updates={updates}")
     try:
@@ -1909,7 +1935,7 @@ def Handle_Notification(obj, state):
                         Announce_LLDP_using_EVPN(state, _lldp_id, [int(_my_port_id)])
                     if state.dhcp and _lldp_port:
                         Announce_LLDP_using_EVPN(
-                            state, _lldp_port, [int(_my_port_id)], True
+                            state, _lldp_id, [int(_my_port_id)], True
                         )
 
                 if state.get_role() == "leaf":
@@ -2056,6 +2082,9 @@ def configure_peer_link(
                         )
                         peer_router_id = state.router_id
                         _r = 0 if lldp_my_port < lldp_peer_port else 1
+
+                        # Don't do EBGP with self
+                        min_peer_as = max_peer_as = 0
                     else:
                         leaf_pair_link = True
                         logging.info(f"Detected leaf pair link: peer_id={peer_id}")
@@ -2064,16 +2093,13 @@ def configure_peer_link(
                             peer_type, peer_node_id
                         )
                         _r = state.pair_role - 1  # a = .0, b = .1
+
+                        # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
+                        min_peer_as = max_peer_as = state.local_as + (1 if state.pair_role == 1 else -1)
                 else:
                     _r = 0 if state.id_from_hostname < peer_id else 1
+                    min_peer_as = max_peer_as = state.evpn_overlay_as
 
-                # EBGP AS, TODO refactor logic to derive AS etc. from LLDP hostname
-                if leaf_pair.groups()[1]:
-                    peer_id = (peer_id - 1) * 2 + (
-                        1 if leaf_pair.groups()[1] == "a" else 2
-                    )
-                    logging.info(f"Effective leaf pair AS offset: {peer_id}")
-                min_peer_as = max_peer_as = state.base_as + 1 + peer_id
             else:
                 logging.info(
                     f"No leaf pair link -> 'host' lldp_peer_name={lldp_peer_name}"
@@ -2170,7 +2196,7 @@ def configure_peer_link(
                 "pair": leaf_pair_link,  # Part of same pair, e.g. leaf1a and leaf1b
             }
             lag_interface = Convert_to_lag(
-                state, lldp_my_port, peer_data
+                state, lldp_my_port, peer_data, _ip
             )  # No EVPN MC-LAG yet
         else:
             logging.info(
@@ -2219,15 +2245,15 @@ def script_update_interface(
     peer_rid,
 ):
     logging.info(
-        f"Calling update script NEW: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} "
+        f"Update config: role={state.get_role()} name={name} ip={ip} peer_ip={peer_ip} peer={peer} "
         + f"first_run={first_run} peer_links={peer_links} peer_type={peer_type} peer_router_id={peer_rid} evpn={state.evpn} "
         + f"peer_as_min={peer_as_min} peer_as_max={peer_as_max}"
     )
     try:
-        my_env = {
-            a: str(v) for a, v in state.__dict__.items() if type(v) in [str, int, bool]
-        }  # **kwargs
-        my_env["PATH"] = "/usr/bin/"
+        # my_env = {
+        #    a: str(v) for a, v in state.__dict__.items() if type(v) in [str, int, bool]
+        # }  # **kwargs
+        # my_env["PATH"] = "/usr/bin/"
         # script_proc = subprocess.Popen(
         #     [
         #         "scripts/gnmic-configure-interface.sh",
